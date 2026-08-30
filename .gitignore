@@ -1,0 +1,29 @@
+# Godot 4
+.godot/
+export.cfg
+export_presets.cfg
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Build outputs
+build/
+exports/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+firebase-debug.log
+
+# Generated Firebase files
+backend/.firebase/
+backend/node_modules/
