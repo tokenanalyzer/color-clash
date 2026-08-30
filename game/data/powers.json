@@ -1,0 +1,34 @@
+{
+  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins.",
+  "thresholds": [
+    { "power": "chain", "min_size": 6 },
+    { "power": "lightning", "min_size": 5 },
+    { "power": "bomb", "min_size": 4 },
+    { "power": "none", "min_size": 3 }
+  ],
+  "definitions": {
+    "bomb": {
+      "label": "Bomb",
+      "radius": 1,
+      "base_points_per_cell": 12,
+      "activation_bonus": 150
+    },
+    "lightning": {
+      "label": "Lightning",
+      "base_points_per_cell": 10,
+      "activation_bonus": 250
+    },
+    "chain": {
+      "label": "Chain",
+      "base_points_per_cell": 14,
+      "activation_bonus": 400
+    },
+    "rainbow": {
+      "label": "Rainbow",
+      "base_points_per_cell": 16,
+      "activation_bonus": 500,
+      "refill_spawn_chance": 0.012
+    }
+  },
+  "base_points_per_piece": 10
+}

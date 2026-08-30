@@ -1,0 +1,11 @@
+{
+  "_comment": "Fever is earned through consecutive satisfying moves, never purchased. gain is added to the meter after each move based on that move's chain depth (combo); meter decays slightly on weak moves.",
+  "meter_max": 100.0,
+  "gain_per_chain_step": 16.0,
+  "decay_per_weak_move": 6.0,
+  "weak_move_chain_threshold": 2,
+  "activation_meter": 100.0,
+  "duration_moves": 6,
+  "score_multiplier": 1.5,
+  "meter_reset_on_activate": true
+}

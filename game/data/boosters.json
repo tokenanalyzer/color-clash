@@ -1,0 +1,10 @@
+{
+  "_comment": "Boosters are pre-level inventory items. Cost/value are data-driven for live balancing. Client purchases with soft currency only; premium-currency grants must go through a trusted service boundary (see docs/SECURITY.md).",
+  "boosters": [
+    { "id": "bomb", "label": "Bomb", "cost": 100, "currency": "coins", "effect": "clear_random_cluster", "value": 1 },
+    { "id": "lightning", "label": "Lightning", "cost": 100, "currency": "coins", "effect": "clear_line", "value": 1 },
+    { "id": "rainbow", "label": "Rainbow", "cost": 150, "currency": "coins", "effect": "clear_color", "value": 1 },
+    { "id": "shuffle", "label": "Shuffle", "cost": 80, "currency": "coins", "effect": "shuffle_board", "value": 1 },
+    { "id": "extra_moves", "label": "+5 Moves", "cost": 120, "currency": "coins", "effect": "add_moves", "value": 5 }
+  ]
+}
