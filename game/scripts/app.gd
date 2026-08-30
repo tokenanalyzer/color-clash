@@ -1,9 +1,10 @@
 extends Node2D
 ## Color Clash application entry point and top-level game controller.
-## Owns level flow (load -> play -> win/lose -> next) and wires the board
-## view to the HUD and session-scoped systems (combo, fever, objectives,
-## economy). Board/HUD are built entirely in code — see board_view.gd and
-## hud.gd — so there is no hand-authored scene file to keep in sync.
+## Owns screen flow (Map <-> Play) and, once in Play, level flow (load ->
+## play -> win/lose -> next), wiring the board view to the HUD and
+## session-scoped systems (combo, fever, objectives, economy, progress).
+## Board/HUD/Map are built entirely in code — see board_view.gd, hud.gd,
+## level_map.gd — so there is no hand-authored scene file to keep in sync.
 
 const BOARD_TOP_MARGIN := 220.0
 const BOARD_BOTTOM_MARGIN := 170.0
@@ -13,10 +14,12 @@ const NEAR_FAIL_MOVES := 3
 ## How long a big-chain "high" music state holds before smoothly settling
 ## back down if no further move keeps it there (feedback detail #9).
 const HIGH_STATE_COOLDOWN := 2.0
+const TRANSITION_DURATION := 0.35
 
 var _board: BoardView
 var _hud: HUD
 var _board_layer: Node2D
+var _map: LevelMap
 
 var _current_level: LevelConfig
 var _moves_left: int = 0
@@ -31,34 +34,94 @@ func _ready() -> void:
 	randomize()
 	_fever = FeverSystem.new(GameData.fever_config)
 
-	var canvas := CanvasLayer.new()
-	add_child(canvas)
+	var game_canvas := CanvasLayer.new()
+	game_canvas.layer = 0
+	add_child(game_canvas)
 	_hud = HUD.new()
-	canvas.add_child(_hud)
+	game_canvas.add_child(_hud)
 	_hud.booster_pressed.connect(_on_booster_pressed)
 	_hud.next_level_pressed.connect(_on_next_level_pressed)
 	_hud.retry_pressed.connect(_on_retry_pressed)
+	_hud.map_pressed.connect(_on_map_pressed)
 
 	_board_layer = Node2D.new()
 	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN)
 	add_child(_board_layer)
 
-	var start_id: int = SaveService.get_int("current_level", GameData.levels.first_level_id())
-	if not GameData.levels.has_level(start_id):
-		start_id = GameData.levels.first_level_id()
-	_start_level(start_id)
+	var map_canvas := CanvasLayer.new()
+	map_canvas.layer = 10
+	add_child(map_canvas)
+	_map = LevelMap.new()
+	map_canvas.add_child(_map)
+	_map.level_selected.connect(_on_level_selected_from_map)
+
+	_hud.visible = false
+	_board_layer.visible = false
+	_map.visible = true
+	_map.modulate.a = 1.0
 
 func _board_rect() -> Rect2:
 	var vp_size := get_viewport().get_visible_rect().size
 	var height := vp_size.y - BOARD_TOP_MARGIN - BOARD_BOTTOM_MARGIN
 	return Rect2(Vector2.ZERO, Vector2(vp_size.x, height))
 
+# --------------------------------------------------------- screen flow --
+
+func _on_map_pressed() -> void:
+	await _go_to_map()
+
+func _on_level_selected_from_map(level_id: int) -> void:
+	await _go_to_level(level_id)
+
+func _go_to_map() -> void:
+	await _fade_out_game(TRANSITION_DURATION)
+	_map.refresh()
+	await _fade_in(_map, TRANSITION_DURATION)
+
+func _go_to_level(level_id: int) -> void:
+	await _fade_out(_map, TRANSITION_DURATION)
+	_start_level(level_id)
+	await _fade_in_game(TRANSITION_DURATION)
+
+func _fade_out(node: CanvasItem, duration: float) -> void:
+	var tween := create_tween()
+	tween.tween_property(node, "modulate:a", 0.0, duration)
+	await tween.finished
+	node.visible = false
+
+func _fade_in(node: CanvasItem, duration: float) -> void:
+	node.modulate.a = 0.0
+	node.visible = true
+	var tween := create_tween()
+	tween.tween_property(node, "modulate:a", 1.0, duration)
+	await tween.finished
+
+func _fade_out_game(duration: float) -> void:
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(_hud, "modulate:a", 0.0, duration)
+	tween.tween_property(_board_layer, "modulate:a", 0.0, duration)
+	await tween.finished
+	_hud.visible = false
+	_board_layer.visible = false
+
+func _fade_in_game(duration: float) -> void:
+	_hud.modulate.a = 0.0
+	_board_layer.modulate.a = 0.0
+	_hud.visible = true
+	_board_layer.visible = true
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(_hud, "modulate:a", 1.0, duration)
+	tween.tween_property(_board_layer, "modulate:a", 1.0, duration)
+	await tween.finished
+
+# -------------------------------------------------------- level session --
+
 func _start_level(level_id: int) -> void:
 	_current_level = GameData.levels.get_level(level_id)
 	if _current_level == null:
 		return
-	SaveService.set_int("current_level", level_id)
-	SaveService.save()
 
 	_score = 0
 	_moves_left = _current_level.move_limit
@@ -162,8 +225,10 @@ func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
 
 func _on_level_won() -> void:
 	Economy.grant(_current_level.reward_coins)
+	var stars := StarRating.stars_for(_moves_left, _current_level.move_limit)
+	Progress.record_completion(_current_level.id, stars, _score)
 	var next_id := GameData.levels.next_level_id(_current_level.id)
-	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1)
+	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1, stars)
 	Music.fade_out_and_stop(0.7)
 	Audio.play(&"level_complete")
 	Haptics.strong(60)
@@ -174,7 +239,10 @@ func _on_level_lost() -> void:
 
 func _on_next_level_pressed() -> void:
 	var next_id := GameData.levels.next_level_id(_current_level.id)
-	_start_level(next_id if next_id != -1 else GameData.levels.first_level_id())
+	if next_id != -1 and Progress.is_unlocked(next_id):
+		_start_level(next_id)
+	else:
+		await _go_to_map()
 
 func _on_retry_pressed() -> void:
 	_start_level(_current_level.id)

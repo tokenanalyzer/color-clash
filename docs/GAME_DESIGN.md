@@ -63,6 +63,22 @@ details — revisit them here if they need to change.
   2. **Secondary generation from exposed clusters.** After any clear, the newly-adjacent cells are checked for a same-color connected group big enough to match on its own (`BoardModel.find_connected_group`). If the board state exposed one, it auto-clears as its own wave and, if large enough, spawns its own power(s), which re-enter the cascade. A blast that happens to open up a large same-color pocket can keep going for several waves — entirely from real board state, no randomness deciding whether a "bonus chain" fires.
   Fever's `max_gain_per_move` (`data/fever.json`) intentionally caps how much any single huge cascade can fill the meter, so Fever stays a built-up progression across several strong moves rather than something one lucky mega-chain instantly maxes out.
 
+## Campaign map & progression
+
+The app now boots into a level-select map (`level_map.gd`), not straight
+into gameplay — a standard mobile-puzzle entry point and the natural home
+for "which level am I on" state. Levels unlock linearly: level 1 is always
+unlocked, and level N unlocks once level N-1 is completed
+(`ProgressService.is_unlocked`). A completed level stays tappable (replay
+is allowed; nothing here forces linear-only play once unlocked).
+
+Star rating (`StarRating.stars_for`) is deliberately objective-agnostic —
+it only looks at how many of the level's move budget were left unused
+(>=50% spare = 3 stars, >=25% = 2, otherwise 1), so it works identically
+whether the level's goal was clear_color/reach_score/create_powers/
+break_obstacles without special-casing. Stars and best score only ever
+improve, never regress, per level.
+
 ## Audio & adaptive music
 
 Nothing here is sampled or licensed — the entire soundtrack and every SFX

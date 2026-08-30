@@ -14,10 +14,20 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
+	assert(app._map != null, "map screen not created")
+	assert(app._map.visible, "app should boot into the level map, not straight into a level")
+	assert(app._board == null, "board should not exist before a level is selected from the map")
+
+	var game_data := get_root().get_node("GameData")
+	var first_id: int = game_data.levels.first_level_id()
+	await app._go_to_level(first_id)
+	await process_frame
+
 	var board = app._board
 	var hud = app._hud
 	assert(board != null, "board not created")
 	assert(hud != null, "hud not created")
+	assert(not app._map.visible, "map should be hidden once a level starts")
 	print("Level loaded: ", app._current_level.level_name, " size=", board.board.width, "x", board.board.height)
 
 	var path := _find_valid_path(board.board)

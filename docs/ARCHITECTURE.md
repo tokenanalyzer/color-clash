@@ -66,8 +66,9 @@ game/
                            PieceView (presentation + touch input)
     combo/                ComboSystem, FeverSystem
     levels/                LevelConfig, LevelDatabase, ObjectiveTracker
-    economy/               ScoreCalculator (pure), EconomyService,
-                           BoosterInventory (autoloads)
+    economy/               ScoreCalculator/StarRating (pure), EconomyService,
+                           BoosterInventory, ProgressService (autoloads —
+                           campaign unlock/completion/star state)
     core/                  JsonLoader, GameData (autoload — boot-time
                            config loader)
     save/                  SaveService (autoload — local JSON save)
@@ -79,9 +80,10 @@ game/
                            control, SFX playback, adaptive music director)
     services/              IapService, AdsService, FirebaseService —
                            interface stubs only, not wired into gameplay
-    ui/                    HUD (built in code, not a hand-authored scene)
-    app.gd                 top-level GameController (level flow, session
-                           state, signal wiring)
+    ui/                    HUD + LevelMap/LevelNodeButton/LevelPathCanvas
+                           (built in code, not hand-authored scenes)
+    app.gd                 top-level GameController: screen flow (Map <->
+                           Play, faded transitions) + level session state
   scenes/main.tscn         entry scene; everything else is built in code
   tests/                   headless unit tests + manual smoke scripts
 tools/level_gen/           level-data authoring script (regenerates
@@ -100,26 +102,38 @@ tweens, or input.
 No GUT dependency — a small reflection-based `TestCase` base
 (`game/tests/test_case.gd`) plus `game/tests/test_runner.gd` cover
 matching, path validation, obstacle interactions, power area effects,
-chain cascades, scoring, objectives, the economy/booster autoloads, and
-the audio DSP/builders (Synth/SfxBuilder/MusicLayerBuilder — buffer
-length, no NaN/clipping, intensity actually changes pitch, every
-data/sfx.json id builds, every data/music.json layer renders the same
-loop length). Run headlessly:
+multi-power creation, power+power interaction, secondary/auto-chain
+generation, chain cascades, scoring, objectives, the economy/booster/
+progress autoloads, and the audio DSP/builders (Synth/SfxBuilder/
+MusicLayerBuilder — buffer length, no NaN/clipping, intensity actually
+changes pitch, every data/sfx.json id builds, every data/music.json layer
+renders the same loop length). 202 assertions as of the deeper-chains +
+campaign-map milestone. Run headlessly:
 
 ```
 godot4 --headless --path game --script res://tests/test_runner.gd
 ```
 
 Manual (non-CI) smoke scripts boot the real main scene end to end —
-useful after any board/level/audio change:
-- `game/tests/smoke_main_e2e.gd` drives an actual move + booster through
-  it.
+useful after any board/level/audio/map change:
+- `game/tests/smoke_main_e2e.gd` selects a level from the map, then
+  drives an actual move + booster through it.
 - `game/tests/smoke_all_levels.gd` generates every campaign level's board
   to catch layout/obstacle crashes.
 - `game/tests/smoke_audio_chain.gd` drives the full connect -> match ->
   power -> blast -> cascade -> combo -> Fever -> level-completion chain
   through a real drag gesture and boosters, asserting each stage actually
   played its sound and (for Fever) that the music state reached it.
+- `game/tests/smoke_level_map.gd` confirms the app boots into the map
+  (not straight into play), an unlocked node starts its level, winning
+  records progress/stars and unlocks the next node, and the map reflects
+  it on return.
+
+Several of these persist to the same local `user://save.json` across
+runs (that's the point — it's the same offline-first save gameplay uses),
+so tests/smoke scripts that touch Economy/Boosters/Progress are written
+to assert relative to whatever's already there rather than assuming a
+pristine save.
 
 ## Release pipeline
 

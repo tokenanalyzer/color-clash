@@ -9,6 +9,7 @@ extends Control
 signal booster_pressed(booster_id: StringName)
 signal next_level_pressed()
 signal retry_pressed()
+signal map_pressed()
 
 var _level_label: Label
 var _objective_labels: Array[Label] = []
@@ -20,8 +21,10 @@ var _booster_buttons: Dictionary = {} # StringName -> Button
 var _booster_count_labels: Dictionary = {} # StringName -> Label
 var _end_panel: PanelContainer
 var _end_title: Label
+var _end_stars: Label
 var _end_body: Label
 var _end_button: Button
+var _end_map_button: Button
 var _settings_panel: PanelContainer
 
 const _BOOSTER_ICONS := {
@@ -68,6 +71,16 @@ func _build_top_bar() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 18)
 	vbox.add_child(row)
+
+	var map_btn := Button.new()
+	map_btn.text = "🗺"
+	map_btn.custom_minimum_size = Vector2(40, 40)
+	map_btn.add_theme_font_size_override("font_size", 18)
+	map_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		map_pressed.emit()
+	)
+	row.add_child(map_btn)
 
 	_level_label = _make_label("Level 1", 26, Color(1, 1, 1))
 	row.add_child(_level_label)
@@ -161,7 +174,7 @@ func _build_booster_bar() -> void:
 func _build_end_panel() -> void:
 	_end_panel = PanelContainer.new()
 	_end_panel.set_anchors_preset(Control.PRESET_CENTER)
-	_end_panel.custom_minimum_size = Vector2(420, 260)
+	_end_panel.custom_minimum_size = Vector2(420, 320)
 	_end_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.08, 0.16, 0.97), Color(1, 1, 1, 0.15)))
 	_end_panel.visible = false
 	add_child(_end_panel)
@@ -175,15 +188,29 @@ func _build_end_panel() -> void:
 	_end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_end_title)
 
+	_end_stars = _make_label("", 30, Color(1, 0.85, 0.2))
+	_end_stars.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(_end_stars)
+
 	_end_body = _make_label("", 20, Color(1, 1, 1))
 	_end_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_end_body)
 
 	_end_button = Button.new()
 	_end_button.text = "Continue"
-	_end_button.custom_minimum_size = Vector2(180, 56)
+	_end_button.custom_minimum_size = Vector2(200, 56)
 	_end_button.add_theme_font_size_override("font_size", 22)
 	vbox.add_child(_end_button)
+
+	_end_map_button = Button.new()
+	_end_map_button.text = "Level Map"
+	_end_map_button.custom_minimum_size = Vector2(200, 48)
+	_end_map_button.add_theme_font_size_override("font_size", 18)
+	_end_map_button.pressed.connect(func():
+		Audio.play(&"button_tap")
+		map_pressed.emit()
+	)
+	vbox.add_child(_end_map_button)
 
 func _build_settings_panel() -> void:
 	_settings_panel = PanelContainer.new()
@@ -294,10 +321,12 @@ func set_booster_counts(counts: Dictionary) -> void:
 	for id in _booster_count_labels.keys():
 		_booster_count_labels[id].text = str(int(counts.get(id, 0)))
 
-func show_win_panel(score: int, reward_coins: int, has_next_level: bool) -> void:
+func show_win_panel(score: int, reward_coins: int, has_next_level: bool, stars: int) -> void:
 	_end_title.text = "Level Complete!"
+	_end_stars.text = _star_text(stars)
 	_end_body.text = "Score: %d\n+%d coins" % [score, reward_coins]
 	_end_button.text = "Next Level" if has_next_level else "Back to Map"
+	_end_map_button.visible = true
 	for c in _end_button.pressed.get_connections():
 		_end_button.pressed.disconnect(c["callable"])
 	_end_button.pressed.connect(func():
@@ -306,11 +335,19 @@ func show_win_panel(score: int, reward_coins: int, has_next_level: bool) -> void
 	)
 	_end_panel.visible = true
 
+func _star_text(stars: int) -> String:
+	var out := ""
+	for i in 3:
+		out += "★" if i < stars else "☆"
+	return out
+
 func show_lose_panel(score: int) -> void:
 	# Keep this encouraging, not punishing — "so close", not "you failed".
 	_end_title.text = "So Close!"
+	_end_stars.text = ""
 	_end_body.text = "Score: %d\nTry again — you've got this!" % score
 	_end_button.text = "Try Again"
+	_end_map_button.visible = true
 	for c in _end_button.pressed.get_connections():
 		_end_button.pressed.disconnect(c["callable"])
 	_end_button.pressed.connect(func():
