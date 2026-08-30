@@ -159,6 +159,7 @@ func _begin_drag(screen_pos: Vector2) -> void:
 	_dragging = true
 	_current_path = [cell]
 	_refresh_selection_visual()
+	Audio.play(&"select", 0.0)
 
 func _update_drag(screen_pos: Vector2) -> void:
 	if not _dragging:
@@ -182,6 +183,7 @@ func _update_drag(screen_pos: Vector2) -> void:
 		return
 	_current_path.append(cell)
 	_refresh_selection_visual()
+	Audio.play(&"select", clampf(float(_current_path.size()) / 10.0, 0.0, 1.0))
 
 func _end_drag() -> void:
 	if not _dragging:
@@ -206,60 +208,118 @@ func _refresh_selection_visual() -> void:
 
 # ------------------------------------------------------------- resolve --
 
+## Chain depth is 1 for a plain match and 2 for any move that creates and
+## auto-detonates a power (see chain_resolver.gd's docstring) — deeper
+## multi-hop cascades (3+) need a second power to exist mid-move to chain
+## into, which the architecture supports (see the `chained` queue in
+## _process_power_chain) but nothing currently produces, so only tier 0 is
+## reachable today. The higher tiers are left in place, ready to light up
+## the moment a future power source can trigger them.
+const _COMBO_TIERS := [2, 4, 6]
+const _WAVE_STAGGER := 0.07
+
 func _play_move(path: Array[Vector2i]) -> void:
 	var result := ChainResolver.resolve_move(board, path, power_config, rng, available_colors, rainbow_chance)
 	if not result.valid:
 		_locked_input = false
 		return
-	await _animate_result(result)
+	await _animate_result(result, path.size())
 	_locked_input = false
 	move_resolved.emit(result)
 	if not board.has_any_valid_move():
 		await _reshuffle()
 
-func _animate_result(result: ChainResolver.MoveResult) -> void:
-	for pc in result.powers_created:
-		var node := _node_at(pc["pos"])
-		if node:
-			node.power_id = pc["power_id"]
-			node.queue_redraw()
-	if not result.powers_created.is_empty():
-		await get_tree().create_timer(0.12).timeout
+static func _power_sfx_id(power_id: StringName) -> StringName:
+	match power_id:
+		&"bomb":
+			return &"power_bomb"
+		&"lightning":
+			return &"power_lightning"
+		&"chain":
+			return &"power_chain"
+		&"rainbow":
+			return &"power_rainbow"
+		_:
+			return &"blast"
 
-	if not result.cleared_cells.is_empty():
-		var pop_tween := create_tween()
-		pop_tween.set_parallel(true)
-		for pos in result.cleared_cells:
-			var node := _node_at(pos)
-			if node == null:
-				continue
-			particles.burst(node.global_position, _burst_color_for(node), 8 + result.chain_depth)
-			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-		await pop_tween.finished
-		for pos in result.cleared_cells:
-			var node := _node_at(pos)
-			if node == null:
-				continue
-			node.scale = Vector2.ONE
-			node.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, node.obstacle_id, node.obstacle_hp, _cell_size, palette)
-
+## Plays out one move's whole cascade wave-by-wave (initial match, then each
+## power detonation in order) so both the visuals and the audio ripple
+## outward and escalate rather than popping everything at once — this is
+## what makes a big chain feel like an escalating musical event instead of
+## one flat explosion. `group_size` is the player's drawn path length (0 for
+## booster-triggered detonations, which skip the "match" sfx since nothing
+## was connected).
+func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> void:
 	var chain_depth := result.chain_depth
+	var animated: Dictionary = {}
+	var pop_tweens: Array[Tween] = []
+
+	for wave_index in result.wave_cells.size():
+		var cells: Array = result.wave_cells[wave_index]
+		if wave_index == 0:
+			if group_size > 0:
+				Audio.play(&"match", clampf(float(group_size - 3) / 5.0, 0.0, 1.0))
+		else:
+			var activation: Dictionary = result.powers_activated[wave_index - 1]
+			var power_pos: Vector2i = activation["pos"]
+			var power_id: StringName = activation["power_id"]
+			var power_node := _node_at(power_pos)
+			if power_node != null:
+				power_node.power_id = power_id
+				power_node.queue_redraw()
+			Audio.play(_power_sfx_id(power_id), 0.0, 0)
+			Audio.play(&"chain_step", clampf(float(wave_index) / 6.0, 0.0, 1.0), wave_index - 1)
+
+		Audio.play(&"blast", clampf(float(cells.size()) / 10.0, 0.0, 1.0), wave_index)
+
+		var pop_tween: Tween = null
+		for pos in cells:
+			if animated.has(pos):
+				continue
+			animated[pos] = true
+			var node := _node_at(pos)
+			if node == null:
+				continue
+			var board_cell := board.get_cell(pos)
+			if board_cell != null and not board_cell.is_empty():
+				continue
+			if pop_tween == null:
+				pop_tween = create_tween()
+				pop_tween.set_parallel(true)
+			particles.burst(node.global_position, _burst_color_for(node), 6 + wave_index)
+			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+		if pop_tween != null:
+			pop_tweens.append(pop_tween)
+
+		if wave_index < result.wave_cells.size() - 1:
+			await get_tree().create_timer(_WAVE_STAGGER).timeout
+
+	if not pop_tweens.is_empty():
+		await pop_tweens[pop_tweens.size() - 1].finished
+	for pos in animated.keys():
+		var node := _node_at(pos)
+		if node == null:
+			continue
+		node.scale = Vector2.ONE
+		node.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, node.obstacle_id, node.obstacle_hp, _cell_size, palette)
+
 	if chain_depth >= 3:
 		ScreenShake.apply(self, 6.0 + float(chain_depth), 0.28)
 		Haptics.medium()
 	elif chain_depth > 1:
 		Haptics.light()
-	Audio.play(&"blast")
 
 	var ghosts: Array[PieceView] = []
-	var fly_tween := create_tween()
-	fly_tween.set_parallel(true)
+	var fly_tween: Tween = null
 	for move in result.gravity_moves:
 		var from_pos: Vector2i = move["from"]
 		var to_pos: Vector2i = move["to"]
 		var cell := board.get_cell(to_pos)
 		var ghost := _spawn_ghost(cell, _slot_center(from_pos))
 		ghosts.append(ghost)
+		if fly_tween == null:
+			fly_tween = create_tween()
+			fly_tween.set_parallel(true)
 		fly_tween.tween_property(ghost, "position", _slot_center(to_pos), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 	var column_refill_index: Dictionary = {}
@@ -270,9 +330,12 @@ func _animate_result(result: ChainResolver.MoveResult) -> void:
 		var start := _slot_center(Vector2i(pos.x, -1 - idx))
 		var ghost := _spawn_ghost(cell, start)
 		ghosts.append(ghost)
+		if fly_tween == null:
+			fly_tween = create_tween()
+			fly_tween.set_parallel(true)
 		fly_tween.tween_property(ghost, "position", _slot_center(pos), 0.24 + float(idx) * 0.03).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 
-	if not ghosts.is_empty():
+	if fly_tween != null:
 		await fly_tween.finished
 	for g in ghosts:
 		g.queue_free()
@@ -282,6 +345,16 @@ func _animate_result(result: ChainResolver.MoveResult) -> void:
 	if chain_depth > 1 and not result.cleared_cells.is_empty():
 		var popup_pos: Vector2 = _node_at(result.cleared_cells[result.cleared_cells.size() - 1]).position
 		ComboPopup.spawn(self, popup_pos, "COMBO x%d" % chain_depth, Color(1, 0.85, 0.2))
+		var tier := _combo_tier(chain_depth)
+		if tier >= 0:
+			Audio.play(&"combo_ding", 0.0, tier)
+
+func _combo_tier(chain_depth: int) -> int:
+	var tier := -1
+	for i in _COMBO_TIERS.size():
+		if chain_depth >= _COMBO_TIERS[i]:
+			tier = i
+	return tier
 
 # ------------------------------------------------------------ boosters --
 

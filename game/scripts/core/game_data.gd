@@ -9,6 +9,8 @@ var power_config: PowerConfig
 var fever_config: FeverConfig
 var boosters: Dictionary = {} # StringName -> Dictionary
 var levels: LevelDatabase
+var sfx: SfxConfig
+var music: MusicConfig
 
 func _ready() -> void:
 	colors = PieceColorPalette.from_dict(JsonLoader.load_json("res://data/colors.json"))
@@ -20,3 +22,5 @@ func _ready() -> void:
 		boosters[StringName(String(b["id"]))] = b
 
 	levels = LevelDatabase.from_dict(JsonLoader.load_json("res://data/levels.json"))
+	sfx = SfxConfig.from_dict(JsonLoader.load_json("res://data/sfx.json"))
+	music = MusicConfig.from_dict(JsonLoader.load_json("res://data/music.json"))

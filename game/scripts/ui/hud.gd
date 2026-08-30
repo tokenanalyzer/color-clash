@@ -22,6 +22,7 @@ var _end_panel: PanelContainer
 var _end_title: Label
 var _end_body: Label
 var _end_button: Button
+var _settings_panel: PanelContainer
 
 const _BOOSTER_ICONS := {
 	&"bomb": "💣", &"lightning": "⚡", &"rainbow": "🌈", &"shuffle": "🔀", &"extra_moves": "➕",
@@ -33,6 +34,7 @@ func _ready() -> void:
 	_build_top_bar()
 	_build_booster_bar()
 	_build_end_panel()
+	_build_settings_panel()
 
 func _panel_style(bg: Color, border: Color = Color(0, 0, 0, 0)) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -79,6 +81,16 @@ func _build_top_bar() -> void:
 
 	_coins_label = _make_label("🪙 0", 22, Color(1, 0.85, 0.3))
 	row.add_child(_coins_label)
+
+	var settings_btn := Button.new()
+	settings_btn.text = "⚙"
+	settings_btn.custom_minimum_size = Vector2(40, 40)
+	settings_btn.add_theme_font_size_override("font_size", 20)
+	settings_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		_settings_panel.visible = true
+	)
+	row.add_child(settings_btn)
 
 	_objective_box = VBoxContainer.new()
 	_objective_box.add_theme_constant_override("separation", 2)
@@ -134,7 +146,10 @@ func _build_booster_bar() -> void:
 		btn.text = _BOOSTER_ICONS[id]
 		btn.custom_minimum_size = Vector2(64, 64)
 		btn.add_theme_font_size_override("font_size", 28)
-		btn.pressed.connect(func(): booster_pressed.emit(id))
+		btn.pressed.connect(func():
+			Audio.play(&"button_tap")
+			booster_pressed.emit(id)
+		)
 		cell.add_child(btn)
 		var count_label := _make_label("0", 16, Color(0.9, 0.9, 0.9))
 		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -169,6 +184,70 @@ func _build_end_panel() -> void:
 	_end_button.custom_minimum_size = Vector2(180, 56)
 	_end_button.add_theme_font_size_override("font_size", 22)
 	vbox.add_child(_end_button)
+
+func _build_settings_panel() -> void:
+	_settings_panel = PanelContainer.new()
+	_settings_panel.set_anchors_preset(Control.PRESET_CENTER)
+	_settings_panel.custom_minimum_size = Vector2(460, 420)
+	_settings_panel.add_theme_stylebox_override("panel", _panel_style(Color(0.08, 0.08, 0.16, 0.97), Color(1, 1, 1, 0.15)))
+	_settings_panel.visible = false
+	_settings_panel.z_index = 200
+	add_child(_settings_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 12)
+	_settings_panel.add_child(vbox)
+
+	var title := _make_label("Settings", 28, Color(1, 1, 1))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	vbox.add_child(_make_toggle_row("Music", AudioSettings.music_enabled, func(v): AudioSettings.set_music_enabled(v)))
+	vbox.add_child(_make_toggle_row("Sound Effects", AudioSettings.sfx_enabled, func(v): AudioSettings.set_sfx_enabled(v)))
+	vbox.add_child(_make_toggle_row("Haptics", AudioSettings.haptics_enabled, func(v): AudioSettings.set_haptics_enabled(v)))
+	vbox.add_child(_make_slider_row("Master Volume", AudioSettings.master_volume, func(v): AudioSettings.set_master_volume(v)))
+	vbox.add_child(_make_slider_row("Music Volume", AudioSettings.music_volume, func(v): AudioSettings.set_music_volume(v)))
+	vbox.add_child(_make_slider_row("SFX Volume", AudioSettings.sfx_volume, func(v): AudioSettings.set_sfx_volume(v)))
+
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.custom_minimum_size = Vector2(160, 48)
+	close_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		_settings_panel.visible = false
+	)
+	vbox.add_child(close_btn)
+
+func _make_toggle_row(label_text: String, initial: bool, on_toggled: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := _make_label(label_text, 18, Color(0.9, 0.92, 1))
+	label.custom_minimum_size = Vector2(220, 0)
+	row.add_child(label)
+	var toggle := CheckButton.new()
+	toggle.button_pressed = initial
+	toggle.toggled.connect(func(v):
+		Audio.play(&"button_tap")
+		on_toggled.call(v)
+	)
+	row.add_child(toggle)
+	return row
+
+func _make_slider_row(label_text: String, initial: float, on_changed: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := _make_label(label_text, 18, Color(0.9, 0.92, 1))
+	label.custom_minimum_size = Vector2(220, 0)
+	row.add_child(label)
+	var slider := HSlider.new()
+	slider.min_value = 0.0
+	slider.max_value = 1.0
+	slider.step = 0.01
+	slider.value = initial
+	slider.custom_minimum_size = Vector2(160, 0)
+	slider.value_changed.connect(func(v): on_changed.call(v))
+	row.add_child(slider)
+	return row
 
 # ------------------------------------------------------------- updates --
 
@@ -221,16 +300,23 @@ func show_win_panel(score: int, reward_coins: int, has_next_level: bool) -> void
 	_end_button.text = "Next Level" if has_next_level else "Back to Map"
 	for c in _end_button.pressed.get_connections():
 		_end_button.pressed.disconnect(c["callable"])
-	_end_button.pressed.connect(func(): next_level_pressed.emit())
+	_end_button.pressed.connect(func():
+		Audio.play(&"button_tap")
+		next_level_pressed.emit()
+	)
 	_end_panel.visible = true
 
 func show_lose_panel(score: int) -> void:
-	_end_title.text = "Out of Moves"
-	_end_body.text = "Score: %d" % score
-	_end_button.text = "Retry"
+	# Keep this encouraging, not punishing — "so close", not "you failed".
+	_end_title.text = "So Close!"
+	_end_body.text = "Score: %d\nTry again — you've got this!" % score
+	_end_button.text = "Try Again"
 	for c in _end_button.pressed.get_connections():
 		_end_button.pressed.disconnect(c["callable"])
-	_end_button.pressed.connect(func(): retry_pressed.emit())
+	_end_button.pressed.connect(func():
+		Audio.play(&"button_tap")
+		retry_pressed.emit()
+	)
 	_end_panel.visible = true
 
 func hide_end_panel() -> void:

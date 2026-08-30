@@ -7,6 +7,12 @@ extends Node2D
 
 const BOARD_TOP_MARGIN := 220.0
 const BOARD_BOTTOM_MARGIN := 170.0
+## Moves-remaining threshold (with the objective still incomplete) at which
+## the music eases into a "tension" mix — a subtle nudge, not a punishment.
+const NEAR_FAIL_MOVES := 3
+## How long a big-chain "high" music state holds before smoothly settling
+## back down if no further move keeps it there (feedback detail #9).
+const HIGH_STATE_COOLDOWN := 2.0
 
 var _board: BoardView
 var _hud: HUD
@@ -18,6 +24,8 @@ var _score: int = 0
 var _combo := ComboSystem.new()
 var _fever: FeverSystem
 var _objectives: ObjectiveTracker
+var _was_near_fail: bool = false
+var _music_token: int = 0
 
 func _ready() -> void:
 	randomize()
@@ -56,6 +64,8 @@ func _start_level(level_id: int) -> void:
 	_moves_left = _current_level.move_limit
 	_combo.reset()
 	_fever.reset()
+	_was_near_fail = false
+	_music_token += 1
 	_objectives = ObjectiveTracker.new(_current_level.objectives)
 
 	if _board != null:
@@ -75,6 +85,9 @@ func _start_level(level_id: int) -> void:
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 	_refresh_booster_counts()
 
+	Music.start()
+	Music.set_state(_compute_music_state(0), true)
+
 func _refresh_booster_counts() -> void:
 	_hud.set_booster_counts(Boosters.counts)
 
@@ -84,7 +97,7 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	var gained := ScoreCalculator.compute_move_score(result, GameData.power_config, combo_mult, fever_mult)
 	_score += gained
 	_combo.record_move(result.chain_depth)
-	_fever.register_move(result.chain_depth)
+	var fever_activated := _fever.register_move(result.chain_depth)
 	_objectives.apply_move(result.colors_cleared, _score, result.powers_created, result.obstacles_broken)
 
 	if counts_as_move:
@@ -95,10 +108,51 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 
+	if fever_activated:
+		Audio.play(&"fever_activate")
+		Haptics.strong(90)
+
+	var near_fail := _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete()
+	if near_fail and not _was_near_fail:
+		Audio.play(&"tension_pulse")
+	_was_near_fail = near_fail
+
+	_update_music_state(result.chain_depth, result.cleared_cells.size())
+
 	if _objectives.is_complete():
 		_on_level_won()
 	elif _moves_left <= 0:
 		_on_level_lost()
+
+## `chain_depth` (1 = plain match, 2 = a power was created and detonated —
+## see chain_resolver.gd) picks between base/active; `cleared_count` (how
+## many cells this move actually cleared) is what promotes to "high" — a
+## Lightning bolt sweeping a whole row or a big Bomb blast is a genuinely
+## big moment even though today's chain_depth tops out at 2.
+func _compute_music_state(chain_depth: int, cleared_count: int = 0) -> StringName:
+	if _fever.is_active():
+		return &"fever"
+	if _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete():
+		return &"tension"
+	if cleared_count >= 10:
+		return &"high"
+	if chain_depth >= 2:
+		return &"active"
+	return &"base"
+
+## Crossfades music to reflect this move's energy, then — for a big-clear
+## "high" spike only — smoothly settles back down after a short hold if no
+## later move keeps the intensity up (feedback detail #9: resolve tension
+## when the chain ends, don't cut it abruptly).
+func _update_music_state(chain_depth: int, cleared_count: int = 0) -> void:
+	_music_token += 1
+	var token := _music_token
+	var state := _compute_music_state(chain_depth, cleared_count)
+	Music.set_state(state)
+	if state == &"high":
+		await get_tree().create_timer(HIGH_STATE_COOLDOWN).timeout
+		if token == _music_token:
+			Music.set_state(_compute_music_state(0))
 
 func _on_move_resolved(result: ChainResolver.MoveResult) -> void:
 	_apply_move_result(result, true)
@@ -110,9 +164,13 @@ func _on_level_won() -> void:
 	Economy.grant(_current_level.reward_coins)
 	var next_id := GameData.levels.next_level_id(_current_level.id)
 	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1)
+	Music.fade_out_and_stop(0.7)
+	Audio.play(&"level_complete")
+	Haptics.strong(60)
 
 func _on_level_lost() -> void:
 	_hud.show_lose_panel(_score)
+	Audio.play(&"level_failed")
 
 func _on_next_level_pressed() -> void:
 	var next_id := GameData.levels.next_level_id(_current_level.id)

@@ -58,6 +58,41 @@ details — revisit them here if they need to change.
   architecture. Bomb/Lightning/Rainbow apply their power at a random
   eligible cell; Shuffle regenerates the board; Extra Moves adds moves
   directly. None of this grants premium currency — see docs/SECURITY.md.
+- **Chain depth today tops out at 2.** `chain_depth` is 1 for a plain match and 2 for any move that creates and auto-detonates a power (see `chain_resolver.gd`'s docstring). Genuine multi-hop cascades (a power's blast catching a *second* power, chain_depth 3+) need a power to already exist mid-move to chain into — the architecture supports it (`_process_power_chain`'s `chained` queue), but nothing currently produces a second power within one move, so it's structurally unreachable for now. Combo/Fever/music tuning is calibrated to what's actually reachable (see "Audio & adaptive music" below). A natural future enhancement: let a blast that exposes a fresh same-color cluster (3+, newly adjacent to the cleared area) auto-resolve as a bonus wave, which would make deeper cascades real without changing the connect-not-swap identity.
+
+## Audio & adaptive music
+
+Nothing here is sampled or licensed — the entire soundtrack and every SFX
+are synthesized at runtime from a small set of DSP primitives (`synth.gd`:
+sine/triangle/square/saw tones, pitch sweeps, filtered noise bursts), so
+there is zero risk of reusing another game's audio and it costs nothing to
+extend. Content lives in `data/sfx.json` and `data/music.json`, exactly
+like colors/powers/levels — designers rebalance sound by editing JSON, not
+GDScript. Real recorded assets can replace any id later via
+`Audio.register(id, stream)` with no gameplay-code change.
+
+- **SFX** scale with what's happening: `intensity` (0..1, e.g. connection
+  size) raises pitch/energy within an id, `event_index` (cascade wave,
+  combo tier) shifts it up the pentatonic scale — so "match" pitches up
+  with a bigger connection and "chain_step"/"combo_ding" audibly climb
+  across a cascade, without needing a unique clip per variation.
+- **Music** is five short loops (pad/bass/arpeggio/perc/fever_lead), all
+  the same bar length, started together and crossfaded by `MusicDirector`
+  between named intensity states (idle/base/active/high/fever/tension) —
+  vertical layering, so intensity changes are seamless, never a track
+  restart. "high" triggers off a big single-move clear count (>=10 cells,
+  e.g. a Lightning sweep), not chain_depth, since chain_depth's reachable
+  range is only {1, 2} today (see above).
+- **Fever** (`fever_activate` sting + the "fever" music state) is earned
+  only through skilled play — repeated power-creating moves build the
+  meter, weak moves decay it. Never purchasable, per this doc's existing
+  Fever section.
+- **Losing stays soft**: `level_failed` is a gentle three-note descent,
+  and the panel copy is "So Close! Try again" rather than a failure
+  message, per this doc's difficulty/accessibility principles.
+- **Settings**: Music/SFX/Haptics on-off plus Master/Music/SFX volume
+  live in `AudioSettings` (persisted locally, applied to real `AudioServer`
+  buses), reachable from the in-HUD gear icon.
 
 ## Adrenaline / satisfaction design
 

@@ -63,6 +63,28 @@ func test_four_match_creates_and_autodetonates_bomb() -> void:
 	check_eq("ten_cells_cleared_total", result.cleared_cells.size(), 10)
 	check_eq("bomb_bonus_in_second_wave", int(result.score_events[1]["power_bonus"]), 150)
 	check_eq("board_refilled_all_cleared_cells", result.refilled_cells.size(), 10)
+	check_eq("wave_cells_has_two_waves", result.wave_cells.size(), 2)
+	check_eq("wave0_touched_three_path_cells", (result.wave_cells[0] as Array).size(), 3)
+	# wave_cells lists every cell the bomb's blast radius touched (9: itself
+	# + 8 neighbors), including two that wave0 already cleared — unlike
+	# score_events' "cells" count, wave_cells is for view/audio staging and
+	# intentionally doesn't dedupe against earlier waves.
+	check_eq("wave1_touched_full_blast_radius", (result.wave_cells[1] as Array).size(), 9)
+	var wave1: Array = result.wave_cells[1]
+	check("wave1_includes_bomb_origin", wave1.has(Vector2i(2, 1)))
+
+func test_detonate_power_at_scores_same_chain_depth_as_a_matched_power() -> void:
+	# A booster-triggered detonation and a player match that creates then
+	# auto-detonates the same power must both read as "one wave, one
+	# activation" (chain_depth 2) -- otherwise boosters would never build
+	# Combo/Fever the way an equivalent match does.
+	var board := BoardModel.new(5, 5, 3)
+	for x in 5:
+		for y in 5:
+			board.get_cell(Vector2i(x, y)).color_id = &"blue"
+	var result := ChainResolver.detonate_power_at(board, Vector2i(2, 2), &"bomb", _power_config(), _rng(), [&"red", &"blue"], 0.0)
+	check("detonate_power_at_valid", result.valid)
+	check_eq("booster_detonation_chain_depth_matches_match_triggered", result.chain_depth, 2)
 
 func test_stone_only_clears_via_power_not_plain_match() -> void:
 	var board := BoardModel.new(5, 5, 3)

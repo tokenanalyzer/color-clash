@@ -21,6 +21,7 @@ class MoveResult:
 	var obstacles_broken: Array[Dictionary] = [] # [{pos, obstacle_id}]
 	var chain_depth: int = 0
 	var score_events: Array[Dictionary] = [] # [{cells, power_bonus}] one per wave
+	var wave_cells: Array = [] # Array[Array[Vector2i]] — cells touched per wave, parallel to score_events
 	var gravity_moves: Array[Dictionary] = []
 	var refilled_cells: Array[Vector2i] = []
 
@@ -73,6 +74,11 @@ static func detonate_power_at(board: BoardModel, pos: Vector2i, power_id: String
 	cell.color_id = source_color
 	cell.power_id = power_id
 	result.powers_created.append({"pos": pos, "power_id": power_id})
+	# Baseline of 1 mirrors resolve_move's wave0, so a booster-triggered
+	# detonation scores/feels identical to a player match that created and
+	# auto-detonated the same power (both are "one wave, one activation" ->
+	# chain_depth 2) instead of being under-counted as a plain no-power clear.
+	result.chain_depth = 1
 	_process_power_chain(board, result, power_config, pos, horizontal)
 	result.gravity_moves = board.apply_gravity()
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
@@ -91,13 +97,14 @@ static func _path_is_horizontal(path: Array[Vector2i]) -> bool:
 	return (max_x - min_x) >= (max_y - min_y)
 
 static func _apply_initial_clear(board: BoardModel, result: MoveResult, path: Array[Vector2i], skip_pos: Vector2i) -> void:
-	var wave_new_cells := 0
+	var touched: Array[Vector2i] = []
 	for pos in path:
 		if pos == skip_pos:
 			continue
 		_clear_or_damage(board, result, pos)
-		wave_new_cells += 1
-	result.score_events.append({"cells": wave_new_cells, "power_bonus": 0})
+		touched.append(pos)
+	result.score_events.append({"cells": touched.size(), "power_bonus": 0})
+	result.wave_cells.append(touched)
 
 ## Clears a piece (counting stats, ice/lock/stone side effects) or, for a
 ## stone cell, applies a power hit instead. Safe to call on an already-empty
@@ -148,6 +155,7 @@ static func _process_power_chain(board: BoardModel, result: MoveResult, power_co
 		_clear_or_damage(board, result, pos)
 
 		var wave_new_cells := 0
+		var touched: Array[Vector2i] = [pos]
 		var chained: Array[Vector2i] = []
 		for apos in affected:
 			if apos == pos:
@@ -160,9 +168,11 @@ static func _process_power_chain(board: BoardModel, result: MoveResult, power_co
 				continue
 			var was_occupied := not acell.is_empty() or acell.is_stone()
 			_clear_or_damage(board, result, apos)
+			touched.append(apos)
 			if was_occupied:
 				wave_new_cells += 1
 
 		result.score_events.append({"cells": wave_new_cells, "power_bonus": int(definition.get("activation_bonus", 0))})
+		result.wave_cells.append(touched)
 		for chained_pos in chained:
 			queue.append(chained_pos)

@@ -58,7 +58,8 @@ Levels, objectives, colors, power definitions, reward tables, and balance consta
 
 ```
 game/
-  data/                   colors, powers, fever, boosters, levels (JSON)
+  data/                   colors, powers, fever, boosters, levels, sfx,
+                           music (JSON)
   scripts/
     board/                BoardModel, CellData, PowerResolver, ChainResolver
                            (pure logic, no Node dependency) + BoardView/
@@ -70,8 +71,12 @@ game/
     core/                  JsonLoader, GameData (autoload — boot-time
                            config loader)
     save/                  SaveService (autoload — local JSON save)
-    vfx/, audio/           game-feel hooks: particle pool, screen shake,
-                           combo popups, haptics, sfx hooks (autoload)
+    vfx/                   particle pool, screen shake, combo popups,
+                           haptics, ShapeDrawUtils (piece rendering)
+    audio/                 Synth (DSP primitives), SfxBuilder/
+                           MusicLayerBuilder (pure, data -> PCM buffer),
+                           AudioSettings/Audio/Music (autoloads — bus
+                           control, SFX playback, adaptive music director)
     services/              IapService, AdsService, FirebaseService —
                            interface stubs only, not wired into gameplay
     ui/                    HUD (built in code, not a hand-authored scene)
@@ -95,17 +100,26 @@ tweens, or input.
 No GUT dependency — a small reflection-based `TestCase` base
 (`game/tests/test_case.gd`) plus `game/tests/test_runner.gd` cover
 matching, path validation, obstacle interactions, power area effects,
-chain cascades, scoring, objectives, and the economy/booster autoloads
-(105 assertions as of Phase 1). Run headlessly:
+chain cascades, scoring, objectives, the economy/booster autoloads, and
+the audio DSP/builders (Synth/SfxBuilder/MusicLayerBuilder — buffer
+length, no NaN/clipping, intensity actually changes pitch, every
+data/sfx.json id builds, every data/music.json layer renders the same
+loop length). Run headlessly:
 
 ```
 godot4 --headless --path game --script res://tests/test_runner.gd
 ```
 
-`game/tests/smoke_main_e2e.gd` and `game/tests/smoke_all_levels.gd` are
-manual (non-CI) smoke scripts that boot the real main scene and drive an
-actual move/booster through it, and generate every campaign level's board
-to catch layout/obstacle crashes — useful after any board/level change.
+Manual (non-CI) smoke scripts boot the real main scene end to end —
+useful after any board/level/audio change:
+- `game/tests/smoke_main_e2e.gd` drives an actual move + booster through
+  it.
+- `game/tests/smoke_all_levels.gd` generates every campaign level's board
+  to catch layout/obstacle crashes.
+- `game/tests/smoke_audio_chain.gd` drives the full connect -> match ->
+  power -> blast -> cascade -> combo -> Fever -> level-completion chain
+  through a real drag gesture and boosters, asserting each stage actually
+  played its sound and (for Fever) that the music state reached it.
 
 ## Release pipeline
 
