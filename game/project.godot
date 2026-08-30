@@ -28,3 +28,14 @@ ui_accept={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":4194309,"unicode":13)]
 }
+
+[autoload]
+
+SaveService="*res://scripts/save/save_service.gd"
+GameData="*res://scripts/core/game_data.gd"
+Economy="*res://scripts/economy/economy_service.gd"
+Boosters="*res://scripts/economy/booster_inventory.gd"
+Audio="*res://scripts/audio/audio_hooks.gd"
+Iap="*res://scripts/services/iap_service.gd"
+Ads="*res://scripts/services/ads_service.gd"
+Firebase="*res://scripts/services/firebase_service.gd"

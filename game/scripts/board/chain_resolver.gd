@@ -57,6 +57,27 @@ static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config:
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result
 
+## Detonates a power directly at `pos` without a player-drawn path — used by
+## boosters (Bomb/Lightning/Rainbow) which grant an instant activation
+## rather than requiring a match. Shares the same cascade, obstacle and
+## gravity/refill rules as a normal move so behavior stays consistent.
+static func detonate_power_at(board: BoardModel, pos: Vector2i, power_id: StringName, power_config: PowerConfig, rng: RandomNumberGenerator, available_colors: Array[StringName], rainbow_chance: float = 0.0, horizontal: bool = true) -> MoveResult:
+	var result := MoveResult.new()
+	var cell := board.get_cell(pos)
+	if cell == null or cell.is_stone() or cell.locked_empty:
+		return result
+	result.valid = true
+	var source_color := cell.color_id
+	if source_color == CellData.COLOR_EMPTY or source_color == BoardModel.RAINBOW_COLOR_ID:
+		source_color = available_colors[rng.randi_range(0, available_colors.size() - 1)]
+	cell.color_id = source_color
+	cell.power_id = power_id
+	result.powers_created.append({"pos": pos, "power_id": power_id})
+	_process_power_chain(board, result, power_config, pos, horizontal)
+	result.gravity_moves = board.apply_gravity()
+	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
+	return result
+
 static func _path_is_horizontal(path: Array[Vector2i]) -> bool:
 	var min_x: int = path[0].x
 	var max_x: int = path[0].x

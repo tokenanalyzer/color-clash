@@ -14,6 +14,12 @@ const TEST_SCRIPTS := [
 ]
 
 func _initialize() -> void:
+	# Autoload singletons (GameData, Economy, Boosters, ...) run their
+	# _ready() on the first processed frame, not synchronously here — wait
+	# for it so economy/booster tests see fully-loaded config.
+	await process_frame
+	await process_frame
+
 	var total_pass := 0
 	var total_fail := 0
 	var failures: Array[String] = []

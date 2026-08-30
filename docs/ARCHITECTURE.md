@@ -54,6 +54,59 @@ Levels, objectives, colors, power definitions, reward tables, and balance consta
 - Keep textures/audio appropriately compressed.
 - Measure before optimizing.
 
+## Current implementation (Phase 1 core)
+
+```
+game/
+  data/                   colors, powers, fever, boosters, levels (JSON)
+  scripts/
+    board/                BoardModel, CellData, PowerResolver, ChainResolver
+                           (pure logic, no Node dependency) + BoardView/
+                           PieceView (presentation + touch input)
+    combo/                ComboSystem, FeverSystem
+    levels/                LevelConfig, LevelDatabase, ObjectiveTracker
+    economy/               ScoreCalculator (pure), EconomyService,
+                           BoosterInventory (autoloads)
+    core/                  JsonLoader, GameData (autoload — boot-time
+                           config loader)
+    save/                  SaveService (autoload — local JSON save)
+    vfx/, audio/           game-feel hooks: particle pool, screen shake,
+                           combo popups, haptics, sfx hooks (autoload)
+    services/              IapService, AdsService, FirebaseService —
+                           interface stubs only, not wired into gameplay
+    ui/                    HUD (built in code, not a hand-authored scene)
+    app.gd                 top-level GameController (level flow, session
+                           state, signal wiring)
+  scenes/main.tscn         entry scene; everything else is built in code
+  tests/                   headless unit tests + manual smoke scripts
+tools/level_gen/           level-data authoring script (regenerates
+                           data/levels.json)
+```
+
+The gameplay-critical logic (BoardModel, PowerResolver, ChainResolver,
+ScoreCalculator, ComboSystem/FeverSystem, ObjectiveTracker) is written as
+plain `RefCounted` classes with no scene-tree dependency, specifically so
+it can be unit tested headlessly and reasoned about independently of
+rendering. BoardView/PieceView/HUD are the only layer that touches nodes,
+tweens, or input.
+
+### Testing & validation
+
+No GUT dependency — a small reflection-based `TestCase` base
+(`game/tests/test_case.gd`) plus `game/tests/test_runner.gd` cover
+matching, path validation, obstacle interactions, power area effects,
+chain cascades, scoring, objectives, and the economy/booster autoloads
+(105 assertions as of Phase 1). Run headlessly:
+
+```
+godot4 --headless --path game --script res://tests/test_runner.gd
+```
+
+`game/tests/smoke_main_e2e.gd` and `game/tests/smoke_all_levels.gd` are
+manual (non-CI) smoke scripts that boot the real main scene and drive an
+actual move/booster through it, and generate every campaign level's board
+to catch layout/obstacle crashes — useful after any board/level change.
+
 ## Release pipeline
 
 Local development → automated validation → Android debug build → device playtest → release candidate → internal testing → production AAB.
