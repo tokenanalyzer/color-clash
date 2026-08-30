@@ -25,7 +25,8 @@ func register_move(chain_depth: int) -> bool:
 		moves_remaining -= 1
 		return false
 	if chain_depth >= config.weak_move_chain_threshold:
-		meter += float(chain_depth) * config.gain_per_chain_step
+		var gain: float = float(chain_depth) * config.gain_per_chain_step
+		meter += min(gain, config.max_gain_per_move)
 	else:
 		meter = max(0.0, meter - config.decay_per_weak_move)
 	meter = clamp(meter, 0.0, config.meter_max)

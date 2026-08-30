@@ -1,15 +1,40 @@
 class_name ChainResolver
 extends RefCounted
-## Orchestrates one player move: validates the path, clears it, creates a
-## power if the group is large enough, and auto-detonates that power as
-## part of the same move — any further power tiles caught in its area
-## detonate too, cascading until nothing new triggers. This is the
-## "Match -> Power -> Explosion -> Another power triggered -> Chain -> Combo"
-## feedback ladder described in docs/GAME_DESIGN.md, entirely deterministic
-## and independent of the view layer so it can be unit tested headlessly.
+## Orchestrates one player move: validates the path, clears it, creates
+## power(s) if the group is large enough, and auto-detonates them as part
+## of the same move. Two independent, fully deterministic mechanisms let a
+## single strong move produce a real multi-stage cascade (never a faked
+## counter — every extra wave traces back to an actual board interaction):
+##
+## 1. MULTIPLE POWERS FROM ONE MOVE. A big enough connected group creates
+##    more than one power tile, spread across the path (see
+##    PowerConfig.powers_for_group_size / data/powers.json's `count`).
+##    Several powers detonating from one move can legitimately catch each
+##    other in their own blast areas — POWER + POWER INTERACTION — handled
+##    by the existing "is this affected cell itself a live power" check
+##    below, which now has more than one power to ever find.
+## 2. SECONDARY POWER GENERATION FROM EXPOSED CLUSTERS. After any clear
+##    (the player's initial match or a power's blast), the cells newly
+##    adjacent to what just cleared are checked for a same-color connected
+##    group big enough to match on its own (BoardModel.find_connected_group).
+##    If the board state exposed one, it auto-clears as a genuine bonus
+##    wave — and, exactly like a player match, a big enough exposed group
+##    creates its own power(s), which re-enter the same queue and can keep
+##    the cascade going. This is what makes chain depth reflect the real
+##    board, not a scripted number.
+##
+## This is the "Match -> Power -> Explosion -> Another power triggered ->
+## Chain -> Combo" feedback ladder from docs/GAME_DESIGN.md, entirely
+## deterministic and independent of the view layer so it can be unit
+## tested headlessly.
 
-const _NO_SKIP := Vector2i(-999, -999)
-const _CHAIN_SAFETY_LIMIT := 200
+const _CHAIN_SAFETY_LIMIT := 400
+## Caps how many board-exposed secondary waves one move can trigger. Without
+## this, a fortunate blast on a low-color-count board could theoretically
+## domino through a large fraction of the board every time, making outcomes
+## feel more like luck than skill. Six still allows a real, escalating,
+## multi-stage cascade — it just can't run away with the whole board.
+const _MAX_SECONDARY_TRIGGERS := 6
 
 class MoveResult:
 	extends RefCounted
@@ -20,8 +45,12 @@ class MoveResult:
 	var powers_activated: Array[Dictionary] = [] # [{pos, power_id}]
 	var obstacles_broken: Array[Dictionary] = [] # [{pos, obstacle_id}]
 	var chain_depth: int = 0
-	var score_events: Array[Dictionary] = [] # [{cells, power_bonus}] one per wave
-	var wave_cells: Array = [] # Array[Array[Vector2i]] — cells touched per wave, parallel to score_events
+	## How many waves were triggered purely by exposed board state (not by
+	## the player's path or by one power directly catching another) — proof
+	## a cascade is real, useful for tests/analytics.
+	var secondary_triggers: int = 0
+	var score_events: Array[Dictionary] = [] # [{cells, power_bonus, [power_id, power_pos]}] one per wave — power_id/power_pos are only present for a wave that IS a power detonation (not wave0 or a plain auto-chain clear wave)
+	var wave_cells: Array = [] # Array[Array[Vector2i]] -- cells touched per wave, parallel to score_events
 	var gravity_moves: Array[Dictionary] = []
 	var refilled_cells: Array[Vector2i] = []
 
@@ -33,26 +62,37 @@ static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config:
 
 	var group_size := path.size()
 	var target_color := board.get_path_target_color(path)
-	var power_to_create := power_config.power_for_group_size(group_size)
-	var release_pos: Vector2i = path[path.size() - 1]
+	if target_color == BoardModel.RAINBOW_COLOR_ID:
+		target_color = available_colors[rng.randi_range(0, available_colors.size() - 1)]
+	var power_plan := power_config.powers_for_group_size(group_size)
 	var horizontal := _path_is_horizontal(path)
 
-	var skip_pos := _NO_SKIP
-	if power_to_create != &"none":
-		skip_pos = release_pos
+	var power_positions := _pick_positions_from_list(path, power_plan.size())
+	var skip_set := {}
+	for p in power_positions:
+		skip_set[p] = true
 
-	_apply_initial_clear(board, result, path, skip_pos)
+	_apply_initial_clear(board, result, path, skip_set)
 	result.chain_depth = 1
 
-	if power_to_create != &"none":
-		var cell := board.get_cell(release_pos)
-		var placed_color := target_color
-		if placed_color == BoardModel.RAINBOW_COLOR_ID:
-			placed_color = available_colors[rng.randi_range(0, available_colors.size() - 1)]
-		cell.color_id = placed_color
-		cell.power_id = power_to_create
-		result.powers_created.append({"pos": release_pos, "power_id": power_to_create})
-		_process_power_chain(board, result, power_config, release_pos, horizontal)
+	var queue: Array = []
+	var path_oriented := {}
+	for i in power_plan.size():
+		var pos: Vector2i = power_positions[i]
+		var power_id: StringName = power_plan[i]
+		var cell := board.get_cell(pos)
+		cell.color_id = target_color
+		cell.power_id = power_id
+		result.powers_created.append({"pos": pos, "power_id": power_id})
+		queue.append(pos)
+		path_oriented[pos] = true
+
+	# Secondary generation only triggers "during cascades" (a power's blast),
+	# not off the player's own plain match — that keeps a common 3/4-length
+	# connect exactly as predictable as before, while a move that actually
+	# creates a power can still snowball into something bigger if the board
+	# state allows it.
+	_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
 
 	result.gravity_moves = board.apply_gravity()
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
@@ -60,8 +100,9 @@ static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config:
 
 ## Detonates a power directly at `pos` without a player-drawn path — used by
 ## boosters (Bomb/Lightning/Rainbow) which grant an instant activation
-## rather than requiring a match. Shares the same cascade, obstacle and
-## gravity/refill rules as a normal move so behavior stays consistent.
+## rather than requiring a match. Shares the same cascade (including
+## secondary/power-interaction cascading), obstacle and gravity/refill
+## rules as a normal move so behavior stays consistent.
 static func detonate_power_at(board: BoardModel, pos: Vector2i, power_id: StringName, power_config: PowerConfig, rng: RandomNumberGenerator, available_colors: Array[StringName], rainbow_chance: float = 0.0, horizontal: bool = true) -> MoveResult:
 	var result := MoveResult.new()
 	var cell := board.get_cell(pos)
@@ -79,7 +120,11 @@ static func detonate_power_at(board: BoardModel, pos: Vector2i, power_id: String
 	# auto-detonated the same power (both are "one wave, one activation" ->
 	# chain_depth 2) instead of being under-counted as a plain no-power clear.
 	result.chain_depth = 1
-	_process_power_chain(board, result, power_config, pos, horizontal)
+
+	var queue: Array = [pos]
+	var path_oriented := {pos: true}
+	_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
+
 	result.gravity_moves = board.apply_gravity()
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result
@@ -96,10 +141,31 @@ static func _path_is_horizontal(path: Array[Vector2i]) -> bool:
 		max_y = max(max_y, p.y)
 	return (max_x - min_x) >= (max_y - min_y)
 
-static func _apply_initial_clear(board: BoardModel, result: MoveResult, path: Array[Vector2i], skip_pos: Vector2i) -> void:
+## Picks `count` items spread evenly across `items` (an ordered path or an
+## unordered flood-filled group — either way index-spread is a deterministic,
+## reasonable placement). Never returns duplicates.
+static func _pick_positions_from_list(items: Array, count: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if count <= 0:
+		return out
+	var n := items.size()
+	if count >= n:
+		for i in n:
+			out.append(items[i])
+		return out
+	var used := {}
+	for i in count:
+		var idx: int = (n - 1) if count == 1 else int(round(float(i) * float(n - 1) / float(count - 1)))
+		while used.has(idx) and idx < n - 1:
+			idx += 1
+		used[idx] = true
+		out.append(items[idx])
+	return out
+
+static func _apply_initial_clear(board: BoardModel, result: MoveResult, path: Array[Vector2i], skip_set: Dictionary) -> void:
 	var touched: Array[Vector2i] = []
 	for pos in path:
-		if pos == skip_pos:
+		if skip_set.has(pos):
 			continue
 		_clear_or_damage(board, result, pos)
 		touched.append(pos)
@@ -130,9 +196,13 @@ static func _clear_or_damage(board: BoardModel, result: MoveResult, pos: Vector2
 		result.obstacles_broken.append({"pos": unlocked_pos, "obstacle_id": &"lock"})
 	cell.clear_piece()
 
-static func _process_power_chain(board: BoardModel, result: MoveResult, power_config: PowerConfig, origin: Vector2i, initial_horizontal: bool) -> void:
+## Drains `queue` (which may already contain more than one origin — a big
+## move's several created powers, or ones an earlier wave already found)
+## until nothing new triggers. `path_oriented` marks which positions should
+## use the player's swipe direction for Lightning; anything discovered
+## mid-cascade (chained-into, or auto-chain-created) defaults to horizontal.
+static func _process_chain_queue(board: BoardModel, result: MoveResult, power_config: PowerConfig, queue: Array, initial_horizontal: bool, path_oriented: Dictionary) -> void:
 	var visited := {}
-	var queue: Array[Vector2i] = [origin]
 	var safety := 0
 	while not queue.is_empty() and safety < _CHAIN_SAFETY_LIMIT:
 		safety += 1
@@ -147,7 +217,7 @@ static func _process_power_chain(board: BoardModel, result: MoveResult, power_co
 		var power_id := cell.power_id
 		var source_color := cell.color_id
 		var definition := power_config.get_definition(power_id)
-		var horizontal := initial_horizontal if pos == origin else true
+		var horizontal: bool = initial_horizontal if path_oriented.has(pos) else true
 		var affected := PowerResolver.affected_cells(board, pos, power_id, horizontal, source_color, definition)
 
 		result.powers_activated.append({"pos": pos, "power_id": power_id})
@@ -164,7 +234,11 @@ static func _process_power_chain(board: BoardModel, result: MoveResult, power_co
 			if acell == null:
 				continue
 			if acell.has_power() and not visited.has(apos):
+				# POWER + POWER INTERACTION: this blast reached a still-live
+				# power tile (from a multi-power move, or one an earlier wave
+				# created) -- let it detonate properly instead of just wiping it.
 				chained.append(apos)
+				touched.append(apos)
 				continue
 			var was_occupied := not acell.is_empty() or acell.is_stone()
 			_clear_or_damage(board, result, apos)
@@ -172,7 +246,79 @@ static func _process_power_chain(board: BoardModel, result: MoveResult, power_co
 			if was_occupied:
 				wave_new_cells += 1
 
-		result.score_events.append({"cells": wave_new_cells, "power_bonus": int(definition.get("activation_bonus", 0))})
+		result.score_events.append({
+			"cells": wave_new_cells,
+			"power_bonus": int(definition.get("activation_bonus", 0)),
+			"power_id": power_id,
+			"power_pos": pos,
+		})
 		result.wave_cells.append(touched)
 		for chained_pos in chained:
 			queue.append(chained_pos)
+
+		_append_auto_chain_groups(board, result, power_config, touched, queue)
+
+## After a wave clears `touched`, checks every newly-adjacent cell for a
+## same-color connected group big enough to match on its own. Each such
+## exposed group auto-clears as its own wave and, if large enough, spawns
+## its own power(s) fed back into `queue` — genuine secondary generation,
+## driven entirely by the resulting board state.
+static func _append_auto_chain_groups(board: BoardModel, result: MoveResult, power_config: PowerConfig, touched: Array, queue: Array) -> void:
+	if result.secondary_triggers >= _MAX_SECONDARY_TRIGGERS:
+		return
+	for group in _find_auto_chain_groups(board, touched, power_config.min_group_size()):
+		if result.secondary_triggers >= _MAX_SECONDARY_TRIGGERS:
+			return
+		_resolve_auto_chain_group(board, result, power_config, group, queue)
+
+static func _find_auto_chain_groups(board: BoardModel, touched: Array, min_group_size: int) -> Array:
+	var groups: Array = []
+	var seen := {}
+	for pos in touched:
+		for n in board.get_orthogonal_neighbors(pos):
+			if seen.has(n):
+				continue
+			var group := board.find_connected_group(n)
+			if group.is_empty():
+				seen[n] = true
+				continue
+			for m in group:
+				seen[m] = true
+			if group.size() >= min_group_size:
+				groups.append(group)
+	return groups
+
+static func _resolve_auto_chain_group(board: BoardModel, result: MoveResult, power_config: PowerConfig, group: Array, queue: Array) -> void:
+	var power_plan := power_config.powers_for_group_size(group.size())
+	var anchor_positions := _pick_positions_from_list(group, power_plan.size())
+	var anchor_set := {}
+	for p in anchor_positions:
+		anchor_set[p] = true
+
+	var target_color: StringName = BoardModel.RAINBOW_COLOR_ID
+	for pos in group:
+		var c := board.get_cell(pos)
+		if c != null and c.color_id != BoardModel.RAINBOW_COLOR_ID:
+			target_color = c.color_id
+			break
+
+	var touched: Array[Vector2i] = []
+	for pos in group:
+		if anchor_set.has(pos):
+			continue
+		_clear_or_damage(board, result, pos)
+		touched.append(pos)
+
+	result.score_events.append({"cells": touched.size(), "power_bonus": 0})
+	result.wave_cells.append(touched)
+	result.chain_depth += 1
+	result.secondary_triggers += 1
+
+	for i in power_plan.size():
+		var pos: Vector2i = anchor_positions[i]
+		var power_id: StringName = power_plan[i]
+		var cell := board.get_cell(pos)
+		cell.color_id = target_color
+		cell.power_id = power_id
+		result.powers_created.append({"pos": pos, "power_id": power_id})
+		queue.append(pos)

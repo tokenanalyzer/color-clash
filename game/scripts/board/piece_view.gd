@@ -113,12 +113,18 @@ func _draw_power_icon(size: Vector2) -> void:
 			draw_line(Vector2(0, -size.y * 0.22), Vector2(size.x * 0.12, -size.y * 0.36), Color(1, 0.6, 0.1), 3.0)
 			draw_circle(Vector2(size.x * 0.12, -size.y * 0.38), size.x * 0.05, Color(1, 0.82, 0.25))
 		&"lightning":
-			var pts := PackedVector2Array([
-				Vector2(-size.x * 0.05, -size.y * 0.32), Vector2(size.x * 0.1, -size.y * 0.02),
-				Vector2(-size.x * 0.01, -size.y * 0.02), Vector2(size.x * 0.06, size.y * 0.32),
-				Vector2(-size.x * 0.12, size.y * 0.02), Vector2(size.x * 0.0, size.y * 0.02),
+			# Two separate convex triangles (each always a valid simple
+			# polygon) instead of one hand-built zigzag hexagon, which could
+			# self-intersect depending on exact proportions and fail
+			# Godot's polygon triangulation.
+			var top := PackedVector2Array([
+				Vector2(size.x * 0.05, -size.y * 0.34), Vector2(size.x * 0.13, -size.y * 0.02), Vector2(-size.x * 0.02, -size.y * 0.02),
 			])
-			draw_colored_polygon(pts, Color(1, 0.92, 0.3))
+			var bottom := PackedVector2Array([
+				Vector2(-size.x * 0.05, size.y * 0.34), Vector2(-size.x * 0.13, size.y * 0.02), Vector2(size.x * 0.02, size.y * 0.02),
+			])
+			draw_colored_polygon(top, Color(1, 0.92, 0.3))
+			draw_colored_polygon(bottom, Color(1, 0.92, 0.3))
 		&"chain":
 			draw_arc(Vector2(-size.x * 0.1, 0), size.x * 0.16, 0, TAU, 16, Color(1, 1, 1, 0.95), size.x * 0.045, true)
 			draw_arc(Vector2(size.x * 0.1, 0), size.x * 0.16, 0, TAU, 16, Color(1, 1, 1, 0.95), size.x * 0.045, true)

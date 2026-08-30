@@ -1,10 +1,12 @@
 {
-  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins.",
+  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles that group size creates -- a very large connection legitimately earns multiple powers from one real move, which can then interact with each other during the cascade (see ChainResolver).",
   "thresholds": [
-    { "power": "chain", "min_size": 6 },
-    { "power": "lightning", "min_size": 5 },
-    { "power": "bomb", "min_size": 4 },
-    { "power": "none", "min_size": 3 }
+    { "power": "chain", "min_size": 12, "count": 3 },
+    { "power": "chain", "min_size": 9, "count": 2 },
+    { "power": "chain", "min_size": 6, "count": 1 },
+    { "power": "lightning", "min_size": 5, "count": 1 },
+    { "power": "bomb", "min_size": 4, "count": 1 },
+    { "power": "none", "min_size": 3, "count": 0 }
   ],
   "definitions": {
     "bomb": {

@@ -87,6 +87,33 @@ func test_refill_fills_empty_non_blocker_cells() -> void:
 	check_eq("fills_three_open_cells", filled.size(), 3)
 	check("stone_cell_stays_empty", board.get_cell(Vector2i(1, 1)).is_empty())
 
+func test_find_connected_group_flood_fills_same_color() -> void:
+	var board := _colored_board(4, 4, &"red")
+	var group := board.find_connected_group(Vector2i(0, 0))
+	check_eq("uniform_board_group_is_whole_board", group.size(), 16)
+
+func test_find_connected_group_stops_at_color_boundary() -> void:
+	var board := _colored_board(4, 4, &"red")
+	board.get_cell(Vector2i(2, 0)).color_id = &"blue"
+	board.get_cell(Vector2i(3, 0)).color_id = &"blue"
+	var group := board.find_connected_group(Vector2i(0, 0))
+	check_eq("group_stops_before_blue", group.size(), 14)
+	check("blue_cells_excluded", not group.has(Vector2i(2, 0)) and not group.has(Vector2i(3, 0)))
+
+func test_find_connected_group_excludes_power_tiles_as_boundary() -> void:
+	var board := _colored_board(3, 3, &"red")
+	board.get_cell(Vector2i(1, 1)).power_id = &"bomb" # still red, but now "live"
+	var group := board.find_connected_group(Vector2i(0, 0))
+	check("power_tile_not_a_member", not group.has(Vector2i(1, 1)))
+	check_eq("group_excludes_only_the_power_cell", group.size(), 8)
+
+func test_find_connected_group_returns_empty_for_power_or_unselectable_start() -> void:
+	var board := _colored_board(3, 3, &"red")
+	board.get_cell(Vector2i(1, 1)).power_id = &"bomb"
+	check_eq("power_tile_start_yields_empty", board.find_connected_group(Vector2i(1, 1)).size(), 0)
+	board.set_obstacle(Vector2i(0, 0), &"stone", 0)
+	check_eq("stone_start_yields_empty", board.find_connected_group(Vector2i(0, 0)).size(), 0)
+
 func test_has_any_valid_move_true_for_uniform_board() -> void:
 	var board := _colored_board(3, 3, &"red")
 	check("uniform_board_has_move", board.has_any_valid_move())

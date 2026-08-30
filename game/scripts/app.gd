@@ -124,17 +124,17 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	elif _moves_left <= 0:
 		_on_level_lost()
 
-## `chain_depth` (1 = plain match, 2 = a power was created and detonated —
-## see chain_resolver.gd) picks between base/active; `cleared_count` (how
-## many cells this move actually cleared) is what promotes to "high" — a
-## Lightning bolt sweeping a whole row or a big Bomb blast is a genuinely
-## big moment even though today's chain_depth tops out at 2.
+## `chain_depth` (1 = plain match, 2 = one power created+detonated, 3+ = a
+## real multi-stage cascade — see chain_resolver.gd) drives base/active/high;
+## `cleared_count` (how many cells this move actually cleared) can also
+## promote to "high" on its own, since a Lightning bolt sweeping a whole row
+## or a big Bomb blast is a genuinely big moment even at a shallow chain depth.
 func _compute_music_state(chain_depth: int, cleared_count: int = 0) -> StringName:
 	if _fever.is_active():
 		return &"fever"
 	if _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete():
 		return &"tension"
-	if cleared_count >= 10:
+	if chain_depth >= 4 or cleared_count >= 10:
 		return &"high"
 	if chain_depth >= 2:
 		return &"active"

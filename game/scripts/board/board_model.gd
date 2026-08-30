@@ -186,39 +186,41 @@ func refill(rng: RandomNumberGenerator, available_colors: Array[StringName], rai
 				filled.append(Vector2i(x, y))
 	return filled
 
-## True if no valid connect-3 move currently exists anywhere on the board.
-## Used to trigger an automatic reshuffle rather than stranding the player.
-func has_any_valid_move() -> bool:
-	for x in width:
-		for y in height:
-			var start := Vector2i(x, y)
-			var cell := get_cell(start)
-			if cell == null or not cell.is_selectable():
-				continue
-			if _has_move_from(start):
-				return true
-	return false
-
-func _has_move_from(start: Vector2i) -> bool:
-	# A move exists if a same-color connected group of size >= min_group_size
-	# is reachable from `start` via orthogonal same-color/rainbow steps.
-	var target := get_cell(start).color_id
+## Flood-fills the same-color (Rainbow-wildcard-aware) connected group
+## containing `start`, via orthogonal steps. Cells currently holding a
+## power (has_power()) are treated as boundaries, not members — a power
+## tile is always resolved through its own detonation, never swept into a
+## plain clear. Returns [] if `start` itself isn't a plain selectable
+## colored piece. Used both for move-availability checks and for
+## ChainResolver's "does this blast expose a fresh cluster" auto-chain scan.
+func find_connected_group(start: Vector2i) -> Array[Vector2i]:
+	var start_cell := get_cell(start)
+	if start_cell == null or not start_cell.is_selectable() or start_cell.has_power():
+		return []
+	var target := start_cell.color_id
 	var visited := {start: true}
 	var stack: Array[Vector2i] = [start]
-	var count := 0
+	var members: Array[Vector2i] = [start]
 	while not stack.is_empty():
 		var pos: Vector2i = stack.pop_back()
-		count += 1
-		if count >= min_group_size:
-			return true
 		for n in get_orthogonal_neighbors(pos):
 			if visited.has(n):
 				continue
 			var ncell := get_cell(n)
-			if ncell == null or not ncell.is_selectable():
+			if ncell == null or not ncell.is_selectable() or ncell.has_power():
 				continue
 			if ncell.color_id != target and ncell.color_id != RAINBOW_COLOR_ID and target != RAINBOW_COLOR_ID:
 				continue
 			visited[n] = true
 			stack.append(n)
-	return count >= min_group_size
+			members.append(n)
+	return members
+
+## True if no valid connect-3 move currently exists anywhere on the board.
+## Used to trigger an automatic reshuffle rather than stranding the player.
+func has_any_valid_move() -> bool:
+	for x in width:
+		for y in height:
+			if find_connected_group(Vector2i(x, y)).size() >= min_group_size:
+				return true
+	return false

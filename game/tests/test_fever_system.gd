@@ -36,3 +36,22 @@ func test_fever_multiplier_applies_while_active_and_counts_down() -> void:
 		fever.register_move(1)
 	check("fever_expires_after_duration", not fever.is_active())
 	check("multiplier_back_to_one", fever.score_multiplier() == 1.0)
+
+func test_max_gain_per_move_prevents_one_mega_cascade_from_instant_maxing() -> void:
+	var config := FeverConfig.from_dict({
+		"meter_max": 100.0,
+		"gain_per_chain_step": 40.0,
+		"max_gain_per_move": 50.0,
+		"decay_per_weak_move": 10.0,
+		"weak_move_chain_threshold": 2,
+		"activation_meter": 100.0,
+		"duration_moves": 3,
+		"score_multiplier": 1.5,
+		"meter_reset_on_activate": true
+	})
+	var fever := FeverSystem.new(config)
+	# Uncapped this would be 10 * 40 = 400 -- a single huge cascade should
+	# not be able to max Fever in one move on its own.
+	var activated := fever.register_move(10)
+	check("single_mega_cascade_does_not_activate_fever_alone", not activated)
+	check_eq("gain_capped_at_max_gain_per_move", fever.meter, 50.0)

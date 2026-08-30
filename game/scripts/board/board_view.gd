@@ -208,13 +208,12 @@ func _refresh_selection_visual() -> void:
 
 # ------------------------------------------------------------- resolve --
 
-## Chain depth is 1 for a plain match and 2 for any move that creates and
-## auto-detonates a power (see chain_resolver.gd's docstring) — deeper
-## multi-hop cascades (3+) need a second power to exist mid-move to chain
-## into, which the architecture supports (see the `chained` queue in
-## _process_power_chain) but nothing currently produces, so only tier 0 is
-## reachable today. The higher tiers are left in place, ready to light up
-## the moment a future power source can trigger them.
+## Chain depth is 1 for a plain match, 2 for one power created+detonated,
+## and 3+ for a real multi-stage cascade — either a big move that created
+## several powers which catch each other, or a blast exposing a fresh
+## same-color cluster that auto-chains into another wave (and maybe another
+## power) — see chain_resolver.gd's docstring. All three tiers are reachable
+## through real play, not just the first.
 const _COMBO_TIERS := [2, 4, 6]
 const _WAVE_STAGGER := 0.07
 
@@ -256,19 +255,22 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 
 	for wave_index in result.wave_cells.size():
 		var cells: Array = result.wave_cells[wave_index]
-		if wave_index == 0:
-			if group_size > 0:
-				Audio.play(&"match", clampf(float(group_size - 3) / 5.0, 0.0, 1.0))
-		else:
-			var activation: Dictionary = result.powers_activated[wave_index - 1]
-			var power_pos: Vector2i = activation["pos"]
-			var power_id: StringName = activation["power_id"]
+		# Each wave carries its own metadata (whether it's a power detonation,
+		# and which power) rather than assuming wave_index lines up 1:1 with
+		# powers_activated — auto-chain waves (a secondary exposed-cluster
+		# clear) are interspersed and don't activate a power themselves.
+		var wave_info: Dictionary = result.score_events[wave_index]
+		if wave_info.has("power_id"):
+			var power_pos: Vector2i = wave_info["power_pos"]
+			var power_id: StringName = wave_info["power_id"]
 			var power_node := _node_at(power_pos)
 			if power_node != null:
 				power_node.power_id = power_id
 				power_node.queue_redraw()
 			Audio.play(_power_sfx_id(power_id), 0.0, 0)
 			Audio.play(&"chain_step", clampf(float(wave_index) / 6.0, 0.0, 1.0), wave_index - 1)
+		elif wave_index == 0 and group_size > 0:
+			Audio.play(&"match", clampf(float(group_size - 3) / 5.0, 0.0, 1.0))
 
 		Audio.play(&"blast", clampf(float(cells.size()) / 10.0, 0.0, 1.0), wave_index)
 
