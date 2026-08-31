@@ -1,42 +1,89 @@
 #!/usr/bin/env python3
 """Deterministic level-data generator for Color Clash.
 
-Produces game/data/levels.json. This is a design-time authoring tool, not
-part of the shipped game — levels are consumed at runtime purely as data
-(see game/scripts/levels/level_database.gd). Re-run after editing the
-CURVE below to regenerate the campaign.
+Produces game/data/levels.json. Design-time authoring tool only — levels
+are consumed at runtime purely as data (game/scripts/levels/level_database.gd).
+Re-run after editing the curve below to regenerate the campaign.
 
 Usage: python3 tools/level_gen/generate_levels.py
+
+Progression intent (40-level campaign):
+  * Colours ramp 3 -> 6 (4th at L3, 5th at L10, Orange 6th at L15) so the
+    board gets busier and matches get rarer as skills grow.
+  * Board grows 7x8 -> 9x12.
+  * Move budget tightens from generous to demanding.
+  * Obstacles are taught one at a time (ice -> lock -> stone) then mixed,
+    with counts climbing in the back third.
+  * Objective types rotate and stack into multi-goal levels later on.
+  * Only obstacle types with full gameplay support are emitted
+    (ice / lock / stone); time-bomb art exists but its logic does not yet.
 """
 import json
 import os
 
-ALL_COLORS = ["red", "blue", "yellow", "green", "purple"]
+LEVEL_COUNT = 40
+# Colour unlock order — later ids append, never reorder (keeps saves stable).
+COLOR_ORDER = ["red", "blue", "yellow", "green", "purple", "orange"]
 OUT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "game", "data", "levels.json")
+
+
+def color_count_for(level_id):
+    if level_id < 3:
+        return 3
+    if level_id < 10:
+        return 4
+    if level_id < 15:
+        return 5
+    return 6  # Orange in play from L15
+
+
+def board_size_for(level_id):
+    width = 7 + min(level_id // 12, 2)      # 7 -> 9
+    height = 8 + min(level_id // 8, 4)      # 8 -> 12
+    return width, height
+
+
+def move_limit_for(level_id):
+    # 24 down to a floor of 12, tightening ~1 move every 2 levels.
+    return max(12, 25 - level_id // 2)
+
+
+def difficulty_for(level_id):
+    if level_id < 6:
+        return "easy"
+    if level_id < 16:
+        return "medium"
+    if level_id < 30:
+        return "hard"
+    return "expert"
 
 
 def obstacles_for(level_id, width, height):
     obs = []
-    # Teach obstacles gradually: none -> ice -> lock -> stone -> mixed.
-    if level_id < 4:
+    if level_id < 5:
         return obs
-    if level_id < 8:
-        count = min(3, (level_id - 3))
-        for i in range(count):
+    if level_id < 10:                       # ice
+        n = min(3, level_id - 4)
+        for i in range(n):
             obs.append({"type": "ice", "x": 2 + i, "y": 1, "hp": 2})
-    elif level_id < 12:
-        count = min(3, (level_id - 7))
-        for i in range(count):
+    elif level_id < 15:                     # lock
+        n = min(3, level_id - 9)
+        for i in range(n):
             obs.append({"type": "lock", "x": 1 + i, "y": height - 2, "hp": 1})
-    elif level_id < 16:
-        count = min(3, (level_id - 11))
-        for i in range(count):
+    elif level_id < 20:                     # stone
+        n = min(3, level_id - 14)
+        for i in range(n):
             obs.append({"type": "stone", "x": 3 + i, "y": 2})
-    else:
-        # Mixed obstacle levels for the later campaign.
-        obs.append({"type": "ice", "x": 1, "y": 1, "hp": 2})
-        obs.append({"type": "lock", "x": width - 2, "y": height - 2, "hp": 1})
-        obs.append({"type": "stone", "x": width // 2, "y": height // 2})
+    else:                                   # mixed, climbing count
+        tier = 2 + (level_id - 20) // 5     # 2 -> 5 obstacles
+        picks = [
+            {"type": "ice", "x": 1, "y": 1, "hp": 2},
+            {"type": "lock", "x": width - 2, "y": height - 2, "hp": 1},
+            {"type": "stone", "x": width // 2, "y": height // 2},
+            {"type": "ice", "x": width - 2, "y": 1, "hp": 2},
+            {"type": "stone", "x": 2, "y": height - 3},
+        ]
+        obs = picks[:min(tier, len(picks))]
     return obs
 
 
@@ -44,50 +91,45 @@ def objectives_for(level_id, colors, width, height):
     cycle = level_id % 5
     base_target = 12 + level_id
     if cycle == 0:
-        return [{"type": "clear_color", "color": colors[0], "target": base_target}]
+        return [{"type": "clear_color", "color": colors[level_id % len(colors)], "target": base_target}]
     if cycle == 1:
-        return [{"type": "reach_score", "target": 4000 + level_id * 500}]
+        return [{"type": "reach_score", "target": 4000 + level_id * 550}]
     if cycle == 2:
-        return [{"type": "create_powers", "power": "any", "target": min(2 + level_id // 4, 8)}]
+        return [{"type": "create_powers", "power": "any", "target": min(2 + level_id // 4, 10)}]
     if cycle == 3:
-        obs_types = [o["type"] for o in obstacles_for(level_id, width, height)]
+        obs_types = obstacles_for(level_id, width, height)
         if obs_types:
             return [{"type": "break_obstacles", "obstacle": "any", "target": len(obs_types)}]
-        return [{"type": "reach_score", "target": 4500 + level_id * 400}]
-    # Mixed objective.
-    return [
+        return [{"type": "reach_score", "target": 4500 + level_id * 450}]
+    # Mixed objective — stacks a 3rd goal in the back third.
+    goals = [
         {"type": "clear_color", "color": colors[0], "target": base_target},
         {"type": "clear_color", "color": colors[1], "target": max(8, base_target - 6)},
     ]
+    if level_id >= 28:
+        goals.append({"type": "create_powers", "power": "any", "target": 3})
+    return goals
 
 
 def build_level(level_id):
-    width = 7 + min(level_id // 6, 2)       # 7 -> 9
-    height = 8 + min(level_id // 5, 3)      # 8 -> 11
-    color_count = 3 if level_id < 3 else (4 if level_id < 10 else 5)
-    colors = ALL_COLORS[:color_count]
-    move_limit = max(14, 24 - level_id // 2)
-    difficulty = "easy" if level_id < 5 else ("medium" if level_id < 14 else "hard")
-    obstacles = obstacles_for(level_id, width, height)
-    objectives = objectives_for(level_id, colors, width, height)
-    reward_coins = 80 + level_id * 15
-
+    width, height = board_size_for(level_id)
+    colors = COLOR_ORDER[:color_count_for(level_id)]
     return {
         "id": level_id,
         "name": "Level %d" % level_id,
         "width": width,
         "height": height,
         "colors": colors,
-        "move_limit": move_limit,
-        "objectives": objectives,
-        "obstacles": obstacles,
-        "reward": {"coins": reward_coins},
-        "difficulty": difficulty,
+        "move_limit": move_limit_for(level_id),
+        "objectives": objectives_for(level_id, colors, width, height),
+        "obstacles": obstacles_for(level_id, width, height),
+        "reward": {"coins": 80 + level_id * 15},
+        "difficulty": difficulty_for(level_id),
     }
 
 
 def main():
-    levels = [build_level(i) for i in range(1, 26)]
+    levels = [build_level(i) for i in range(1, LEVEL_COUNT + 1)]
     payload = {
         "_comment": "Generated by tools/level_gen/generate_levels.py. Edit the generator, not this file, for bulk changes.",
         "levels": levels,

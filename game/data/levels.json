@@ -11,11 +11,11 @@
         "blue",
         "yellow"
       ],
-      "move_limit": 24,
+      "move_limit": 25,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 4500
+          "target": 4550
         }
       ],
       "obstacles": [],
@@ -34,7 +34,7 @@
         "blue",
         "yellow"
       ],
-      "move_limit": 23,
+      "move_limit": 24,
       "objectives": [
         {
           "type": "create_powers",
@@ -59,11 +59,11 @@
         "yellow",
         "green"
       ],
-      "move_limit": 23,
+      "move_limit": 24,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 5700
+          "target": 5850
         }
       ],
       "obstacles": [],
@@ -83,7 +83,7 @@
         "yellow",
         "green"
       ],
-      "move_limit": 22,
+      "move_limit": 23,
       "objectives": [
         {
           "type": "clear_color",
@@ -96,14 +96,7 @@
           "target": 10
         }
       ],
-      "obstacles": [
-        {
-          "type": "ice",
-          "x": 2,
-          "y": 1,
-          "hp": 2
-        }
-      ],
+      "obstacles": [],
       "reward": {
         "coins": 140
       },
@@ -113,18 +106,18 @@
       "id": 5,
       "name": "Level 5",
       "width": 7,
-      "height": 9,
+      "height": 8,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green"
       ],
-      "move_limit": 22,
+      "move_limit": 23,
       "objectives": [
         {
           "type": "clear_color",
-          "color": "red",
+          "color": "blue",
           "target": 17
         }
       ],
@@ -134,35 +127,29 @@
           "x": 2,
           "y": 1,
           "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 3,
-          "y": 1,
-          "hp": 2
         }
       ],
       "reward": {
         "coins": 155
       },
-      "difficulty": "medium"
+      "difficulty": "easy"
     },
     {
       "id": 6,
       "name": "Level 6",
-      "width": 8,
-      "height": 9,
+      "width": 7,
+      "height": 8,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green"
       ],
-      "move_limit": 21,
+      "move_limit": 22,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 7000
+          "target": 7300
         }
       ],
       "obstacles": [
@@ -175,12 +162,6 @@
         {
           "type": "ice",
           "x": 3,
-          "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 4,
           "y": 1,
           "hp": 2
         }
@@ -193,15 +174,15 @@
     {
       "id": 7,
       "name": "Level 7",
-      "width": 8,
-      "height": 9,
+      "width": 7,
+      "height": 8,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green"
       ],
-      "move_limit": 21,
+      "move_limit": 22,
       "objectives": [
         {
           "type": "create_powers",
@@ -237,7 +218,7 @@
     {
       "id": 8,
       "name": "Level 8",
-      "width": 8,
+      "width": 7,
       "height": 9,
       "colors": [
         "red",
@@ -245,20 +226,32 @@
         "yellow",
         "green"
       ],
-      "move_limit": 20,
+      "move_limit": 21,
       "objectives": [
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 1
+          "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "lock",
-          "x": 1,
-          "y": 7,
-          "hp": 1
+          "type": "ice",
+          "x": 2,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "ice",
+          "x": 3,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "ice",
+          "x": 4,
+          "y": 1,
+          "hp": 2
         }
       ],
       "reward": {
@@ -269,7 +262,7 @@
     {
       "id": 9,
       "name": "Level 9",
-      "width": 8,
+      "width": 7,
       "height": 9,
       "colors": [
         "red",
@@ -277,7 +270,7 @@
         "yellow",
         "green"
       ],
-      "move_limit": 20,
+      "move_limit": 21,
       "objectives": [
         {
           "type": "clear_color",
@@ -292,16 +285,22 @@
       ],
       "obstacles": [
         {
-          "type": "lock",
-          "x": 1,
-          "y": 7,
-          "hp": 1
+          "type": "ice",
+          "x": 2,
+          "y": 1,
+          "hp": 2
         },
         {
-          "type": "lock",
-          "x": 2,
-          "y": 7,
-          "hp": 1
+          "type": "ice",
+          "x": 3,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "ice",
+          "x": 4,
+          "y": 1,
+          "hp": 2
         }
       ],
       "reward": {
@@ -312,8 +311,8 @@
     {
       "id": 10,
       "name": "Level 10",
-      "width": 8,
-      "height": 10,
+      "width": 7,
+      "height": 9,
       "colors": [
         "red",
         "blue",
@@ -321,7 +320,7 @@
         "green",
         "purple"
       ],
-      "move_limit": 19,
+      "move_limit": 20,
       "objectives": [
         {
           "type": "clear_color",
@@ -333,19 +332,7 @@
         {
           "type": "lock",
           "x": 1,
-          "y": 8,
-          "hp": 1
-        },
-        {
-          "type": "lock",
-          "x": 2,
-          "y": 8,
-          "hp": 1
-        },
-        {
-          "type": "lock",
-          "x": 3,
-          "y": 8,
+          "y": 7,
           "hp": 1
         }
       ],
@@ -357,8 +344,8 @@
     {
       "id": 11,
       "name": "Level 11",
-      "width": 8,
-      "height": 10,
+      "width": 7,
+      "height": 9,
       "colors": [
         "red",
         "blue",
@@ -366,30 +353,24 @@
         "green",
         "purple"
       ],
-      "move_limit": 19,
+      "move_limit": 20,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 9500
+          "target": 10050
         }
       ],
       "obstacles": [
         {
           "type": "lock",
           "x": 1,
-          "y": 8,
+          "y": 7,
           "hp": 1
         },
         {
           "type": "lock",
           "x": 2,
-          "y": 8,
-          "hp": 1
-        },
-        {
-          "type": "lock",
-          "x": 3,
-          "y": 8,
+          "y": 7,
           "hp": 1
         }
       ],
@@ -401,8 +382,8 @@
     {
       "id": 12,
       "name": "Level 12",
-      "width": 9,
-      "height": 10,
+      "width": 8,
+      "height": 9,
       "colors": [
         "red",
         "blue",
@@ -410,7 +391,7 @@
         "green",
         "purple"
       ],
-      "move_limit": 18,
+      "move_limit": 19,
       "objectives": [
         {
           "type": "create_powers",
@@ -420,9 +401,22 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "lock",
+          "x": 1,
+          "y": 7,
+          "hp": 1
+        },
+        {
+          "type": "lock",
+          "x": 2,
+          "y": 7,
+          "hp": 1
+        },
+        {
+          "type": "lock",
           "x": 3,
-          "y": 2
+          "y": 7,
+          "hp": 1
         }
       ],
       "reward": {
@@ -433,8 +427,8 @@
     {
       "id": 13,
       "name": "Level 13",
-      "width": 9,
-      "height": 10,
+      "width": 8,
+      "height": 9,
       "colors": [
         "red",
         "blue",
@@ -442,24 +436,32 @@
         "green",
         "purple"
       ],
-      "move_limit": 18,
+      "move_limit": 19,
       "objectives": [
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 2
+          "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
-          "x": 3,
-          "y": 2
+          "type": "lock",
+          "x": 1,
+          "y": 7,
+          "hp": 1
         },
         {
-          "type": "stone",
-          "x": 4,
-          "y": 2
+          "type": "lock",
+          "x": 2,
+          "y": 7,
+          "hp": 1
+        },
+        {
+          "type": "lock",
+          "x": 3,
+          "y": 7,
+          "hp": 1
         }
       ],
       "reward": {
@@ -470,8 +472,8 @@
     {
       "id": 14,
       "name": "Level 14",
-      "width": 9,
-      "height": 10,
+      "width": 8,
+      "height": 9,
       "colors": [
         "red",
         "blue",
@@ -479,7 +481,7 @@
         "green",
         "purple"
       ],
-      "move_limit": 17,
+      "move_limit": 18,
       "objectives": [
         {
           "type": "clear_color",
@@ -494,43 +496,47 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "lock",
+          "x": 1,
+          "y": 7,
+          "hp": 1
+        },
+        {
+          "type": "lock",
+          "x": 2,
+          "y": 7,
+          "hp": 1
+        },
+        {
+          "type": "lock",
           "x": 3,
-          "y": 2
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 2
-        },
-        {
-          "type": "stone",
-          "x": 5,
-          "y": 2
+          "y": 7,
+          "hp": 1
         }
       ],
       "reward": {
         "coins": 290
       },
-      "difficulty": "hard"
+      "difficulty": "medium"
     },
     {
       "id": 15,
       "name": "Level 15",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 9,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 17,
+      "move_limit": 18,
       "objectives": [
         {
           "type": "clear_color",
-          "color": "red",
+          "color": "green",
           "target": 27
         }
       ],
@@ -539,59 +545,43 @@
           "type": "stone",
           "x": 3,
           "y": 2
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 2
-        },
-        {
-          "type": "stone",
-          "x": 5,
-          "y": 2
         }
       ],
       "reward": {
         "coins": 305
       },
-      "difficulty": "hard"
+      "difficulty": "medium"
     },
     {
       "id": 16,
       "name": "Level 16",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 16,
+      "move_limit": 17,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 12000
+          "target": 12800
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
-          "x": 1,
-          "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "lock",
-          "x": 7,
-          "y": 9,
-          "hp": 1
+          "type": "stone",
+          "x": 3,
+          "y": 2
         },
         {
           "type": "stone",
           "x": 4,
-          "y": 5
+          "y": 2
         }
       ],
       "reward": {
@@ -602,16 +592,17 @@
     {
       "id": 17,
       "name": "Level 17",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 16,
+      "move_limit": 17,
       "objectives": [
         {
           "type": "create_powers",
@@ -621,21 +612,19 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
-          "x": 1,
-          "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "lock",
-          "x": 7,
-          "y": 9,
-          "hp": 1
+          "type": "stone",
+          "x": 3,
+          "y": 2
         },
         {
           "type": "stone",
           "x": 4,
-          "y": 5
+          "y": 2
+        },
+        {
+          "type": "stone",
+          "x": 5,
+          "y": 2
         }
       ],
       "reward": {
@@ -646,16 +635,17 @@
     {
       "id": 18,
       "name": "Level 18",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 15,
+      "move_limit": 16,
       "objectives": [
         {
           "type": "break_obstacles",
@@ -665,21 +655,19 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
-          "x": 1,
-          "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "lock",
-          "x": 7,
-          "y": 9,
-          "hp": 1
+          "type": "stone",
+          "x": 3,
+          "y": 2
         },
         {
           "type": "stone",
           "x": 4,
-          "y": 5
+          "y": 2
+        },
+        {
+          "type": "stone",
+          "x": 5,
+          "y": 2
         }
       ],
       "reward": {
@@ -690,16 +678,17 @@
     {
       "id": 19,
       "name": "Level 19",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 15,
+      "move_limit": 16,
       "objectives": [
         {
           "type": "clear_color",
@@ -714,21 +703,19 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
-          "x": 1,
-          "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "lock",
-          "x": 7,
-          "y": 9,
-          "hp": 1
+          "type": "stone",
+          "x": 3,
+          "y": 2
         },
         {
           "type": "stone",
           "x": 4,
-          "y": 5
+          "y": 2
+        },
+        {
+          "type": "stone",
+          "x": 5,
+          "y": 2
         }
       ],
       "reward": {
@@ -739,20 +726,21 @@
     {
       "id": 20,
       "name": "Level 20",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 14,
+      "move_limit": 15,
       "objectives": [
         {
           "type": "clear_color",
-          "color": "red",
+          "color": "yellow",
           "target": 32
         }
       ],
@@ -765,14 +753,9 @@
         },
         {
           "type": "lock",
-          "x": 7,
-          "y": 9,
+          "x": 6,
+          "y": 8,
           "hp": 1
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 5
         }
       ],
       "reward": {
@@ -783,20 +766,21 @@
     {
       "id": 21,
       "name": "Level 21",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 14,
+      "move_limit": 15,
       "objectives": [
         {
           "type": "reach_score",
-          "target": 14500
+          "target": 15550
         }
       ],
       "obstacles": [
@@ -808,14 +792,9 @@
         },
         {
           "type": "lock",
-          "x": 7,
-          "y": 9,
+          "x": 6,
+          "y": 8,
           "hp": 1
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 5
         }
       ],
       "reward": {
@@ -826,14 +805,15 @@
     {
       "id": 22,
       "name": "Level 22",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
       "move_limit": 14,
       "objectives": [
@@ -852,14 +832,9 @@
         },
         {
           "type": "lock",
-          "x": 7,
-          "y": 9,
+          "x": 6,
+          "y": 8,
           "hp": 1
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 5
         }
       ],
       "reward": {
@@ -870,21 +845,22 @@
     {
       "id": 23,
       "name": "Level 23",
-      "width": 9,
-      "height": 11,
+      "width": 8,
+      "height": 10,
       "colors": [
         "red",
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
       "move_limit": 14,
       "objectives": [
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 3
+          "target": 2
         }
       ],
       "obstacles": [
@@ -896,14 +872,9 @@
         },
         {
           "type": "lock",
-          "x": 7,
-          "y": 9,
+          "x": 6,
+          "y": 8,
           "hp": 1
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 5
         }
       ],
       "reward": {
@@ -921,9 +892,10 @@
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 14,
+      "move_limit": 13,
       "objectives": [
         {
           "type": "clear_color",
@@ -948,11 +920,6 @@
           "x": 7,
           "y": 9,
           "hp": 1
-        },
-        {
-          "type": "stone",
-          "x": 4,
-          "y": 5
         }
       ],
       "reward": {
@@ -970,13 +937,14 @@
         "blue",
         "yellow",
         "green",
-        "purple"
+        "purple",
+        "orange"
       ],
-      "move_limit": 14,
+      "move_limit": 13,
       "objectives": [
         {
           "type": "clear_color",
-          "color": "red",
+          "color": "blue",
           "target": 37
         }
       ],
@@ -1003,6 +971,804 @@
         "coins": 455
       },
       "difficulty": "hard"
+    },
+    {
+      "id": 26,
+      "name": "Level 26",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "reach_score",
+          "target": 18300
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        }
+      ],
+      "reward": {
+        "coins": 470
+      },
+      "difficulty": "hard"
+    },
+    {
+      "id": 27,
+      "name": "Level 27",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 8
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        }
+      ],
+      "reward": {
+        "coins": 485
+      },
+      "difficulty": "hard"
+    },
+    {
+      "id": 28,
+      "name": "Level 28",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "break_obstacles",
+          "obstacle": "any",
+          "target": 3
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        }
+      ],
+      "reward": {
+        "coins": 500
+      },
+      "difficulty": "hard"
+    },
+    {
+      "id": 29,
+      "name": "Level 29",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "red",
+          "target": 41
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 35
+        },
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 3
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        }
+      ],
+      "reward": {
+        "coins": 515
+      },
+      "difficulty": "hard"
+    },
+    {
+      "id": 30,
+      "name": "Level 30",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "red",
+          "target": 42
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        }
+      ],
+      "reward": {
+        "coins": 530
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 31,
+      "name": "Level 31",
+      "width": 9,
+      "height": 11,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "reach_score",
+          "target": 21050
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 9,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 5
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        }
+      ],
+      "reward": {
+        "coins": 545
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 32,
+      "name": "Level 32",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 10
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        }
+      ],
+      "reward": {
+        "coins": 560
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 33,
+      "name": "Level 33",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "break_obstacles",
+          "obstacle": "any",
+          "target": 4
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        }
+      ],
+      "reward": {
+        "coins": 575
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 34,
+      "name": "Level 34",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "red",
+          "target": 46
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 40
+        },
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 3
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        }
+      ],
+      "reward": {
+        "coins": 590
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 35,
+      "name": "Level 35",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "orange",
+          "target": 47
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 605
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 36,
+      "name": "Level 36",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "reach_score",
+          "target": 23800
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 620
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 37,
+      "name": "Level 37",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 10
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 635
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 38,
+      "name": "Level 38",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "break_obstacles",
+          "obstacle": "any",
+          "target": 5
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 650
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 39,
+      "name": "Level 39",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "red",
+          "target": 51
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 45
+        },
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 3
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 665
+      },
+      "difficulty": "expert"
+    },
+    {
+      "id": 40,
+      "name": "Level 40",
+      "width": 9,
+      "height": 12,
+      "colors": [
+        "red",
+        "blue",
+        "yellow",
+        "green",
+        "purple",
+        "orange"
+      ],
+      "move_limit": 12,
+      "objectives": [
+        {
+          "type": "clear_color",
+          "color": "purple",
+          "target": 52
+        }
+      ],
+      "obstacles": [
+        {
+          "type": "ice",
+          "x": 1,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "lock",
+          "x": 7,
+          "y": 10,
+          "hp": 1
+        },
+        {
+          "type": "stone",
+          "x": 4,
+          "y": 6
+        },
+        {
+          "type": "ice",
+          "x": 7,
+          "y": 1,
+          "hp": 2
+        },
+        {
+          "type": "stone",
+          "x": 2,
+          "y": 9
+        }
+      ],
+      "reward": {
+        "coins": 680
+      },
+      "difficulty": "expert"
     }
   ]
 }
