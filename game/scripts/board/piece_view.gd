@@ -178,15 +178,22 @@ func _draw_rainbow_gem() -> void:
 func _draw_power_gem() -> void:
 	var body_col: Color = _POWER_BODY.get(power_id, _base)
 	var glow_col: Color = _POWER_GLOW.get(power_id, _glow)
-	var pulse := 0.75 + 0.25 * sin(_phase * 4.0)
+	var pulse := 0.7 + 0.3 * sin(_phase * 4.5)
+	var slow := 0.5 + 0.5 * sin(_phase * 1.8)
 
-	# outer aura (soft additive glow sprite)
+	# double aura — a wide breathing halo + a tighter bright core glow
 	var g := GemTextures.glow()
 	if g != null:
-		var gs := cell_size * (1.7 + 0.18 * pulse)
-		draw_texture_rect(g, Rect2(-gs * 0.5, -gs * 0.5, gs, gs), false,
-			Color(glow_col.r, glow_col.g, glow_col.b, 0.32 * pulse))
+		var gs1 := cell_size * (2.2 + 0.35 * slow)
+		draw_texture_rect(g, Rect2(-gs1 * 0.5, -gs1 * 0.5, gs1, gs1), false,
+			Color(glow_col.r, glow_col.g, glow_col.b, 0.22 + 0.12 * slow))
+		var gs2 := cell_size * (1.35 + 0.2 * pulse)
+		draw_texture_rect(g, Rect2(-gs2 * 0.5, -gs2 * 0.5, gs2, gs2), false,
+			Color(glow_col.r, glow_col.g, glow_col.b, 0.35 * pulse))
 
+	# a light "lift" so power tiles read as raised above the plain jewels
+	var lift := Vector2(0, -cell_size * 0.03 * pulse)
+	draw_set_transform(lift, 0.0, Vector2.ONE)
 	_blit_gem(GemTextures.solid_gem(StringName("__pow_" + String(power_id)), body_col))
 
 	match power_id:
@@ -195,6 +202,14 @@ func _draw_power_gem() -> void:
 		&"freeze": _icon_freeze()
 		&"rainbow": _icon_rainbow()
 		&"chain": _icon_chain(pulse)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	# orbiting energy sparks
+	for i in 3:
+		var a := _phase * 3.0 + TAU * float(i) / 3.0
+		var orb := Vector2(cos(a), sin(a * 1.1)) * cell_size * (0.52 + 0.06 * pulse)
+		draw_circle(orb + lift, cell_size * 0.06 * (0.7 + 0.5 * pulse), Color(glow_col.r, glow_col.g, glow_col.b, 0.9))
+		draw_circle(orb + lift, cell_size * 0.03, Color(1, 1, 1, 0.9))
 
 	# charged rim
 	var body := ShapeDrawUtils.gem_points(cell_size)

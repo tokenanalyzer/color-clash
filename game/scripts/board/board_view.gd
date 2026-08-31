@@ -88,6 +88,24 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 func has_valid_moves() -> bool:
 	return board.has_any_valid_move()
 
+## Re-fit the board to a new viewport rect (orientation / window resize).
+## Cell nodes keep their identity; only geometry is recomputed.
+func refit(viewport_rect: Rect2) -> void:
+	if board == null or _locked_input:
+		return
+	_fit_layout(viewport_rect, board.width, board.height)
+	for x in board.width:
+		for y in board.height:
+			var node := _node_at(Vector2i(x, y))
+			if node != null:
+				node.position = _slot_center(Vector2i(x, y))
+				node.cell_size = _cell_size
+				node.queue_redraw()
+	_path_line.width = _cell_size * 0.16
+	_path_glow.width = _cell_size * 0.42
+	_refresh_selection_visual()
+	queue_redraw()
+
 ## External input gate (pause menu). Never unlocks while a cascade is mid-
 ## resolve — `_play_move` clears its own lock when it finishes.
 func set_input_locked(v: bool) -> void:
@@ -99,20 +117,41 @@ func set_fever(v: bool) -> void:
 		return
 	fever_active = v
 	_cascade_scale = 0.55 if v else 1.0
-	set_process(v)
+	_update_process()
 	_refresh_selection_visual()
 	queue_redraw()
 
 func _process(delta: float) -> void:
 	_fever_phase += delta
-	queue_redraw()
+	if fever_active or _armed_booster_id != &"":
+		queue_redraw()
+	# occasional idle glint on a random settled jewel — keeps the board alive
+	if not _locked_input and board != null:
+		_idle_t += delta
+		if _idle_t >= _next_sparkle:
+			_idle_t = 0.0
+			_next_sparkle = randf_range(1.6, 3.4)
+			_idle_sparkle()
+
+func _idle_sparkle() -> void:
+	if particles == null:
+		return
+	for _try in 5:
+		var p := Vector2i(rng.randi_range(0, board.width - 1), rng.randi_range(0, board.height - 1))
+		var cell := board.get_cell(p)
+		if cell != null and not cell.is_empty() and not cell.has_power():
+			var node := _node_at(p)
+			if node != null:
+				particles.burst(node.global_position + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * _cell_size * 0.25,
+					Color(1, 1, 1, 0.8), 2)
+			return
 
 ## A screen-filling punctuation the instant Fever ignites: central flash,
 ## a ring of bursts around the board, a hard shake and a big FEVER! title.
 func play_fever_burst() -> void:
 	var vp := _board_rect_center()
 	particles.flash(to_global(vp), VisualTheme.FEVER_HOT, _cell_size * 8.0)
-	var grid := Vector2(board.width, board.height) * _cell_size
+	var grid := _grid_px()
 	for i in 10:
 		var a := TAU * float(i) / 10.0
 		var p := vp + Vector2(cos(a), sin(a)) * grid.length() * 0.42
@@ -121,8 +160,13 @@ func play_fever_burst() -> void:
 	Haptics.strong(110)
 	ComboPopup.spawn(self, vp - Vector2(0, _cell_size), "FEVER!", VisualTheme.FEVER_HOT, 64, "GO WILD")
 
+## Pixel span of the honeycomb playfield (top-left at _origin).
+func _grid_px() -> Vector2:
+	return Vector2((float(board.width) + 0.5) * _cell_size,
+		(float(board.height - 1) * HEX_ROW + 1.0) * _cell_size)
+
 func _board_rect_center() -> Vector2:
-	return _origin + Vector2(board.width, board.height) * _cell_size * 0.5
+	return _origin + _grid_px() * 0.5
 
 func _generate_playable_board() -> void:
 	board.generate(rng, available_colors)
@@ -131,11 +175,18 @@ func _generate_playable_board() -> void:
 		board.generate(rng, available_colors)
 		guard += 1
 
+## Honeycomb layout: odd rows are shifted +½ cell right, and rows are packed
+## at HEX_ROW (≈0.866) of a cell apart so the hexagons interlock. The grid
+## therefore spans (width + 0.5) cells across and (height·0.866 + 0.134) down.
+const HEX_ROW := 0.866025
+
 func _fit_layout(viewport_rect: Rect2, width: int, height: int) -> void:
-	var margin := 24.0
+	var margin := 20.0
 	var avail := viewport_rect.size - Vector2(margin, margin) * 2.0
-	_cell_size = min(avail.x / float(width), avail.y / float(height))
-	var grid_size := Vector2(_cell_size * width, _cell_size * height)
+	var span_x := float(width) + 0.5
+	var span_y := float(height - 1) * HEX_ROW + 1.0
+	_cell_size = min(avail.x / span_x, avail.y / span_y)
+	var grid_size := Vector2(_cell_size * span_x, _cell_size * span_y)
 	_origin = (viewport_rect.size - grid_size) * 0.5
 
 func _build_piece_pool(width: int, height: int) -> void:
@@ -151,7 +202,30 @@ func _build_piece_pool(width: int, height: int) -> void:
 		_piece_nodes[x] = col
 
 func _slot_center(pos: Vector2i) -> Vector2:
-	return _origin + Vector2(pos.x + 0.5, pos.y + 0.5) * _cell_size
+	var x_off := 0.5 if (pos.y & 1) == 1 else 0.0
+	return _origin + Vector2((float(pos.x) + 0.5 + x_off) * _cell_size,
+		(float(pos.y) * HEX_ROW + 0.5) * _cell_size)
+
+## Nearest hex-cell centre to a local point (robust inverse of _slot_center).
+func _cell_at_point(local: Vector2) -> Vector2i:
+	var approx_y := int(round((local.y - _origin.y) / (_cell_size * HEX_ROW) - 0.5))
+	var best := Vector2i(-1, -1)
+	var best_d := INF
+	for dy in range(-1, 2):
+		var y := approx_y + dy
+		if y < 0 or y >= board.height:
+			continue
+		var x_off := 0.5 if (y & 1) == 1 else 0.0
+		var approx_x := int(round((local.x - _origin.x) / _cell_size - 0.5 - x_off))
+		for dx in range(-1, 2):
+			var x := approx_x + dx
+			if x < 0 or x >= board.width:
+				continue
+			var d := local.distance_squared_to(_slot_center(Vector2i(x, y)))
+			if d < best_d:
+				best_d = d
+				best = Vector2i(x, y)
+	return best
 
 func _node_at(pos: Vector2i) -> PieceView:
 	if pos.x < 0 or pos.x >= _piece_nodes.size():
@@ -175,49 +249,75 @@ func _draw() -> void:
 	if board == null:
 		return
 	var pad := _cell_size * 0.34
-	var grid := Vector2(board.width, board.height) * _cell_size
+	var grid := _grid_px()
 	var frame := Rect2(_origin - Vector2(pad, pad), grid + Vector2(pad, pad) * 2.0)
 
-	# outer frame: drop shadow, gradient body, bright top edge
 	var r := _cell_size * 0.5
-	draw_rect(Rect2(frame.position + Vector2(0, 10), frame.size), Color(0, 0, 0, 0.35), true)
 
-	# Fever aura: a pulsing hot halo behind the frame + charged rim
+	# soft outer glow behind the whole board — separates it from the backdrop
+	for i in range(5, 0, -1):
+		var t := float(i) / 5.0
+		_draw_round_rect(frame.grow(6.0 + t * 22.0), r + t * 16.0,
+			Color(VisualTheme.ACCENT.r, VisualTheme.ACCENT.g, VisualTheme.ACCENT.b, 0.05 * (1.0 - t)))
+	# drop shadow
+	_draw_round_rect(Rect2(frame.position + Vector2(0, 12), frame.size), r, Color(0, 0, 0, 0.45))
+
+	# Fever aura
 	if fever_active:
-		var pulse := 0.5 + 0.5 * sin(_fever_phase * 7.0)
+		var fpulse := 0.5 + 0.5 * sin(_fever_phase * 7.0)
 		for i in 5:
 			var t := float(i) / 4.0
-			var col := VisualTheme.FEVER.lerp(VisualTheme.FEVER_HOT, pulse)
-			col.a = (0.28 - 0.05 * float(i)) * (0.6 + 0.4 * pulse)
-			_draw_round_rect(frame.grow(6.0 + t * 26.0 + pulse * 10.0), r + t * 20.0, col)
+			var col := VisualTheme.FEVER.lerp(VisualTheme.FEVER_HOT, fpulse)
+			col.a = (0.30 - 0.05 * float(i)) * (0.6 + 0.4 * fpulse)
+			_draw_round_rect(frame.grow(6.0 + t * 28.0 + fpulse * 12.0), r + t * 22.0, col)
 
-	_draw_round_rect(frame, r, VisualTheme.PANEL_RAISED)
-	_draw_round_rect(frame.grow(-3.0), r, VisualTheme.PANEL_SOLID)
+	# frame body: raised bevel — lighter top band, darker base
+	_draw_round_rect(frame, r, VisualTheme.PANEL_RAISED.darkened(0.12))
+	_draw_round_rect(Rect2(frame.position, Vector2(frame.size.x, frame.size.y * 0.5)), r,
+		VisualTheme.PANEL_RAISED.lightened(0.10))
+	_draw_round_rect(frame.grow(-4.0), r - 2.0, VisualTheme.PANEL_SOLID)
+
+	# accent / fever rim
+	var rim_col := Color(VisualTheme.ACCENT.r, VisualTheme.ACCENT.g, VisualTheme.ACCENT.b, 0.28)
 	if fever_active:
-		var rim := VisualTheme.FEVER_HOT
-		rim.a = 0.55 + 0.35 * sin(_fever_phase * 9.0)
-		var rp := ShapeDrawUtils.rounded_rect_points(frame.size, r, 6)
-		var moved := PackedVector2Array()
-		for p in rp:
-			moved.append(p + frame.position + frame.size * 0.5)
-		moved.append(moved[0])
-		draw_polyline(moved, rim, 3.0, true)
-	# inner well
-	var well := Rect2(_origin - Vector2(pad * 0.4, pad * 0.4), grid + Vector2(pad * 0.4, pad * 0.4) * 2.0)
-	_draw_round_rect(well, _cell_size * 0.4, VisualTheme.WELL)
+		rim_col = VisualTheme.FEVER_HOT
+		rim_col.a = 0.55 + 0.35 * sin(_fever_phase * 9.0)
+	_draw_round_rect_outline(frame.grow(-3.0), r, rim_col, 2.5)
 
-	# per-cell sockets
+	# inner well with an inset shadow band across the top
+	var well := Rect2(_origin - Vector2(pad * 0.42, pad * 0.42), grid + Vector2(pad * 0.42, pad * 0.42) * 2.0)
+	_draw_round_rect(well, _cell_size * 0.42, VisualTheme.WELL)
+	_draw_round_rect(Rect2(well.position, Vector2(well.size.x, _cell_size * 0.5)), _cell_size * 0.42,
+		Color(0, 0, 0, 0.3))
+
+	# per-cell sockets (recessed: dark rim + subtle bottom light)
 	var socket_glow := 0.0
 	if fever_active:
 		socket_glow = 0.05 + 0.05 * sin(_fever_phase * 6.0)
 	for x in board.width:
 		for y in board.height:
 			var c := _slot_center(Vector2i(x, y))
-			var s := _cell_size * 0.4
-			draw_circle(c + Vector2(0, _cell_size * 0.04), s, Color(0, 0, 0, 0.22))
-			draw_circle(c, s, Color(1, 1, 1, 0.035))
+			var s := _cell_size * 0.42
+			draw_circle(c + Vector2(0, _cell_size * 0.05), s, Color(0, 0, 0, 0.28))
+			draw_circle(c, s * 0.96, Color(0.10, 0.12, 0.2, 0.5))
+			draw_arc(c, s * 0.96, PI * 0.15, PI * 0.85, 10, Color(1, 1, 1, 0.05), 2.0, true)
 			if socket_glow > 0.0:
 				draw_circle(c, s * 1.05, Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, socket_glow))
+
+	# armed-booster targeting overlay
+	if _armed_booster_id != &"":
+		var tint: Color = PieceView._POWER_GLOW.get(_armed_power_id, Color(1, 1, 1))
+		var pulse := 0.5 + 0.5 * sin(_fever_phase * 6.0)
+		var rp := ShapeDrawUtils.rounded_rect_points(frame.size, r, 6)
+		var moved := PackedVector2Array()
+		for p in rp:
+			moved.append(p + frame.position + frame.size * 0.5)
+		moved.append(moved[0])
+		draw_polyline(moved, Color(tint.r, tint.g, tint.b, 0.4 + 0.4 * pulse), 4.0 + 2.0 * pulse, true)
+		for x in board.width:
+			for y in board.height:
+				var c := _slot_center(Vector2i(x, y))
+				draw_arc(c, _cell_size * 0.44, 0, TAU, 6, Color(tint.r, tint.g, tint.b, 0.12 + 0.1 * pulse), 2.0, true)
 
 	# selection path pips
 	if _current_path.size() >= 1:
@@ -233,7 +333,54 @@ func _draw_round_rect(rect: Rect2, radius: float, color: Color) -> void:
 		moved.append(p + rect.position + rect.size * 0.5)
 	draw_colored_polygon(moved, color)
 
+func _draw_round_rect_outline(rect: Rect2, radius: float, color: Color, width: float) -> void:
+	var pts := ShapeDrawUtils.rounded_rect_points(rect.size, radius, 6)
+	var moved := PackedVector2Array()
+	for p in pts:
+		moved.append(p + rect.position + rect.size * 0.5)
+	moved.append(moved[0])
+	draw_polyline(moved, color, width, true)
+
 # ---------------------------------------------------------------- input --
+
+## When set, a booster is "armed": the next tap on the board fires that
+## power at the tapped cell instead of drawing a connection.
+var _armed_booster_id: StringName = &""
+var _armed_power_id: StringName = &""
+var _press_cell := Vector2i(-1, -1)
+var _drag_moved := false
+
+signal booster_committed(booster_id: StringName)
+signal booster_disarmed()
+
+func arm_booster(booster_id: StringName, power_id: StringName) -> void:
+	_armed_booster_id = booster_id
+	_armed_power_id = power_id
+	if _dragging:
+		_dragging = false
+		_current_path = []
+		_refresh_selection_visual()
+	_update_process()
+	queue_redraw()
+
+func disarm_booster() -> void:
+	if _armed_booster_id != &"":
+		_armed_booster_id = &""
+		_armed_power_id = &""
+		_update_process()
+		queue_redraw()
+		booster_disarmed.emit()
+
+func _update_process() -> void:
+	# always on for the idle sparkle; the board itself only redraws when it
+	# actually animates (fever aura / armed reticle).
+	set_process(true)
+
+var _idle_t := 0.0
+var _next_sparkle := 1.2
+
+func is_booster_armed() -> bool:
+	return _armed_booster_id != &""
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _locked_input or board == null:
@@ -243,7 +390,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if e.pressed:
 			_begin_drag(e.position)
 		else:
-			_end_drag()
+			_end_drag(e.position)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventScreenDrag:
 		_update_drag((event as InputEventScreenDrag).position)
@@ -254,19 +401,23 @@ func _unhandled_input(event: InputEvent) -> void:
 			if e.pressed:
 				_begin_drag(e.position)
 			else:
-				_end_drag()
+				_end_drag(e.position)
 			get_viewport().set_input_as_handled()
 	elif event is InputEventMouseMotion and _dragging:
 		_update_drag((event as InputEventMouseMotion).position)
 		get_viewport().set_input_as_handled()
 
 func _pixel_to_cell(local: Vector2) -> Vector2i:
-	var rel := local - _origin
-	return Vector2i(int(floor(rel.x / _cell_size)), int(floor(rel.y / _cell_size)))
+	return _cell_at_point(local)
 
 func _begin_drag(screen_pos: Vector2) -> void:
 	var cell := _pixel_to_cell(to_local(screen_pos))
+	_press_cell = cell
+	_drag_moved = false
 	if not board.in_bounds(cell):
+		return
+	# Armed booster: a plain tap fires it — no path drawing.
+	if _armed_booster_id != &"":
 		return
 	var cell_data := board.get_cell(cell)
 	if cell_data == null or not cell_data.is_selectable():
@@ -277,9 +428,11 @@ func _begin_drag(screen_pos: Vector2) -> void:
 	Audio.play(&"select", 0.0)
 
 func _update_drag(screen_pos: Vector2) -> void:
+	var cell := _pixel_to_cell(to_local(screen_pos))
+	if cell != _press_cell:
+		_drag_moved = true
 	if not _dragging:
 		return
-	var cell := _pixel_to_cell(to_local(screen_pos))
 	if not board.in_bounds(cell):
 		return
 	if _current_path.size() >= 2 and cell == _current_path[_current_path.size() - 2]:
@@ -293,23 +446,51 @@ func _update_drag(screen_pos: Vector2) -> void:
 	var cell_data := board.get_cell(cell)
 	if cell_data == null or not cell_data.is_selectable():
 		return
-	var target := board.get_path_target_color(_current_path)
-	if target != BoardModel.RAINBOW_COLOR_ID and cell_data.color_id != BoardModel.RAINBOW_COLOR_ID and cell_data.color_id != target:
-		return
+	# Power tiles connect to any colour; otherwise the path must stay on one.
+	if not cell_data.has_power():
+		var target := board.get_path_target_color(_current_path)
+		if target != BoardModel.RAINBOW_COLOR_ID and cell_data.color_id != BoardModel.RAINBOW_COLOR_ID and cell_data.color_id != target:
+			return
 	_current_path.append(cell)
 	_refresh_selection_visual()
 	Audio.play(&"select", clampf(float(_current_path.size()) / 10.0, 0.0, 1.0))
 
-func _end_drag() -> void:
+func _end_drag(screen_pos: Vector2 = Vector2.ZERO) -> void:
+	# Armed-booster tap.
+	if _armed_booster_id != &"":
+		var tap := _pixel_to_cell(to_local(screen_pos)) if screen_pos != Vector2.ZERO else _press_cell
+		if board.in_bounds(tap):
+			var tc := board.get_cell(tap)
+			if tc != null and (tc.is_selectable() or tc.is_stone() or tc.is_timebomb()):
+				var used := _armed_booster_id
+				_armed_booster_id = &""
+				_armed_power_id = &""
+				_locked_input = true
+				booster_committed.emit(used)
+				_apply_power_booster_at(tap, _power_for_booster(used))
+				return
+		disarm_booster()
+		return
+
 	if not _dragging:
 		return
 	_dragging = false
 	var path := _current_path
 	_current_path = []
 	_refresh_selection_visual()
-	if path.size() >= board.min_group_size:
+
+	# Single tap on a lone power tile -> detonate it.
+	if path.size() == 1 and not _drag_moved and board.get_cell(path[0]).has_power():
+		_locked_input = true
+		_play_power_tap(path[0])
+		return
+	if board.validate_path(path):
 		_locked_input = true
 		_play_move(path)
+
+func _power_for_booster(booster_id: StringName) -> StringName:
+	var def: Dictionary = GameData.boosters.get(booster_id, {})
+	return StringName(String(def.get("power", booster_id)))
 
 func _refresh_selection_visual() -> void:
 	for x in board.width:
@@ -355,6 +536,18 @@ func _play_move(path: Array[Vector2i]) -> void:
 		_locked_input = false
 		return
 	await _animate_result(result, path.size())
+	_locked_input = false
+	move_resolved.emit(result)
+	if not board.has_any_valid_move():
+		await _reshuffle()
+
+## Single tap on a power tile the player already built.
+func _play_power_tap(pos: Vector2i) -> void:
+	var result := ChainResolver.resolve_power_tap(board, pos, power_config, rng, available_colors, rainbow_chance)
+	if not result.valid:
+		_locked_input = false
+		return
+	await _animate_result(result, 0)
 	_locked_input = false
 	move_resolved.emit(result)
 	if not board.has_any_valid_move():
@@ -446,23 +639,26 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			pop_tweens.append(last_pop)
 		if wave_hits > 0:
 			var wave_center := wave_sum / float(wave_hits)
-			var flash_col := wave_tint
-			if wave_info.has("power_id"):
-				flash_col = Color(1, 1, 1)
-			var amount := 8 + wave_index * 2
+			var is_power := wave_info.has("power_id")
+			var flash_col := Color(1, 1, 1) if is_power else wave_tint
+			# Tiered feedback: a plain 3-match is quiet (small bursts, no flash);
+			# a bigger clear or any power wave escalates.
+			var big := wave_hits >= 5 or is_power
+			var amount := (6 if not big else 10) + wave_index * 2
 			if fever_active:
 				amount = int(amount * 1.7)
 				flash_col = flash_col.lerp(VisualTheme.FEVER_HOT, 0.35)
-			# impact lands at the anticipation peak
 			await get_tree().create_timer(anticip).timeout
 			for pos in cells:
 				var node := _node_at(pos)
 				if node != null:
 					particles.burst(node.global_position, wave_tint.lerp(VisualTheme.FEVER_HOT, 0.4) if fever_active else wave_tint, amount)
-			var flash_r := _cell_size * (1.2 + 0.14 * float(wave_hits))
-			particles.flash(to_global(wave_center), flash_col, flash_r * (1.4 if fever_active else 1.0))
-			if wave_info.has("power_id"):
-				ScreenShake.apply(self, 4.0 + float(wave_hits) * 0.4, 0.2)
+			if big:
+				var flash_r := _cell_size * (1.2 + 0.14 * float(wave_hits))
+				particles.flash(to_global(wave_center), flash_col, flash_r * (1.4 if fever_active else 1.0))
+			if is_power:
+				ScreenShake.apply(self, 4.0 + float(wave_hits) * 0.5, 0.2)
+				Haptics.light()
 
 		if wave_index < result.wave_cells.size() - 1:
 			await get_tree().create_timer(_WAVE_STAGGER * _cascade_scale).timeout
@@ -515,8 +711,10 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 
 	_resync_all_from_board()
 	_settle_frozen_cells(result.frozen_cells)
+	if result.powers_formed:
+		await _animate_powers_formed(result)
 
-	if not result.cleared_cells.is_empty() and (chain_depth > 1 or result.cleared_cells.size() >= 6):
+	if not result.powers_formed and not result.cleared_cells.is_empty() and (chain_depth > 1 or result.cleared_cells.size() >= 5):
 		var anchor := Vector2.ZERO
 		for cp in result.cleared_cells:
 			anchor += _slot_center(cp)
@@ -524,10 +722,62 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		anchor.y -= _cell_size * 0.6
 		var pr := VisualTheme.praise(chain_depth, result.cleared_cells.size())
 		var sub := "COMBO x%d" % chain_depth if chain_depth > 1 else ""
-		ComboPopup.spawn(self, anchor, String(pr["text"]), pr["color"], 46, sub)
+		var fs := 40 + mini(chain_depth, 6) * 4
+		ComboPopup.spawn(self, anchor, String(pr["text"]), pr["color"], fs, sub)
 		var tier := _combo_tier(chain_depth)
 		if tier >= 0:
 			Audio.play(&"combo_ding", 0.0, tier)
+
+const _POWER_LABELS := {
+	&"bomb": "BOMB", &"lightning": "LIGHTNING", &"freeze": "FREEZE",
+	&"chain": "CHAIN", &"rainbow": "RAINBOW",
+}
+const _POWER_TINTS := {
+	&"bomb": Color(1.0, 0.35, 0.3), &"lightning": Color(1.0, 0.9, 0.35),
+	&"freeze": Color(0.6, 0.9, 1.0), &"chain": Color(0.4, 1.0, 0.6),
+	&"rainbow": Color(0.9, 0.6, 1.0),
+}
+
+## "Power discovery" beat — a big plain match just LEFT a power tile on the
+## board (not detonated). Pop it in, ring-flash it, name it the first few
+## times so the player learns what they made, and nudge them to use it.
+func _animate_powers_formed(result: ChainResolver.MoveResult) -> void:
+	var seen: Dictionary = SaveService.get_value("powers_seen", {})
+	var first_pid := &""
+	var first_pos := Vector2.ZERO
+	var last_tween: Tween = null
+	for entry in result.powers_created:
+		var pos: Vector2i = entry["pos"]
+		var pid: StringName = entry["power_id"]
+		var node := _node_at(pos)
+		if node == null:
+			continue
+		if first_pid == &"":
+			first_pid = pid
+			first_pos = node.position
+		var tint: Color = _POWER_TINTS.get(pid, Color(1, 1, 1))
+		particles.flash(node.global_position, tint, _cell_size * 2.6)
+		particles.burst(node.global_position, tint, 14)
+		node.scale = Vector2(0.2, 0.2)
+		var t := create_tween()
+		t.tween_property(node, "scale", Vector2(1.32, 1.32), 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		t.tween_property(node, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_SINE)
+		last_tween = t
+	Audio.play(_power_sfx_id(first_pid), 0.2, 0)
+	Haptics.light()
+	ScreenShake.apply(self, 3.0, 0.16)
+	if last_tween != null:
+		await last_tween.finished
+
+	# Teach the name + "connect it to fire" the first two times per type.
+	var shown := int(seen.get(String(first_pid), 0))
+	if shown < 2 and first_pid != &"":
+		var label: String = _POWER_LABELS.get(first_pid, "POWER")
+		ComboPopup.spawn(self, first_pos - Vector2(0, _cell_size * 0.9), "%s READY" % label,
+			_POWER_TINTS.get(first_pid, Color(1, 1, 1)), 34, "connect it to fire")
+		seen[String(first_pid)] = shown + 1
+		SaveService.set_value("powers_seen", seen)
+		SaveService.save()
 
 ## Frost-settle beat for cells the Freeze power just encased: an icy burst
 ## and a quick over-shoot scale on each newly-frozen node.
@@ -557,7 +807,28 @@ func _combo_tier(chain_depth: int) -> int:
 
 # ------------------------------------------------------------ boosters --
 
-## Detonates a Bomb/Lightning/Rainbow booster at a random eligible cell.
+## Detonates a targeted booster (Bomb/Lightning/Freeze/Rainbow) at `pos`.
+## Called from _end_drag when an armed booster is tapped onto the board.
+func _apply_power_booster_at(pos: Vector2i, power_id: StringName) -> void:
+	if board == null:
+		_locked_input = false
+		return
+	var cell := board.get_cell(pos)
+	if cell == null:
+		_locked_input = false
+		return
+	var result := ChainResolver.detonate_power_at(board, pos, power_id, power_config, rng, available_colors, rainbow_chance)
+	if not result.valid:
+		_locked_input = false
+		return
+	await _animate_result(result)
+	_locked_input = false
+	booster_resolved.emit(result)
+	if not board.has_any_valid_move():
+		await _reshuffle()
+
+## Random-cell fallback (kept for any caller that fires a booster without a
+## chosen target).
 func apply_power_booster(power_id: StringName) -> void:
 	if _locked_input or board == null:
 		return
@@ -571,13 +842,7 @@ func apply_power_booster(power_id: StringName) -> void:
 	if candidates.is_empty():
 		return
 	_locked_input = true
-	var pos: Vector2i = candidates[rng.randi_range(0, candidates.size() - 1)]
-	var result := ChainResolver.detonate_power_at(board, pos, power_id, power_config, rng, available_colors, rainbow_chance)
-	await _animate_result(result)
-	_locked_input = false
-	booster_resolved.emit(result)
-	if not board.has_any_valid_move():
-		await _reshuffle()
+	await _apply_power_booster_at(candidates[rng.randi_range(0, candidates.size() - 1)], power_id)
 
 ## Shuffles the whole board without consuming a move (Shuffle booster).
 func request_shuffle() -> void:

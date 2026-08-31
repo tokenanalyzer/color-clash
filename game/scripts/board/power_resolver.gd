@@ -20,39 +20,51 @@ static func affected_cells(board: BoardModel, pos: Vector2i, power_id: StringNam
 		_:
 			return []
 
-## Freeze shatters a small diamond (Manhattan radius) and then encases the
-## ring one step further out — see ChainResolver, which applies the ring.
+## The hex ring at exactly `distance` steps from `pos` (BFS on the honeycomb
+## neighbour graph). distance 0 = just `pos`.
+static func hex_ring(board: BoardModel, pos: Vector2i, distance: int) -> Array[Vector2i]:
+	var dist := {pos: 0}
+	var frontier: Array[Vector2i] = [pos]
+	for step in distance:
+		var next: Array[Vector2i] = []
+		for p in frontier:
+			for n in board.get_neighbors(p):
+				if not dist.has(n):
+					dist[n] = step + 1
+					next.append(n)
+		frontier = next
+	var out: Array[Vector2i] = []
+	for k in dist.keys():
+		if dist[k] == distance:
+			out.append(k)
+	return out
+
+## Every cell within `radius` hex steps of `pos` (inclusive).
+static func hex_disc(board: BoardModel, pos: Vector2i, radius: int) -> Array[Vector2i]:
+	var dist := {pos: 0}
+	var frontier: Array[Vector2i] = [pos]
+	var out: Array[Vector2i] = [pos]
+	for step in radius:
+		var next: Array[Vector2i] = []
+		for p in frontier:
+			for n in board.get_neighbors(p):
+				if not dist.has(n):
+					dist[n] = step + 1
+					next.append(n)
+					out.append(n)
+		frontier = next
+	return out
+
+## Freeze shatters a small hex disc, then encases the ring one step further
+## out — see ChainResolver, which applies the ring.
 static func freeze_ring_cells(board: BoardModel, pos: Vector2i, radius: int = 1) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	var ring := radius + 1
-	for dx in range(-ring, ring + 1):
-		for dy in range(-ring, ring + 1):
-			if abs(dx) + abs(dy) != ring:
-				continue
-			var p := pos + Vector2i(dx, dy)
-			if board.in_bounds(p):
-				cells.append(p)
-	return cells
+	return hex_ring(board, pos, radius + 1)
 
 static func _diamond_cells(board: BoardModel, pos: Vector2i, radius: int) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for dx in range(-radius, radius + 1):
-		for dy in range(-radius, radius + 1):
-			if abs(dx) + abs(dy) > radius:
-				continue
-			var p := pos + Vector2i(dx, dy)
-			if board.in_bounds(p):
-				cells.append(p)
-	return cells
+	return hex_disc(board, pos, radius)
 
 static func _bomb_cells(board: BoardModel, pos: Vector2i, radius: int) -> Array[Vector2i]:
-	var cells: Array[Vector2i] = []
-	for dx in range(-radius, radius + 1):
-		for dy in range(-radius, radius + 1):
-			var p := pos + Vector2i(dx, dy)
-			if board.in_bounds(p):
-				cells.append(p)
-	return cells
+	return hex_disc(board, pos, radius)
 
 static func _line_cells(board: BoardModel, pos: Vector2i, horizontal: bool) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []

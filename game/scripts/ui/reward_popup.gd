@@ -17,10 +17,6 @@ const _RARITY_TINT := {
 	&"epic": Color(0.62, 0.36, 0.92),
 	&"legendary": Color(1.0, 0.78, 0.24),
 }
-const _BOOSTER_GLYPH := {
-	&"bomb": "💣", &"lightning": "⚡", &"rainbow": "🌈", &"shuffle": "🔀", &"extra_moves": "➕",
-}
-
 var _rewards: Array = []
 var _rarity: StringName = &"common"
 var _rows: VBoxContainer
@@ -180,12 +176,18 @@ func _add_reward_row(r: Dictionary) -> void:
 		label.create_tween().tween_method(
 			func(v: float): label.text = "+%d" % int(round(v)), 0.0, float(amount), 0.5)
 	elif kind == "booster":
-		var g := VisualTheme.label(_BOOSTER_GLYPH.get(StringName(String(r.get("id", ""))), "★"), 26)
+		var g := IconDraw.IconRect.new()
+		g.id = StringName(String(r.get("id", "bomb")))
+		g.custom_minimum_size = Vector2(32, 32)
 		row.add_child(g)
-		label.text = "%s  x%d" % [String(r.get("id", "booster")).capitalize(), amount]
+		label.text = "%s  x%d" % [String(r.get("id", "booster")).capitalize().replace("_", " "), amount]
 		row.add_child(label)
 	elif kind == "stars":
-		label.text = "%d ★" % amount
+		var sr := HUD.GemIcon.new()
+		sr.kind = &"score"
+		sr.custom_minimum_size = Vector2(30, 30)
+		row.add_child(sr)
+		label.text = "x%d" % amount
 		label.add_theme_color_override("font_color", VisualTheme.STAR)
 		row.add_child(label)
 	else:

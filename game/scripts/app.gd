@@ -6,8 +6,11 @@ extends Node2D
 ## Board/HUD/Map are built entirely in code — see board_view.gd, hud.gd,
 ## level_map.gd — so there is no hand-authored scene file to keep in sync.
 
-const BOARD_TOP_MARGIN := 220.0
-const BOARD_BOTTOM_MARGIN := 170.0
+## Reserved bands above / below the playfield for the HUD top bar + fever
+## meter and the booster tray. `_safe_inset()` widens them on notched
+## phones so the board never slides under the chrome.
+const BOARD_TOP_MARGIN := 240.0
+const BOARD_BOTTOM_MARGIN := 230.0
 ## Moves-remaining threshold (with the objective still incomplete) at which
 ## the music eases into a "tension" mix — a subtle nudge, not a punishment.
 const NEAR_FAIL_MOVES := 3
@@ -31,6 +34,7 @@ var _fever: FeverSystem
 var _objectives: ObjectiveTracker
 var _was_near_fail: bool = false
 var _was_fever: bool = false
+var _armed_booster: StringName = &""
 var _music_token: int = 0
 
 var _backdrop: Backdrop
@@ -48,6 +52,7 @@ func _ready() -> void:
 	add_child(game_canvas)
 	_hud = HUD.new()
 	game_canvas.add_child(_hud)
+	get_viewport().size_changed.connect(_relayout_board)
 	_hud.booster_pressed.connect(_on_booster_pressed)
 	_hud.next_level_pressed.connect(_on_next_level_pressed)
 	_hud.retry_pressed.connect(_on_retry_pressed)
@@ -56,7 +61,7 @@ func _ready() -> void:
 	_hud.resume_pressed.connect(_on_resume_pressed)
 
 	_board_layer = Node2D.new()
-	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN)
+	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN + _safe_inset().x)
 	add_child(_board_layer)
 
 	var map_canvas := CanvasLayer.new()
@@ -96,10 +101,29 @@ func _ready() -> void:
 	_menu.visible = true
 	_menu.modulate.a = 1.0
 
+func _safe_inset() -> Vector2:
+	var safe := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y <= 0 or safe.size.y <= 0:
+		return Vector2.ZERO
+	var sy := get_viewport().get_visible_rect().size.y / float(win.y)
+	return Vector2(maxf(safe.position.y * sy, 0.0), maxf((win.y - safe.end.y) * sy, 0.0))
+
 func _board_rect() -> Rect2:
 	var vp_size := get_viewport().get_visible_rect().size
-	var height := vp_size.y - BOARD_TOP_MARGIN - BOARD_BOTTOM_MARGIN
+	var inset := _safe_inset()
+	var top := BOARD_TOP_MARGIN + inset.x
+	var bottom := BOARD_BOTTOM_MARGIN + inset.y
+	var height := maxf(vp_size.y - top - bottom, vp_size.x * 0.6)
 	return Rect2(Vector2.ZERO, Vector2(vp_size.x, height))
+
+## Reposition the board layer + re-fit the board when the viewport/orientation
+## changes (portrait aspect-ratio adaptation).
+func _relayout_board() -> void:
+	var inset := _safe_inset()
+	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN + inset.x)
+	if _board != null and _current_level != null:
+		_board.refit(_board_rect())
 
 # --------------------------------------------------------- screen flow --
 
@@ -188,6 +212,7 @@ func _start_level(level_id: int) -> void:
 	_fever.reset()
 	_was_near_fail = false
 	_was_fever = false
+	_armed_booster = &""
 	_backdrop.set_accent_target(VisualTheme.ACCENT, 0.2)
 	_music_token += 1
 	_objectives = ObjectiveTracker.new(_current_level.objectives)
@@ -200,11 +225,15 @@ func _start_level(level_id: int) -> void:
 	_board.setup(_current_level, GameData.colors, GameData.power_config, rainbow_chance, randi(), _board_rect())
 	_board.move_resolved.connect(_on_move_resolved)
 	_board.booster_resolved.connect(_on_booster_resolved)
+	_board.booster_committed.connect(_on_booster_committed)
+	_board.booster_disarmed.connect(func(): _hud.set_booster_armed(&""))
+	_hud.set_booster_armed(&"")
 
 	_hud.hide_end_panel()
 	_hud.set_level_info(_current_level)
 	_hud.set_moves(_moves_left)
 	_hud.set_coins(Economy.coins)
+	_hud.set_score(_score)
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 	_refresh_booster_counts()
@@ -229,6 +258,7 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 
 	_hud.set_moves(_moves_left)
 	_hud.set_coins(Economy.coins)
+	_hud.set_score(_score)
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 
@@ -349,7 +379,9 @@ func _on_retry_pressed() -> void:
 
 func _on_pause_pressed() -> void:
 	if _board != null:
+		_board.disarm_booster()
 		_board.set_input_locked(true)
+	_armed_booster = &""
 	Music.set_state(&"tension")
 	_hud.show_pause_panel(true)
 
@@ -358,26 +390,42 @@ func _on_resume_pressed() -> void:
 		_board.set_input_locked(false)
 	Music.set_state(_compute_music_state(0))
 
+## Booster tapped in the tray. Targeted boosters (Bomb / Lightning / Freeze
+## / Rainbow) ARM — the player then taps a jewel and the charge is spent on
+## `booster_committed`. Instant boosters (Shuffle / +Moves) fire now.
 func _on_booster_pressed(booster_id: StringName) -> void:
-	if not Boosters.use(booster_id):
-		if not Boosters.purchase(booster_id):
-			return
-		Boosters.use(booster_id)
-	_refresh_booster_counts()
-	_hud.set_coins(Economy.coins)
+	if _board == null:
+		return
+	# Toggle off if this one is already armed.
+	if _board.is_booster_armed() and _armed_booster == booster_id:
+		_board.disarm_booster()
+		_armed_booster = &""
+		return
+	if Boosters.get_count(booster_id) <= 0:
+		return
 
 	var def: Dictionary = GameData.boosters.get(booster_id, {})
-	match String(def.get("effect", "")):
-		"clear_random_cluster":
-			_board.apply_power_booster(&"bomb")
-		"clear_line":
-			_board.apply_power_booster(&"lightning")
-		"clear_color":
-			_board.apply_power_booster(&"rainbow")
-		"shuffle_board":
-			_board.request_shuffle()
-		"add_moves":
-			_moves_left += int(def.get("value", 5))
-			_hud.set_moves(_moves_left)
-		_:
-			pass
+	if bool(def.get("instant", false)):
+		if not Boosters.use(booster_id):
+			return
+		_refresh_booster_counts()
+		_hud.flash_booster(booster_id)
+		match String(def.get("effect", "")):
+			"shuffle_board":
+				_board.request_shuffle()
+			"add_moves":
+				_moves_left += int(def.get("value", 5))
+				_hud.set_moves(_moves_left)
+		return
+
+	# Targeted: arm it.
+	_armed_booster = booster_id
+	_board.arm_booster(booster_id, StringName(String(def.get("power", booster_id))))
+	_hud.set_booster_armed(booster_id)
+
+func _on_booster_committed(booster_id: StringName) -> void:
+	Boosters.use(booster_id)
+	_armed_booster = &""
+	_refresh_booster_counts()
+	_hud.set_booster_armed(&"")
+	_hud.flash_booster(booster_id)

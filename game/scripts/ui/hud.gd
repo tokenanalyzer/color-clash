@@ -14,6 +14,7 @@ signal pause_pressed()
 signal resume_pressed()
 
 var _level_label: Label
+var _score_label: Label
 var _moves_value: Label
 var _moves_pill: PanelContainer
 var _objective_row: HBoxContainer
@@ -24,6 +25,10 @@ var _fever_label: Label
 var _fever_wrap: Control
 var _booster_buttons: Dictionary = {}
 var _booster_badges: Dictionary = {}
+var _booster_slots: Dictionary = {}      # id -> Control (for scale/armed FX)
+var _booster_counts: Dictionary = {}     # id -> int (last known)
+var _armed_booster: StringName = &""
+var _hint_label: Label
 var _end_panel: PanelContainer
 var _end_center: CenterContainer
 var _end_title: Label
@@ -41,18 +46,29 @@ var _displayed_coins: int = 0
 var _fever_running := false
 var _fever_pulse: Tween
 
-const _BOOSTER_ICONS := {
-	&"bomb": "💣", &"lightning": "⚡", &"rainbow": "🌈", &"shuffle": "🔀", &"extra_moves": "➕",
-}
+## Order + identity of the in-level booster tray. Icons are code-drawn
+## (IconDraw) — no emoji (Android dropped the legacy emoji font).
+const _BOOSTER_ORDER: Array[StringName] = [
+	&"bomb", &"lightning", &"freeze", &"rainbow", &"shuffle", &"extra_moves",
+]
 const _BOOSTER_TINT := {
 	&"bomb": Color(0.85, 0.22, 0.28), &"lightning": Color(0.98, 0.72, 0.14),
-	&"rainbow": Color(0.62, 0.34, 0.94), &"shuffle": Color(0.2, 0.7, 0.55),
-	&"extra_moves": Color(0.3, 0.6, 0.95),
+	&"freeze": Color(0.28, 0.66, 0.96), &"rainbow": Color(0.62, 0.34, 0.94),
+	&"shuffle": Color(0.2, 0.7, 0.55), &"extra_moves": Color(0.3, 0.6, 0.95),
 }
+
+## Screen-edge insets (notch / status bar / gesture bar) in viewport units,
+## resolved from DisplayServer.get_display_safe_area(). Everything at the
+## top/bottom of the HUD is pushed in by these so nothing is ever clipped.
+var _safe_top := 0.0
+var _safe_bottom := 0.0
+var _top_margin: MarginContainer
+var _bottom_col: VBoxContainer
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resolve_safe_area()
 	_build_top_bar()
 	_build_fever_meter()
 	_build_booster_bar()
@@ -75,6 +91,25 @@ func _track_size() -> void:
 	var vp := get_viewport_rect().size
 	size = vp
 	custom_minimum_size = vp
+	_resolve_safe_area()
+	if _top_margin != null:
+		_top_margin.add_theme_constant_override("margin_top", int(_safe_top + 40.0))
+	if _bottom_col != null:
+		_bottom_col.offset_bottom = -int(_safe_bottom + 14.0)
+	if _fever_wrap != null:
+		_fever_wrap.offset_top = _safe_top + 138.0
+	if _level_label != null:
+		_level_label.offset_top = _safe_top + 12.0
+
+func _resolve_safe_area() -> void:
+	var vp := get_viewport_rect().size
+	var safe := DisplayServer.get_display_safe_area()
+	var win := DisplayServer.window_get_size()
+	if win.y <= 0 or safe.size.y <= 0:
+		return
+	var sy := vp.y / float(win.y)
+	_safe_top = maxf(float(safe.position.y) * sy, 0.0)
+	_safe_bottom = maxf(float(win.y - (safe.position.y + safe.size.y)) * sy, 0.0)
 
 # ------------------------------------------------------------- top bar --
 
@@ -102,9 +137,10 @@ func _pill(child: Control, min_w: float = 0.0) -> PanelContainer:
 func _build_top_bar() -> void:
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 44)
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", int(_safe_top + 30.0))
+	_top_margin = margin
 	add_child(margin)
 
 	var row := HBoxContainer.new()
@@ -165,16 +201,23 @@ func _build_top_bar() -> void:
 	)
 	row.add_child(gear)
 
-	_level_label = VisualTheme.label("Level 1", 15, VisualTheme.TEXT_DIM, 3)
+	_level_label = VisualTheme.label("LEVEL 1", 16, VisualTheme.TEXT_GOLD, 4)
 	_level_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_level_label.offset_top = 16
+	_level_label.offset_top = 12
 	_level_label.custom_minimum_size = Vector2(0, 22)
 	add_child(_level_label)
 
 # ------------------------------------------------------------ fever --
 
 func _build_fever_meter() -> void:
+	_score_label = VisualTheme.label("0", 22, VisualTheme.TEXT, 4)
+	_score_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label.offset_top = _safe_top + 108.0
+	_score_label.custom_minimum_size = Vector2(0, 26)
+	add_child(_score_label)
+
 	_fever_wrap = Control.new()
 	_fever_wrap.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_fever_wrap.offset_top = 150
@@ -208,52 +251,99 @@ func _bar_style(c: Color) -> StyleBoxFlat:
 # ---------------------------------------------------------- boosters --
 
 func _build_booster_bar() -> void:
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	margin.add_theme_constant_override("margin_left", 16)
-	margin.add_theme_constant_override("margin_right", 16)
-	margin.add_theme_constant_override("margin_bottom", 26)
-	add_child(margin)
+	# Anchored directly (not via a MarginContainer) so it has a real rect on
+	# a Control that's parented to a CanvasLayer.
+	var col := VBoxContainer.new()
+	col.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	col.offset_left = 10
+	col.offset_right = -10
+	col.offset_top = -150
+	col.offset_bottom = -int(_safe_bottom + 14.0)
+	col.alignment = BoxContainer.ALIGNMENT_END
+	col.add_theme_constant_override("separation", 6)
+	_bottom_col = col
+	add_child(col)
+
+	_hint_label = VisualTheme.label("", 15, VisualTheme.TEXT_GOLD, 4)
+	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label.custom_minimum_size = Vector2(0, 20)
+	col.add_child(_hint_label)
 
 	var tray := PanelContainer.new()
-	tray.add_theme_stylebox_override("panel", VisualTheme.panel(VisualTheme.PANEL, 26, VisualTheme.PANEL_BORDER, 2))
-	margin.add_child(tray)
+	tray.add_theme_stylebox_override("panel", VisualTheme.panel(VisualTheme.PANEL_RAISED, 24, VisualTheme.PANEL_BORDER_BRIGHT, 2))
+	col.add_child(tray)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 8)
 	tray.add_child(row)
 
-	for id in _BOOSTER_ICONS.keys():
-		var slot := Control.new()
-		slot.custom_minimum_size = Vector2(62, 66)
-		var btn := Button.new()
-		btn.text = _BOOSTER_ICONS[id]
-		btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-		btn.add_theme_font_size_override("font_size", 26)
+	for id in _BOOSTER_ORDER:
 		var tint: Color = _BOOSTER_TINT[id]
-		btn.add_theme_stylebox_override("normal", VisualTheme.button_face(tint.darkened(0.15), 16))
-		btn.add_theme_stylebox_override("hover", VisualTheme.button_face(tint, 16))
-		btn.add_theme_stylebox_override("pressed", VisualTheme.button_face(tint.darkened(0.35), 16))
+		var slot := Control.new()
+		slot.custom_minimum_size = Vector2(66, 72)
+		slot.pivot_offset = slot.custom_minimum_size * 0.5
+
+		var chip := BoosterChip.new()
+		chip.tint = tint
+		chip.booster_id = id
+		chip.set_anchors_preset(Control.PRESET_FULL_RECT)
+		slot.add_child(chip)
+
+		var btn := Button.new()
+		btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+		btn.flat = true
 		btn.focus_mode = Control.FOCUS_NONE
+		var empty := StyleBoxEmpty.new()
+		for s in ["normal", "hover", "pressed", "disabled", "focus"]:
+			btn.add_theme_stylebox_override(s, empty)
 		btn.pressed.connect(func():
 			Audio.play(&"button_tap")
 			booster_pressed.emit(id)
 		)
 		slot.add_child(btn)
 
-		var badge := VisualTheme.label("0", 14, VisualTheme.TEXT, 4)
+		var badge := VisualTheme.label("0", 15, VisualTheme.TEXT, 4)
 		badge.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		badge.offset_left = -20
-		badge.offset_top = -20
-		badge.custom_minimum_size = Vector2(20, 20)
+		badge.offset_left = -22
+		badge.offset_top = -22
+		badge.custom_minimum_size = Vector2(22, 22)
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		badge.add_theme_stylebox_override("normal", VisualTheme.panel(Color(0.06, 0.07, 0.12, 0.95), 10, VisualTheme.PANEL_BORDER_BRIGHT, 1))
+		badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		badge.add_theme_stylebox_override("normal", VisualTheme.panel(Color(0.05, 0.06, 0.11, 0.98), 11, VisualTheme.PANEL_BORDER_BRIGHT, 1))
 		slot.add_child(badge)
 
 		row.add_child(slot)
 		_booster_buttons[id] = btn
 		_booster_badges[id] = badge
+		_booster_slots[id] = slot
+		_booster_counts[id] = 0
+
+## Called by the controller so the tray can show which booster is armed
+## and prompt the player. Pass &"" to clear.
+func set_booster_armed(id: StringName) -> void:
+	_armed_booster = id
+	for bid in _booster_slots.keys():
+		var slot: Control = _booster_slots[bid]
+		var chip = slot.get_child(0)
+		chip.armed = (bid == id)
+		chip.queue_redraw()
+		var t := slot.create_tween()
+		t.tween_property(slot, "scale", Vector2(1.12, 1.12) if bid == id else Vector2.ONE, 0.14).set_trans(Tween.TRANS_BACK)
+	if id == &"":
+		_hint_label.text = ""
+	else:
+		var def: Dictionary = GameData.boosters.get(id, {})
+		_hint_label.text = "Tap the board — %s" % String(def.get("help", "")).to_lower()
+		_pulse(_hint_label, 1.06)
+
+func flash_booster(id: StringName) -> void:
+	if not _booster_slots.has(id):
+		return
+	var slot: Control = _booster_slots[id]
+	var t := slot.create_tween()
+	t.tween_property(slot, "scale", Vector2(1.3, 1.3), 0.1).set_trans(Tween.TRANS_BACK)
+	t.tween_property(slot, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_ELASTIC)
 
 # --------------------------------------------------------- overlays --
 
@@ -460,7 +550,29 @@ func _slider_row(label_text: String, initial: float, on_changed: Callable) -> HB
 # ----------------------------------------------------------- updates --
 
 func set_level_info(level: LevelConfig) -> void:
-	_level_label.text = level.level_name
+	_level_label.text = level.level_name.to_upper()
+	set_booster_armed(&"")
+
+var _shown_score := 0
+func set_score(v: int) -> void:
+	if v == _shown_score:
+		_score_label.text = _fmt(v)
+		return
+	var from := _shown_score
+	_shown_score = v
+	var t := create_tween()
+	t.tween_method(func(x: float): _score_label.text = _fmt(int(round(x))), float(from), float(v), 0.35)
+
+func _fmt(n: int) -> String:
+	var s := str(n)
+	var out := ""
+	var c := 0
+	for i in range(s.length() - 1, -1, -1):
+		out = s[i] + out
+		c += 1
+		if c % 3 == 0 and i > 0:
+			out = "," + out
+	return out
 
 func set_moves(remaining: int) -> void:
 	var r := maxi(remaining, 0)
@@ -553,8 +665,16 @@ func flash_fever() -> void:
 func set_booster_counts(counts: Dictionary) -> void:
 	for id in _booster_badges.keys():
 		var n := int(counts.get(id, 0))
+		var prev := int(_booster_counts.get(id, 0))
+		_booster_counts[id] = n
 		_booster_badges[id].text = str(n)
-		_booster_buttons[id].modulate.a = 1.0 if n > 0 else 0.55
+		var slot: Control = _booster_slots[id]
+		slot.modulate.a = 1.0 if n > 0 else 0.42
+		var chip = slot.get_child(0)
+		chip.enabled = n > 0
+		chip.queue_redraw()
+		if n > prev:
+			flash_booster(id)
 
 func show_win_panel(score: int, reward_coins: int, has_next_level: bool, stars: int) -> void:
 	_end_title.text = "Level Complete!"
@@ -610,6 +730,52 @@ func _pulse(node: Control, amount: float = 1.08) -> void:
 	var t := node.create_tween()
 	t.tween_property(node, "scale", Vector2(amount, amount), 0.09).set_trans(Tween.TRANS_SINE)
 	t.tween_property(node, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_SINE)
+
+
+## One booster tray chip: glossy rounded face in its tint, a code-drawn
+## IconDraw glyph, an armed glow-pulse, and a lock overlay when empty.
+class BoosterChip extends Control:
+	var tint: Color = Color(0.5, 0.5, 0.5)
+	var booster_id: StringName = &"bomb"
+	var armed := false
+	var enabled := true
+	var _t := 0.0
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(true)
+
+	func _process(delta: float) -> void:
+		_t += delta
+		if armed:
+			queue_redraw()
+
+	func _draw() -> void:
+		var rr := 16.0
+		var rect := Rect2(Vector2(3, 3), size - Vector2(6, 6))
+		if armed:
+			var p := 0.5 + 0.5 * sin(_t * 8.0)
+			_round(rect.grow(4.0 + 3.0 * p), rr + 4, Color(tint.r, tint.g, tint.b, 0.35 + 0.35 * p))
+		# body: darker base + lighter top band
+		_round(rect, rr, tint.darkened(0.32))
+		_round(Rect2(rect.position, Vector2(rect.size.x, rect.size.y * 0.5)), rr, tint.lightened(0.05))
+		_round(rect.grow(-2.0), rr - 2, tint.darkened(0.12))
+		# top gloss
+		draw_line(rect.position + Vector2(10, 4), rect.position + Vector2(rect.size.x - 10, 4),
+			Color(1, 1, 1, 0.28), 2.0, true)
+		var c := size * 0.5
+		IconDraw.draw_icon(self, booster_id, c - Vector2(0, size.y * 0.06), minf(size.x, size.y) * 0.62, _t)
+		if not enabled:
+			_round(rect, rr, Color(0.04, 0.05, 0.09, 0.55))
+			draw_arc(c + Vector2(0, -2), size.x * 0.13, PI, TAU, 12, Color(0.8, 0.82, 0.9), 3.0, true)
+			draw_rect(Rect2(c + Vector2(-size.x * 0.13, -2), Vector2(size.x * 0.26, size.y * 0.18)), Color(0.8, 0.82, 0.9))
+
+	func _round(r: Rect2, radius: float, col: Color) -> void:
+		var pts := ShapeDrawUtils.rounded_rect_points(r.size, radius, 5)
+		var moved := PackedVector2Array()
+		for p in pts:
+			moved.append(p + r.position + r.size * 0.5)
+		draw_colored_polygon(moved, col)
 
 
 ## Code-drawn chrome glyph (pause / gear) — avoids missing font glyphs.

@@ -23,10 +23,20 @@ func _rng() -> RandomNumberGenerator:
 ## Checkerboard of blue/green with a red triple along the top row for a
 ## valid, isolated player move that touches nothing else.
 func _board_with_red_triple(w: int, h: int) -> BoardModel:
+	# hex-isolating fill (no matchable group) + a red triple along row 0
 	var board := BoardModel.new(w, h, 3)
-	for x in w:
-		for y in h:
-			board.get_cell(Vector2i(x, y)).color_id = &"blue" if (x + y) % 2 == 0 else &"green"
+	var pal: Array[StringName] = [&"a", &"b", &"c", &"d"]
+	for y in h:
+		for x in w:
+			var used := {}
+			for n in board.get_neighbors(Vector2i(x, y)):
+				var nc := board.get_cell(n)
+				if nc != null and not nc.is_empty():
+					used[nc.color_id] = true
+			for cc in pal:
+				if not used.has(cc):
+					board.get_cell(Vector2i(x, y)).color_id = cc
+					break
 	for x in 3:
 		board.get_cell(Vector2i(x, 0)).color_id = &"red"
 	return board
@@ -67,10 +77,10 @@ func test_timebomb_detonates_when_countdown_hits_zero() -> void:
 	check_eq("move_penalty_applied", result.move_penalty, ChainResolver.TIMEBOMB_MOVE_PENALTY)
 	check("counts_as_obstacle_broken", _has_broken(result, &"timebomb"))
 	check("obstacle_removed", not board.get_cell(Vector2i(4, 4)).is_timebomb())
-	# 3x3 blast cleared the neighbourhood (before gravity/refill it was 9
-	# cells; the explosion wave is the last score event)
+	# hex bomb disc = the cell + its 6 neighbours (7); the explosion wave is
+	# the last score event
 	var last_wave: Array = result.wave_cells[result.wave_cells.size() - 1]
-	check("blast_touched_nine_cells", last_wave.size() == 9)
+	check("blast_touched_seven_hexes", last_wave.size() == 7)
 	check_eq("chain_depth_includes_the_blast_wave", result.chain_depth, 2)
 
 func test_clearing_the_piece_on_a_timebomb_defuses_it_without_exploding() -> void:

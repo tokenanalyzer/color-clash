@@ -184,9 +184,10 @@ class DayTile extends Control:
 		var c := Vector2(r.size.x * 0.5, r.size.y * 0.56)
 		var boosters: Dictionary = reward.get("boosters", {})
 		if boosters.size() > 0:
-			var hex := ShapeDrawUtils.regular_polygon(6, 20.0, PI / 6.0, c)
-			draw_colored_polygon(hex, Color(0.6, 0.4, 0.95))
-			draw_string(font, c + Vector2(-6, 6), "B", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
+			var hex := ShapeDrawUtils.regular_polygon(6, 22.0, PI / 6.0, c)
+			draw_colored_polygon(hex, Color(0.42, 0.28, 0.62))
+			var bid := StringName(String(boosters.keys()[0]))
+			IconDraw.draw_icon(self, bid, c, 30.0)
 		else:
 			draw_circle(c, 18.0, VisualTheme.COIN)
 			draw_circle(c, 13.0, VisualTheme.COIN.lightened(0.25))

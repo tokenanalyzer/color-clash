@@ -1,10 +1,11 @@
 class_name ChainResolver
 extends RefCounted
-## Orchestrates one player move: validates the path, clears it, creates
-## power(s) if the group is large enough, and auto-detonates them as part
-## of the same move. Two independent, fully deterministic mechanisms let a
-## single strong move produce a real multi-stage cascade (never a faked
-## counter — every extra wave traces back to an actual board interaction):
+## Orchestrates one player move: validates the path, clears it, and either
+## LEAVES a persistent power tile (a big plain match — the player activates
+## it later) or DETONATES the power tiles the path threaded through. Two
+## independent, fully deterministic mechanisms let an activation produce a
+## real multi-stage cascade (never a faked counter — every extra wave
+## traces back to an actual board interaction):
 ##
 ## 1. MULTIPLE POWERS FROM ONE MOVE. A big enough connected group creates
 ##    more than one power tile, spread across the path (see
@@ -56,6 +57,10 @@ class MoveResult:
 	## Extra moves deducted this resolve (currently only time-bomb blasts).
 	var move_penalty: int = 0
 	var chain_depth: int = 0
+	## True when this move CREATED persistent power tile(s) and stopped
+	## (a big plain match) — the view plays a "power formation" beat rather
+	## than a detonation cascade. See docs/GAME_DESIGN.md "power discovery".
+	var powers_formed: bool = false
 	## How many waves were triggered purely by exposed board state (not by
 	## the player's path or by one power directly catching another) — proof
 	## a cascade is real, useful for tests/analytics.
@@ -65,50 +70,74 @@ class MoveResult:
 	var gravity_moves: Array[Dictionary] = []
 	var refilled_cells: Array[Vector2i] = []
 
+## One player connection. Three outcomes:
+##  * SMALL plain match (below the power threshold) — clears the group.
+##  * BIG plain match — clears the group but for one/some anchor cells, which
+##    become PERSISTENT power tiles. They are NOT detonated here — the player
+##    activates them later (result.powers_formed = true).
+##  * ACTIVATION — the path threads one or more existing power tiles; the
+##    plain cells clear and every threaded power detonates, cascading
+##    (power+power, auto-chain, exactly as before).
 static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config: PowerConfig, rng: RandomNumberGenerator, available_colors: Array[StringName], rainbow_chance: float = 0.0) -> MoveResult:
 	var result := MoveResult.new()
 	if not board.validate_path(path):
 		return result
 	result.valid = true
-
-	var group_size := path.size()
-	var target_color := board.get_path_target_color(path)
-	if target_color == BoardModel.RAINBOW_COLOR_ID:
-		target_color = available_colors[rng.randi_range(0, available_colors.size() - 1)]
-	var power_plan := power_config.powers_for_group_size(group_size)
 	var horizontal := _path_is_horizontal(path)
 
-	var power_positions := _pick_positions_from_list(path, power_plan.size())
-	var skip_set := {}
-	for p in power_positions:
-		skip_set[p] = true
+	var threaded_powers: Array[Vector2i] = []
+	var plain_cells: Array[Vector2i] = []
+	for pos in path:
+		if board.get_cell(pos).has_power():
+			threaded_powers.append(pos)
+		else:
+			plain_cells.append(pos)
 
-	_apply_initial_clear(board, result, path, skip_set)
-	result.chain_depth = 1
+	if not threaded_powers.is_empty():
+		# ---- ACTIVATION ----
+		_apply_initial_clear(board, result, plain_cells, {})
+		result.chain_depth = 1
+		var queue: Array = []
+		var path_oriented := {}
+		for p in threaded_powers:
+			queue.append(p)
+			path_oriented[p] = true
+		_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
+	else:
+		var target_color := board.get_path_target_color(path)
+		if target_color == BoardModel.RAINBOW_COLOR_ID:
+			target_color = available_colors[rng.randi_range(0, available_colors.size() - 1)]
+		var power_plan := power_config.powers_for_group_size(path.size())
+		var anchors := _pick_positions_from_list(path, power_plan.size())
+		var skip := {}
+		for a in anchors:
+			skip[a] = true
+		_apply_initial_clear(board, result, path, skip)
+		result.chain_depth = 1
+		for i in power_plan.size():
+			var pos: Vector2i = anchors[i]
+			var cell := board.get_cell(pos)
+			cell.color_id = target_color
+			cell.power_id = power_plan[i]
+			result.powers_created.append({"pos": pos, "power_id": power_plan[i]})
+		result.powers_formed = not result.powers_created.is_empty()
 
-	var queue: Array = []
-	var path_oriented := {}
-	for i in power_plan.size():
-		var pos: Vector2i = power_positions[i]
-		var power_id: StringName = power_plan[i]
-		var cell := board.get_cell(pos)
-		cell.color_id = target_color
-		cell.power_id = power_id
-		result.powers_created.append({"pos": pos, "power_id": power_id})
-		queue.append(pos)
-		path_oriented[pos] = true
-
-	# Secondary generation only triggers "during cascades" (a power's blast),
-	# not off the player's own plain match — that keeps a common 3/4-length
-	# connect exactly as predictable as before, while a move that actually
-	# creates a power can still snowball into something bigger if the board
-	# state allows it.
-	_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
-
-	# A player move ticks every time bomb still on the board; any that reach
-	# zero detonate now, before gravity, as their own blast wave(s).
 	_tick_timebombs(board, result)
+	result.gravity_moves = board.apply_gravity()
+	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
+	return result
 
+## A single tap on one power tile — detonate just that power (and whatever
+## it chains into). Counts as a move (ticks time bombs).
+static func resolve_power_tap(board: BoardModel, pos: Vector2i, power_config: PowerConfig, rng: RandomNumberGenerator, available_colors: Array[StringName], rainbow_chance: float = 0.0) -> MoveResult:
+	var result := MoveResult.new()
+	var cell := board.get_cell(pos)
+	if cell == null or not cell.has_power():
+		return result
+	result.valid = true
+	result.chain_depth = 1
+	_process_chain_queue(board, result, power_config, [pos], true, {pos: true})
+	_tick_timebombs(board, result)
 	result.gravity_moves = board.apply_gravity()
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result

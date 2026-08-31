@@ -1,14 +1,20 @@
 extends TestCase
 
-func test_bomb_radius_full_in_center() -> void:
+func test_bomb_is_a_hex_disc() -> void:
 	var board := BoardModel.new(5, 5, 3)
+	# radius 1 on the honeycomb = the cell + its 6 neighbours
 	var cells := PowerResolver.affected_cells(board, Vector2i(2, 2), &"bomb", true, &"red", {"radius": 1})
-	check_eq("bomb_center_3x3", cells.size(), 9)
+	check_eq("bomb_centre_is_seven_hexes", cells.size(), 7)
+	check("includes_centre", cells.has(Vector2i(2, 2)))
+	# radius 2 = centre + 6 + 12
+	var big := PowerResolver.affected_cells(board, Vector2i(2, 2), &"bomb", true, &"red", {"radius": 2})
+	check_eq("radius_two_is_nineteen", big.size(), 19)
 
 func test_bomb_clips_at_board_edge() -> void:
 	var board := BoardModel.new(5, 5, 3)
 	var cells := PowerResolver.affected_cells(board, Vector2i(0, 0), &"bomb", true, &"red", {"radius": 1})
-	check_eq("bomb_corner_clipped_to_4", cells.size(), 4)
+	# top-left corner (even row 0) only has 2 neighbours -> 3 hexes total
+	check_eq("bomb_corner_clipped_to_three", cells.size(), 3)
 
 func test_lightning_horizontal_covers_row() -> void:
 	var board := BoardModel.new(5, 6, 3)

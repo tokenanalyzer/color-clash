@@ -6,22 +6,34 @@ Build a globally understandable, highly polished 2D puzzle game with a satisfyin
 
 ## Core interaction
 
-1. Player selects/connects 3+ adjacent matching-color nodes by touch.
-2. On release, the connected group resolves.
-3. Larger groups create special powers.
-4. Powers can trigger chain reactions.
-5. The board resolves completely before the next input is accepted.
-6. Player earns score, coins, and level progress.
+1. Player connects 3+ adjacent matching-colour jewels by touch; on release
+   the group resolves.
+2. A big enough connection **leaves a power tile on the board** (it is not
+   auto-detonated). The player then activates it later.
+3. Activating a power = threading it into another connection (power tiles
+   connect to any colour) or tapping it. That is when it detonates and can
+   chain into other powers / expose fresh clusters.
+4. The board resolves completely before the next input is accepted.
+5. Player earns score, coins, Fever and level progress.
 
-## Core powers
+## Core powers (match size -> tile left on the board)
 
-- 3 colors: standard clear.
-- 4 colors: Bomb.
-- 5 colors: Lightning.
-- 6+ colors: stronger chain power.
-- Rainbow: wildcard / color conversion power.
+- 3: standard clear, no power.
+- 4: **Bomb** — 3x3 blast.
+- 5: **Lightning** — full row + column.
+- 6: **Freeze** — shatters a small diamond and encases the ring in ice.
+- 7: **Chain** — colour-wide / connected-group clear.
+- 8+: **Rainbow** — clears an entire colour (x2 at 10, x3 at 13).
 
-These values are design starting points and must be data-driven for balancing.
+Data-driven (data/powers.json) for balancing.
+
+## Boosters (in-level tray)
+
+Bomb / Lightning / Freeze / Rainbow / Shuffle / +5 Moves. Bomb, Lightning,
+Freeze and Rainbow **arm** — the player then taps a jewel to fire that
+power there; the charge is spent on commit. Shuffle and +Moves fire
+instantly. All icons are code-drawn (no emoji — Android dropped the legacy
+emoji font).
 
 ## Implementation decisions (Phase 1 core)
 
@@ -29,16 +41,20 @@ These clarify ambiguities in the design above, made while implementing the
 first playable core. They are product decisions, not incidental code
 details — revisit them here if they need to change.
 
-- **Grid & adjacency.** The board is an orthogonal (4-directional) grid,
-  not a hex grid or a swap-based match-3 grid. Color Clash's identity is
-  "connect," not "swap," so a free-form connect grid differentiates it
-  from Candy Crush-likes without borrowing the reference mockup's hex
-  layout. Diagonal connections are not allowed.
-- **Power creation & auto-detonation.** A power tile is created at the
-  path's release cell and **immediately detonates as part of the same
-  move** — it never sits on the board waiting to be matched again. If its
-  blast catches another power tile, that one detonates too, and so on
-  until nothing new triggers. This is what makes the documented
+- **Grid & adjacency.** A HONEYCOMB — odd-r offset hex layout, stored on a
+  rectangular `[x][y]` array but with **6-neighbour** adjacency (E, W and
+  two cells on the rows above and below). Matches the reference's
+  interlocking-jewel look. It is a free-form "connect" game, not
+  swap-based. Straight left/right still works so a "row" is a clean line;
+  a "column" zig-zags by half a cell. `BoardModel.get_neighbors()` is the
+  single source of truth; power areas use hex discs/rings
+  (`PowerResolver.hex_disc` / `hex_ring`).
+- **Power discovery (persistent tiles).** A power tile is created at the
+  connection's release cell(s) and **stays on the board** (result
+  .powers_formed). The player activates it later by threading it into
+  another connection (power tiles connect to any colour) or tapping it —
+  that is when it detonates and can chain into other powers / expose
+  fresh clusters. This is what makes the documented
   Match → Power → Explosion → Chain → Combo ladder happen within a single
   swipe, matching the "CHAIN REACTION" reference panel. "Combo" (the
   x2/x4/x7 counter) is the resulting chain depth of one move, not a

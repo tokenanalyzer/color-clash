@@ -1,10 +1,17 @@
 extends TestCase
 
-func test_adjacency() -> void:
-	var board := BoardModel.new(3, 3, 3)
-	check("orthogonal_adjacent", board.is_adjacent(Vector2i(1, 1), Vector2i(1, 2)))
-	check("diagonal_not_adjacent", not board.is_adjacent(Vector2i(1, 1), Vector2i(2, 2)))
-	check("same_cell_not_adjacent", not board.is_adjacent(Vector2i(1, 1), Vector2i(1, 1)))
+func test_hex_adjacency() -> void:
+	# Honeycomb (odd-r offset): every interior cell has 6 neighbours.
+	var board := BoardModel.new(5, 5, 3)
+	check("left_right_adjacent", board.is_adjacent(Vector2i(2, 2), Vector2i(3, 2)))
+	check("same_cell_not_adjacent", not board.is_adjacent(Vector2i(2, 2), Vector2i(2, 2)))
+	check_eq("interior_cell_has_six_neighbours", board.get_neighbors(Vector2i(2, 2)).size(), 6)
+	# even row (y=2): the two cells directly above are (2,1) and (1,1)
+	check("even_row_up_neighbours", board.is_adjacent(Vector2i(2, 2), Vector2i(2, 1)) and board.is_adjacent(Vector2i(2, 2), Vector2i(1, 1)))
+	check("even_row_skips_far_diagonal", not board.is_adjacent(Vector2i(2, 2), Vector2i(3, 1)))
+	# odd row (y=1): the two cells above are (1,0) and (2,0)
+	check("odd_row_up_neighbours", board.is_adjacent(Vector2i(1, 1), Vector2i(1, 0)) and board.is_adjacent(Vector2i(1, 1), Vector2i(2, 0)))
+	check_eq("top_left_corner_has_two_neighbours", board.get_neighbors(Vector2i(0, 0)).size(), 2)
 
 func test_validate_path_requires_min_size() -> void:
 	var board := _colored_board(3, 3, &"red")
@@ -118,15 +125,23 @@ func test_has_any_valid_move_true_for_uniform_board() -> void:
 	var board := _colored_board(3, 3, &"red")
 	check("uniform_board_has_move", board.has_any_valid_move())
 
-func test_has_any_valid_move_false_for_isolated_singletons() -> void:
-	var board := BoardModel.new(3, 3, 3)
-	var colors: Array[StringName] = [&"red", &"blue"]
-	var i := 0
-	for x in 3:
-		for y in 3:
-			board.get_cell(Vector2i(x, y)).color_id = colors[(x + y) % 2]
-			i += 1
-	check("checkerboard_has_no_move", not board.has_any_valid_move())
+func test_has_any_valid_move_false_when_every_cell_is_isolated() -> void:
+	# Greedy-colour so no cell shares a colour with any of its 6 hex
+	# neighbours -> every connected group is size 1 -> no valid move.
+	var board := BoardModel.new(4, 4, 3)
+	var palette: Array[StringName] = [&"red", &"blue", &"green", &"yellow", &"purple", &"orange", &"pink"]
+	for y in 4:
+		for x in 4:
+			var used := {}
+			for n in board.get_neighbors(Vector2i(x, y)):
+				var nc := board.get_cell(n)
+				if nc != null and not nc.is_empty():
+					used[nc.color_id] = true
+			for c in palette:
+				if not used.has(c):
+					board.get_cell(Vector2i(x, y)).color_id = c
+					break
+	check("isolated_board_has_no_move", not board.has_any_valid_move())
 
 func _colored_board(w: int, h: int, color: StringName) -> BoardModel:
 	var board := BoardModel.new(w, h, 3)

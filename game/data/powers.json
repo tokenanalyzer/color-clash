@@ -1,8 +1,9 @@
 {
-  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles that group size creates -- a very large connection legitimately earns multiple powers from one real move, which can then interact with each other during the cascade (see ChainResolver). Ladder: bomb(4) -> lightning(5) -> freeze(6) -> chain(7/9/12, count 1/2/3).",
+  "_comment": "Match-size -> power tile. A big enough connection LEAVES a power tile on the board (it is not auto-detonated) — the player activates it later by threading it into another connection or catching it in a blast. Evaluated highest min_size down; first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles a group creates. Ladder: bomb 4 / lightning 5 / freeze 6 / chain 7 / rainbow 8+ (x2 at 10, x3 at 13).",
   "thresholds": [
-    { "power": "chain", "min_size": 12, "count": 3 },
-    { "power": "chain", "min_size": 9, "count": 2 },
+    { "power": "rainbow", "min_size": 13, "count": 3 },
+    { "power": "rainbow", "min_size": 10, "count": 2 },
+    { "power": "rainbow", "min_size": 8, "count": 1 },
     { "power": "chain", "min_size": 7, "count": 1 },
     { "power": "freeze", "min_size": 6, "count": 1 },
     { "power": "lightning", "min_size": 5, "count": 1 },
@@ -37,7 +38,7 @@
       "label": "Rainbow",
       "base_points_per_cell": 16,
       "activation_bonus": 500,
-      "refill_spawn_chance": 0.012
+      "refill_spawn_chance": 0.010
     }
   },
   "base_points_per_piece": 10

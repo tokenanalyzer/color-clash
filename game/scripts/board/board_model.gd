@@ -36,19 +36,37 @@ func get_cell(pos: Vector2i) -> CellData:
 		return null
 	return _grid[pos.x][pos.y]
 
-const _ORTHOGONAL_OFFSETS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+## HONEYCOMB adjacency (odd-r offset layout: odd rows are shifted +½ cell
+## right when drawn). Every cell has up to 6 neighbours — E, W and two on
+## each of the rows above and below. Straight left/right still works, so a
+## "row" is a clean horizontal line; a "column" zig-zags by half a cell.
+const _HEX_EVEN: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(-1, 0),
+	Vector2i(0, -1), Vector2i(-1, -1),
+	Vector2i(0, 1), Vector2i(-1, 1),
+]
+const _HEX_ODD: Array[Vector2i] = [
+	Vector2i(1, 0), Vector2i(-1, 0),
+	Vector2i(1, -1), Vector2i(0, -1),
+	Vector2i(1, 1), Vector2i(0, 1),
+]
 
-func get_orthogonal_neighbors(pos: Vector2i) -> Array[Vector2i]:
+func get_neighbors(pos: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
-	for offset in _ORTHOGONAL_OFFSETS:
+	var offsets := _HEX_ODD if (pos.y & 1) == 1 else _HEX_EVEN
+	for offset in offsets:
 		var n: Vector2i = pos + offset
 		if in_bounds(n):
 			result.append(n)
 	return result
 
+## Kept as an alias — callers that predate the hex grid still work, they
+## just get 6 neighbours now instead of 4.
+func get_orthogonal_neighbors(pos: Vector2i) -> Array[Vector2i]:
+	return get_neighbors(pos)
+
 func is_adjacent(a: Vector2i, b: Vector2i) -> bool:
-	var d := (a - b).abs()
-	return (d.x + d.y) == 1
+	return get_neighbors(a).has(b)
 
 ## Applies an obstacle definition to a cell before the board is generated.
 func set_obstacle(pos: Vector2i, obstacle_id: StringName, hp: int) -> void:
@@ -70,19 +88,34 @@ func generate(rng: RandomNumberGenerator, available_colors: Array[StringName]) -
 				continue
 			cell.color_id = available_colors[rng.randi_range(0, available_colors.size() - 1)]
 
-## Resolves the effective match color of a path, skipping Rainbow wildcards.
+## True if any cell on the path already holds a power tile — such a path is
+## an "activation" (thread the power(s) into a connection), not a plain
+## match, so it only needs 2 cells and power tiles count as any colour.
+func path_has_power(path: Array[Vector2i]) -> bool:
+	for pos in path:
+		var cell := get_cell(pos)
+		if cell != null and cell.has_power():
+			return true
+	return false
+
+## Resolves the effective match colour of a path — the colour every plain
+## cell must share. Rainbow wildcards and power tiles are skipped (they
+## connect to anything).
 func get_path_target_color(path: Array[Vector2i]) -> StringName:
 	for pos in path:
 		var cell := get_cell(pos)
-		if cell != null and cell.color_id != RAINBOW_COLOR_ID:
+		if cell != null and cell.color_id != RAINBOW_COLOR_ID and not cell.has_power():
 			return cell.color_id
 	return RAINBOW_COLOR_ID
 
-## A path is valid when it is long enough, has no repeated cells, every step
-## is orthogonally adjacent to the previous one, every cell is selectable,
-## and every non-wildcard cell shares the same color.
+## A path is valid when it is long enough (min_group_size for a plain match,
+## just 2 when it threads a power tile), has no repeated cells, every step is
+## orthogonally adjacent to the previous one, every cell is selectable, and
+## every plain non-wildcard cell shares one colour. Power tiles and Rainbow
+## wildcards match any colour.
 func validate_path(path: Array[Vector2i]) -> bool:
-	if path.size() < min_group_size:
+	var min_size := 2 if path_has_power(path) else min_group_size
+	if path.size() < min_size:
 		return false
 	var seen := {}
 	for i in path.size():
@@ -102,7 +135,9 @@ func validate_path(path: Array[Vector2i]) -> bool:
 		return true
 	for pos in path:
 		var cell := get_cell(pos)
-		if cell.color_id != RAINBOW_COLOR_ID and cell.color_id != target:
+		if cell.has_power() or cell.color_id == RAINBOW_COLOR_ID:
+			continue
+		if cell.color_id != target:
 			return false
 	return true
 
