@@ -81,6 +81,14 @@ game/
     theme/                 VisualTheme — single source of truth for the
                            premium palette, panel styleboxes, easing and
                            shared primitive draws (glow disc, v-gradient)
+    vfx/GemTextures        bakes the glossy-jewel look ONCE per colour into
+                           cached ImageTextures (per-pixel gradient + facet
+                           + specular + rim + AA) plus shared soft-shadow
+                           and additive-glow sprites; the board then blits
+                           one textured quad per cell — sharp at any phone
+                           resolution and far cheaper than per-frame vector
+                           drawing (the Android "bake once, blit forever"
+                           technique)
     vfx/                   ParticlePool (shard bursts + pooled ImpactFlash
                            rings), ScreenShake (re-entrant safe), ComboPopup
                            (bounce-in praise text), Haptics, Backdrop

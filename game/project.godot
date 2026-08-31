@@ -4,30 +4,14 @@
 config_version=5
 
 [application]
+
 config/name="Color Clash"
+config/description="Connect, blast and combo colourful jewels through a 40-level campaign."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4")
-
-[display]
-
-[display/window]
-size/viewport_width=1080
-size/viewport_height=1920
-size/window_width_override=540
-size/window_height_override=960
-stretch/mode="canvas_items"
-
-[rendering]
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
-textures/default_filters/use_nearest_mipmap_filter=false
-
-[input]
-
-ui_accept={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":4194309,"unicode":13)]
-}
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0.02, 0.03, 0.07, 1)
+boot_splash/show_image=false
 
 [autoload]
 
@@ -42,3 +26,31 @@ Music="*res://scripts/audio/music_director.gd"
 Iap="*res://scripts/services/iap_service.gd"
 Ads="*res://scripts/services/ads_service.gd"
 Firebase="*res://scripts/services/firebase_service.gd"
+
+[display]
+
+[display/window]
+
+size/viewport_width=1080
+size/viewport_height=1920
+size/window_width_override=540
+size/window_height_override=960
+size/resizable=false
+stretch/mode="canvas_items"
+stretch/aspect="expand"
+handheld/orientation="portrait"
+
+[input]
+
+ui_accept={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194309,"unicode":13)]
+}
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.02, 0.03, 0.07, 1)

@@ -43,6 +43,10 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 	available_colors = level.colors
 	rng.seed = rng_seed
 
+	# Bake the jewel textures once (hidden by the level-in fade). Cheap
+	# re-call after the first level — GemTextures caches everything.
+	GemTextures.prime(palette)
+
 	board = BoardModel.new(level.width, level.height, power_config.min_group_size())
 	for obstacle in level.obstacles:
 		var pos := Vector2i(int(obstacle.get("x", 0)), int(obstacle.get("y", 0)))
@@ -412,10 +416,15 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 
 		Audio.play(&"blast", clampf(float(cells.size()) / 10.0, 0.0, 1.0), wave_index)
 
-		var pop_tween: Tween = null
+		# Anticipation -> impact -> reward: the wave's tiles first snap UP a
+		# touch (anticipation), then collapse (impact) with the burst + flash
+		# landing at the peak, then the popup/score reward follows.
+		var anticip := 0.06 * _cascade_scale
+		var collapse := 0.12 * _cascade_scale
 		var wave_sum := Vector2.ZERO
 		var wave_hits := 0
 		var wave_tint := Color(1, 1, 1)
+		var last_pop: Tween = null
 		for pos in cells:
 			if animated.has(pos):
 				continue
@@ -426,25 +435,30 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			var board_cell := board.get_cell(pos)
 			if board_cell != null and not board_cell.is_empty():
 				continue
-			if pop_tween == null:
-				pop_tween = create_tween()
-				pop_tween.set_parallel(true)
 			wave_tint = _burst_color_for(node)
-			var amount := 8 + wave_index * 2
-			if fever_active:
-				amount = int(amount * 1.7)
-				wave_tint = wave_tint.lerp(VisualTheme.FEVER_HOT, 0.4)
-			particles.burst(node.global_position, wave_tint, amount)
 			wave_sum += node.position
 			wave_hits += 1
-			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.15 * _cascade_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
-		if pop_tween != null:
-			pop_tweens.append(pop_tween)
+			var ct := create_tween()
+			ct.tween_property(node, "scale", Vector2(1.18, 1.18), anticip).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+			ct.tween_property(node, "scale", Vector2.ZERO, collapse).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			last_pop = ct
+		if last_pop != null:
+			pop_tweens.append(last_pop)
 		if wave_hits > 0:
 			var wave_center := wave_sum / float(wave_hits)
 			var flash_col := wave_tint
 			if wave_info.has("power_id"):
 				flash_col = Color(1, 1, 1)
+			var amount := 8 + wave_index * 2
+			if fever_active:
+				amount = int(amount * 1.7)
+				flash_col = flash_col.lerp(VisualTheme.FEVER_HOT, 0.35)
+			# impact lands at the anticipation peak
+			await get_tree().create_timer(anticip).timeout
+			for pos in cells:
+				var node := _node_at(pos)
+				if node != null:
+					particles.burst(node.global_position, wave_tint.lerp(VisualTheme.FEVER_HOT, 0.4) if fever_active else wave_tint, amount)
 			var flash_r := _cell_size * (1.2 + 0.14 * float(wave_hits))
 			particles.flash(to_global(wave_center), flash_col, flash_r * (1.4 if fever_active else 1.0))
 			if wave_info.has("power_id"):

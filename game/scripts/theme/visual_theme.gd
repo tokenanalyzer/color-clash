@@ -54,8 +54,8 @@ static func praise(chain_depth: int, cleared_count: int) -> Dictionary:
 
 # ------------------------------------------------------------- styleboxes --
 
-## Rounded filled panel with an optional hairline border. Used for every
-## HUD pill / dialog so chrome stays consistent.
+## Rounded filled panel with a soft drop shadow and a subtle lit top edge —
+## the shared chrome for every HUD pill / dialog.
 static func panel(bg: Color = PANEL, radius: int = 20, border: Color = PANEL_BORDER, border_w: int = 2) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
@@ -64,12 +64,15 @@ static func panel(bg: Color = PANEL, radius: int = 20, border: Color = PANEL_BOR
 	sb.content_margin_right = 16
 	sb.content_margin_top = 10
 	sb.content_margin_bottom = 10
-	sb.shadow_color = Color(0, 0, 0, 0.35)
-	sb.shadow_size = 10
-	sb.shadow_offset = Vector2(0, 4)
+	sb.shadow_color = Color(0, 0, 0, 0.4)
+	sb.shadow_size = 14
+	sb.shadow_offset = Vector2(0, 6)
+	# a hairline all round, brighter along the top — reads as "lit from above"
 	if border.a > 0.0:
 		sb.border_color = border
 		sb.set_border_width_all(border_w)
+		sb.border_width_top = maxi(border_w, 2)
+		sb.border_color = Color(border.r, border.g, border.b, minf(border.a * 1.8, 0.5))
 	return sb
 
 ## Filled "capsule" button face in an accent colour, with a lighter top edge.

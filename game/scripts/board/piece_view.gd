@@ -1,13 +1,14 @@
 class_name PieceView
 extends Node2D
-## Draws one board cell: a glossy faceted gem, a special-power tile with its
-## own identity + animated glow, or an obstacle overlay (ice / stone / lock /
-## time-bomb). Pure code-drawn vectors — no texture assets — so it stays
-## light on the gl_compatibility renderer and reskins from data alone.
+## Draws one board cell. The jewel body is a BAKED texture (see
+## GemTextures) blitted as a single quad — sharp at any phone resolution
+## and far cheaper than per-frame vector drawing — with a shared soft
+## shadow beneath it. Power icons, obstacle overlays and the selection
+## glow are drawn on top.
 ##
 ## Only power / time-bomb tiles run _process (an idle glow pulse); plain
 ## gems are fully static between board changes, so a full board costs one
-## _draw each and nothing per frame.
+## textured quad each and nothing per frame.
 
 var color_id: StringName = CellData.COLOR_EMPTY
 var power_id: StringName = CellData.POWER_NONE
@@ -22,6 +23,7 @@ var _accent := Color(0.9, 0.9, 0.9)
 var _rim := Color(1, 1, 1)
 var _glow := Color(1, 1, 1)
 var _phase := 0.0
+var _palette: PieceColorPalette
 
 const _SPECTRUM := [
 	Color(0.96, 0.26, 0.38), Color(1.0, 0.6, 0.2), Color(1.0, 0.87, 0.28),
@@ -51,6 +53,7 @@ func configure(p_color_id: StringName, p_power_id: StringName, p_obstacle_id: St
 	obstacle_id = p_obstacle_id
 	obstacle_hp = p_obstacle_hp
 	cell_size = p_cell_size
+	_palette = palette
 	if palette != null and palette.has(color_id):
 		var d := palette.get_def(color_id)
 		_base = d.base_color
@@ -75,6 +78,26 @@ func set_selected(value: bool) -> void:
 
 # ------------------------------------------------------------------ draw --
 
+## Texture is [RES + 2*PAD] square with the jewel filling RES; blit it so
+## the jewel body is ~cell_size * 0.94 wide.
+const _BLIT := 1.09
+
+func _blit_rect() -> Rect2:
+	var s := cell_size * _BLIT
+	return Rect2(-s * 0.5, -s * 0.5, s, s)
+
+func _blit_gem(tex: Texture2D) -> void:
+	if tex == null:
+		_draw_gem(_accent.lerp(_base, 0.15), _base, _base.lerp(_deep, 0.55), _rim, _glow)
+		return
+	var r := _blit_rect()
+	# soft contact shadow
+	var sh := GemTextures.shadow()
+	if sh != null:
+		var sc := cell_size * 1.02
+		draw_texture_rect(sh, Rect2(-sc * 0.5, -sc * 0.5 + cell_size * 0.12, sc, sc), false, Color(0, 0, 0, 0.5))
+	draw_texture_rect(tex, r, false)
+
 func _draw() -> void:
 	var has_piece := color_id != CellData.COLOR_EMPTY
 	if not has_piece and obstacle_id == CellData.OBSTACLE_NONE:
@@ -92,7 +115,7 @@ func _draw() -> void:
 	elif color_id == BoardModel.RAINBOW_COLOR_ID:
 		_draw_rainbow_gem()
 	elif has_piece:
-		_draw_gem(_accent.lerp(_base, 0.15), _base, _base.lerp(_deep, 0.55), _rim, _glow)
+		_blit_gem(GemTextures.gem(color_id, _palette))
 
 	if obstacle_id == &"ice":
 		_draw_ice_overlay()
@@ -144,13 +167,12 @@ func _draw_gem(c_top: Color, c_mid: Color, c_deep: Color, c_rim: Color, c_glow: 
 	draw_polyline(ring, Color(c_rim.r, c_rim.g, c_rim.b, 0.5), max(cell_size * 0.028, 1.5), true)
 
 func _draw_rainbow_gem() -> void:
-	_draw_gem(Color(0.97, 0.97, 1.0), Color(0.86, 0.88, 0.95), Color(0.6, 0.62, 0.72),
-		Color(1, 1, 1), Color(1, 1, 1))
+	_blit_gem(GemTextures.gem(BoardModel.RAINBOW_COLOR_ID, _palette))
 	var spin := _phase * 0.6
 	for i in _SPECTRUM.size():
-		var r := cell_size * (0.34 - float(i) * 0.03)
+		var r := cell_size * (0.30 - float(i) * 0.028)
 		var col: Color = _SPECTRUM[i]
-		col.a = 0.9
+		col.a = 0.85
 		draw_arc(Vector2.ZERO, r, spin + TAU * float(i) / 6.0, spin + TAU * float(i) / 6.0 + 2.2, 14, col, max(cell_size * 0.05, 2.0), true)
 
 func _draw_power_gem() -> void:
@@ -158,10 +180,14 @@ func _draw_power_gem() -> void:
 	var glow_col: Color = _POWER_GLOW.get(power_id, _glow)
 	var pulse := 0.75 + 0.25 * sin(_phase * 4.0)
 
-	# outer aura
-	VisualTheme.draw_glow(self, Vector2.ZERO, cell_size * (0.5 + 0.08 * pulse), Color(glow_col.r, glow_col.g, glow_col.b, 0.30 * pulse), 5)
-	_draw_gem(body_col.lightened(0.35), body_col, body_col.darkened(0.45),
-		body_col.lightened(0.6), glow_col, 1.6)
+	# outer aura (soft additive glow sprite)
+	var g := GemTextures.glow()
+	if g != null:
+		var gs := cell_size * (1.7 + 0.18 * pulse)
+		draw_texture_rect(g, Rect2(-gs * 0.5, -gs * 0.5, gs, gs), false,
+			Color(glow_col.r, glow_col.g, glow_col.b, 0.32 * pulse))
+
+	_blit_gem(GemTextures.solid_gem(StringName("__pow_" + String(power_id)), body_col))
 
 	match power_id:
 		&"bomb": _icon_bomb(pulse)
@@ -285,11 +311,14 @@ func _draw_timebomb_overlay() -> void:
 	draw_string(font, -ts * 0.5 + Vector2(0, ts.y * 0.33), txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, col)
 
 func _draw_selection() -> void:
-	var body := ShapeDrawUtils.gem_points(cell_size * 1.12)
+	var g := GemTextures.glow()
+	if g != null:
+		var gs := cell_size * 1.7
+		draw_texture_rect(g, Rect2(-gs * 0.5, -gs * 0.5, gs, gs), false,
+			Color(_glow.r, _glow.g, _glow.b, 0.35))
+	var body := ShapeDrawUtils.gem_points(cell_size * 1.13)
 	body.append(body[0])
-	var pulse := 0.6 + 0.4 * sin(_phase * 8.0)
-	draw_polyline(body, Color(1, 1, 1, 0.35 + 0.4 * pulse), max(cell_size * 0.05, 2.5), true)
-	VisualTheme.draw_glow(self, Vector2.ZERO, cell_size * 0.55, Color(_glow.r, _glow.g, _glow.b, 0.25), 4)
+	draw_polyline(body, Color(1, 1, 1, 0.85), max(cell_size * 0.055, 2.5), true)
 
 func _translated(poly: PackedVector2Array, by: Vector2) -> PackedVector2Array:
 	var out := PackedVector2Array()
