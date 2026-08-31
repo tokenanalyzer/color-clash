@@ -72,16 +72,26 @@ game/
     core/                  JsonLoader, GameData (autoload — boot-time
                            config loader)
     save/                  SaveService (autoload — local JSON save)
-    vfx/                   particle pool, screen shake, combo popups,
-                           haptics, ShapeDrawUtils (piece rendering)
+    theme/                 VisualTheme — single source of truth for the
+                           premium palette, panel styleboxes, easing and
+                           shared primitive draws (glow disc, v-gradient)
+    vfx/                   ParticlePool (shard bursts + pooled ImpactFlash
+                           rings), ScreenShake (re-entrant safe), ComboPopup
+                           (bounce-in praise text), Haptics, Backdrop
+                           (shared animated background), ShapeDrawUtils
+                           (gem / polygon / star draw helpers)
     audio/                 Synth (DSP primitives), SfxBuilder/
                            MusicLayerBuilder (pure, data -> PCM buffer),
                            AudioSettings/Audio/Music (autoloads — bus
                            control, SFX playback, adaptive music director)
     services/              IapService, AdsService, FirebaseService —
                            interface stubs only, not wired into gameplay
-    ui/                    HUD + LevelMap/LevelNodeButton/LevelPathCanvas
-                           (built in code, not hand-authored scenes)
+    ui/                    HUD (top pills, Fever meter, booster tray,
+                           win/lose + pause + settings overlays, code-drawn
+                           GemIcon/MiniIcon/StarRow) + LevelMap (parallax
+                           MapEnvironment, colour wordmark) /LevelNodeButton
+                           /LevelPathCanvas — all built in code, no scenes
+                           or art assets
     app.gd                 top-level GameController: screen flow (Map <->
                            Play, faded transitions) + level session state
   scenes/main.tscn         entry scene; everything else is built in code
@@ -107,8 +117,9 @@ generation, chain cascades, scoring, objectives, the economy/booster/
 progress autoloads, and the audio DSP/builders (Synth/SfxBuilder/
 MusicLayerBuilder — buffer length, no NaN/clipping, intensity actually
 changes pitch, every data/sfx.json id builds, every data/music.json layer
-renders the same loop length). 202 assertions as of the deeper-chains +
-campaign-map milestone. Run headlessly:
+renders the same loop length). ~203 assertions as of the premium-visual
+pass (pure-logic tests are unchanged by that milestone — it was
+rendering/UI only). Run headlessly:
 
 ```
 godot4 --headless --path game --script res://tests/test_runner.gd
@@ -128,6 +139,10 @@ useful after any board/level/audio/map change:
   (not straight into play), an unlocked node starts its level, winning
   records progress/stars and unlocks the next node, and the map reflects
   it on return.
+- `game/tests/_capture.gd` (dev tool, not a test) boots the real scene
+  with a rendering context and writes PNGs of every screen (map, gameplay,
+  cascade, win, pause, settings) to `user://shots/` for out-of-editor
+  visual review: `godot4 --path game --script res://tests/_capture.gd`.
 
 Several of these persist to the same local `user://save.json` across
 runs (that's the point — it's the same offline-first save gameplay uses),

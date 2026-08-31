@@ -30,9 +30,14 @@ var _objectives: ObjectiveTracker
 var _was_near_fail: bool = false
 var _music_token: int = 0
 
+var _backdrop: Backdrop
+
 func _ready() -> void:
 	randomize()
 	_fever = FeverSystem.new(GameData.fever_config)
+
+	_backdrop = Backdrop.new()
+	add_child(_backdrop)
 
 	var game_canvas := CanvasLayer.new()
 	game_canvas.layer = 0
@@ -43,6 +48,8 @@ func _ready() -> void:
 	_hud.next_level_pressed.connect(_on_next_level_pressed)
 	_hud.retry_pressed.connect(_on_retry_pressed)
 	_hud.map_pressed.connect(_on_map_pressed)
+	_hud.pause_pressed.connect(_on_pause_pressed)
+	_hud.resume_pressed.connect(_on_resume_pressed)
 
 	_board_layer = Node2D.new()
 	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN)
@@ -246,6 +253,17 @@ func _on_next_level_pressed() -> void:
 
 func _on_retry_pressed() -> void:
 	_start_level(_current_level.id)
+
+func _on_pause_pressed() -> void:
+	if _board != null:
+		_board.set_input_locked(true)
+	Music.set_state(&"tension")
+	_hud.show_pause_panel(true)
+
+func _on_resume_pressed() -> void:
+	if _board != null:
+		_board.set_input_locked(false)
+	Music.set_state(_compute_music_state(0))
 
 func _on_booster_pressed(booster_id: StringName) -> void:
 	if not Boosters.use(booster_id):

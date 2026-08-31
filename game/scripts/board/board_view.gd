@@ -25,7 +25,9 @@ var _origin: Vector2 = Vector2.ZERO
 var _dragging := false
 var _current_path: Array[Vector2i] = []
 var _locked_input := false
+var _path_glow: Line2D
 var _path_line: Line2D
+var _path_color: Color = Color(1, 1, 1)
 
 func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: PowerConfig, p_rainbow_chance: float, rng_seed: int, viewport_rect: Rect2) -> void:
 	palette = p_palette
@@ -47,17 +49,35 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 	particles = ParticlePool.new()
 	add_child(particles)
 
+	_path_glow = Line2D.new()
+	_path_glow.width = _cell_size * 0.42
+	_path_glow.default_color = Color(1, 1, 1, 0.18)
+	_path_glow.z_index = 49
+	_path_glow.antialiased = true
+	_path_glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	_path_glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	_path_glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	add_child(_path_glow)
+
 	_path_line = Line2D.new()
-	_path_line.width = _cell_size * 0.22
-	_path_line.default_color = Color(1, 1, 1, 0.55)
+	_path_line.width = _cell_size * 0.16
+	_path_line.default_color = Color(1, 1, 1, 0.9)
 	_path_line.z_index = 50
 	_path_line.antialiased = true
+	_path_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	_path_line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	_path_line.joint_mode = Line2D.LINE_JOINT_ROUND
 	add_child(_path_line)
 
 	queue_redraw()
 
 func has_valid_moves() -> bool:
 	return board.has_any_valid_move()
+
+## External input gate (pause menu). Never unlocks while a cascade is mid-
+## resolve — `_play_move` clears its own lock when it finishes.
+func set_input_locked(v: bool) -> void:
+	_locked_input = v
 
 func _generate_playable_board() -> void:
 	board.generate(rng, available_colors)
@@ -109,14 +129,40 @@ func _resync_all_from_board() -> void:
 func _draw() -> void:
 	if board == null:
 		return
-	var panel_size := Vector2(board.width, board.height) * _cell_size + Vector2(20, 20)
-	var panel_pos := _origin - Vector2(10, 10)
-	draw_rect(Rect2(panel_pos, panel_size), Color(0.08, 0.08, 0.14, 0.65), true)
+	var pad := _cell_size * 0.34
+	var grid := Vector2(board.width, board.height) * _cell_size
+	var frame := Rect2(_origin - Vector2(pad, pad), grid + Vector2(pad, pad) * 2.0)
+
+	# outer frame: drop shadow, gradient body, bright top edge
+	var r := _cell_size * 0.5
+	draw_rect(Rect2(frame.position + Vector2(0, 10), frame.size), Color(0, 0, 0, 0.35), true)
+	_draw_round_rect(frame, r, VisualTheme.PANEL_RAISED)
+	_draw_round_rect(frame.grow(-3.0), r, VisualTheme.PANEL_SOLID)
+	# inner well
+	var well := Rect2(_origin - Vector2(pad * 0.4, pad * 0.4), grid + Vector2(pad * 0.4, pad * 0.4) * 2.0)
+	_draw_round_rect(well, _cell_size * 0.4, VisualTheme.WELL)
+
+	# per-cell sockets
 	for x in board.width:
 		for y in board.height:
-			var slot_pos := _origin + Vector2(x, y) * _cell_size
-			var inset := _cell_size * 0.06
-			draw_rect(Rect2(slot_pos + Vector2(inset, inset), Vector2(_cell_size, _cell_size) - Vector2(inset, inset) * 2.0), Color(1, 1, 1, 0.04), true)
+			var c := _slot_center(Vector2i(x, y))
+			var s := _cell_size * 0.4
+			draw_circle(c + Vector2(0, _cell_size * 0.04), s, Color(0, 0, 0, 0.22))
+			draw_circle(c, s, Color(1, 1, 1, 0.035))
+
+	# selection path pips
+	if _current_path.size() >= 1:
+		for pos in _current_path:
+			var p := _slot_center(pos)
+			draw_circle(p, _cell_size * 0.12, Color(_path_color.r, _path_color.g, _path_color.b, 0.9))
+			draw_circle(p, _cell_size * 0.07, Color(1, 1, 1, 0.95))
+
+func _draw_round_rect(rect: Rect2, radius: float, color: Color) -> void:
+	var pts := ShapeDrawUtils.rounded_rect_points(rect.size, radius, 5)
+	var moved := PackedVector2Array()
+	for p in pts:
+		moved.append(p + rect.position + rect.size * 0.5)
+	draw_colored_polygon(moved, color)
 
 # ---------------------------------------------------------------- input --
 
@@ -204,7 +250,16 @@ func _refresh_selection_visual() -> void:
 	for pos in _current_path:
 		_node_at(pos).set_selected(true)
 		pts.append(_slot_center(pos))
+	if not _current_path.is_empty():
+		var target := board.get_path_target_color(_current_path)
+		_path_color = Color(1, 1, 1)
+		if target != BoardModel.RAINBOW_COLOR_ID and palette != null and palette.has(target):
+			_path_color = palette.get_def(target).glow_color
 	_path_line.points = pts
+	_path_glow.points = pts
+	_path_line.default_color = Color(1, 1, 1, 0.92)
+	_path_glow.default_color = Color(_path_color.r, _path_color.g, _path_color.b, 0.28)
+	queue_redraw()
 
 # ------------------------------------------------------------- resolve --
 
@@ -275,6 +330,9 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		Audio.play(&"blast", clampf(float(cells.size()) / 10.0, 0.0, 1.0), wave_index)
 
 		var pop_tween: Tween = null
+		var wave_sum := Vector2.ZERO
+		var wave_hits := 0
+		var wave_tint := Color(1, 1, 1)
 		for pos in cells:
 			if animated.has(pos):
 				continue
@@ -288,10 +346,21 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			if pop_tween == null:
 				pop_tween = create_tween()
 				pop_tween.set_parallel(true)
-			particles.burst(node.global_position, _burst_color_for(node), 6 + wave_index)
+			wave_tint = _burst_color_for(node)
+			particles.burst(node.global_position, wave_tint, 8 + wave_index * 2)
+			wave_sum += node.position
+			wave_hits += 1
 			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 		if pop_tween != null:
 			pop_tweens.append(pop_tween)
+		if wave_hits > 0:
+			var wave_center := wave_sum / float(wave_hits)
+			var flash_col := wave_tint
+			if wave_info.has("power_id"):
+				flash_col = Color(1, 1, 1)
+			particles.flash(to_global(wave_center), flash_col, _cell_size * (1.2 + 0.14 * float(wave_hits)))
+			if wave_info.has("power_id"):
+				ScreenShake.apply(self, 4.0 + float(wave_hits) * 0.4, 0.2)
 
 		if wave_index < result.wave_cells.size() - 1:
 			await get_tree().create_timer(_WAVE_STAGGER).timeout
@@ -344,9 +413,15 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 
 	_resync_all_from_board()
 
-	if chain_depth > 1 and not result.cleared_cells.is_empty():
-		var popup_pos: Vector2 = _node_at(result.cleared_cells[result.cleared_cells.size() - 1]).position
-		ComboPopup.spawn(self, popup_pos, "COMBO x%d" % chain_depth, Color(1, 0.85, 0.2))
+	if not result.cleared_cells.is_empty() and (chain_depth > 1 or result.cleared_cells.size() >= 6):
+		var anchor := Vector2.ZERO
+		for cp in result.cleared_cells:
+			anchor += _slot_center(cp)
+		anchor /= float(result.cleared_cells.size())
+		anchor.y -= _cell_size * 0.6
+		var pr := VisualTheme.praise(chain_depth, result.cleared_cells.size())
+		var sub := "COMBO x%d" % chain_depth if chain_depth > 1 else ""
+		ComboPopup.spawn(self, anchor, String(pr["text"]), pr["color"], 46, sub)
 		var tier := _combo_tier(chain_depth)
 		if tier >= 0:
 			Audio.play(&"combo_ding", 0.0, tier)
