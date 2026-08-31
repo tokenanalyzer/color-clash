@@ -10,6 +10,15 @@ var accent: Color = VisualTheme.ACCENT
 var _size: Vector2 = Vector2(1080, 1920)
 var _motes: Array = [] # [{pos, r, speed, phase, tint}]
 var _time := 0.0
+var _accent_tween: Tween
+
+## Smoothly shifts the whole backdrop tint (used to push the scene warm
+## during Fever, then back).
+func set_accent_target(color: Color, duration: float = 0.6) -> void:
+	if _accent_tween != null and _accent_tween.is_valid():
+		_accent_tween.kill()
+	_accent_tween = create_tween()
+	_accent_tween.tween_property(self, "accent", color, duration).set_trans(Tween.TRANS_SINE)
 
 func _ready() -> void:
 	z_index = -100

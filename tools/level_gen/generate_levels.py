@@ -15,8 +15,8 @@ Progression intent (40-level campaign):
   * Obstacles are taught one at a time (ice -> lock -> stone) then mixed,
     with counts climbing in the back third.
   * Objective types rotate and stack into multi-goal levels later on.
-  * Only obstacle types with full gameplay support are emitted
-    (ice / lock / stone); time-bomb art exists but its logic does not yet.
+  * Obstacle types with full gameplay support: ice / lock / stone, plus
+    time bomb (a countdown obstacle) from L28 in the expert tier.
 """
 import json
 import os
@@ -84,6 +84,10 @@ def obstacles_for(level_id, width, height):
             {"type": "stone", "x": 2, "y": height - 3},
         ]
         obs = picks[:min(tier, len(picks))]
+        # Expert tier: a live time bomb the player must defuse before its
+        # countdown runs out (see ChainResolver.tick/detonate).
+        if level_id >= 28:
+            obs.append({"type": "timebomb", "x": width // 2, "y": 1, "hp": 7 - min((level_id - 28) // 4, 3)})
     return obs
 
 

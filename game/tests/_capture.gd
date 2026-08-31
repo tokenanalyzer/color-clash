@@ -59,6 +59,52 @@ func _initialize() -> void:
 	app._hud.show_pause_panel(true)
 	await _frames(25)
 	await _shot("06_pause")
+	app._hud.show_pause_panel(false)
+
+	# Daily rewards screen
+	get_root().get_node("SaveService").set_int("daily_last_claim_day", -1)
+	get_root().get_node("SaveService").set_int("daily_streak", 0)
+	app._daily.refresh()
+	app._daily.visible = true
+	app._daily.modulate.a = 1.0
+	await _frames(25)
+	await _shot("07_daily")
+	app._daily.visible = false
+
+	# Reward popup (chest open)
+	var rp = load("res://scripts/ui/reward_popup.gd").present(app._hud, [
+		{"type": "coins", "amount": 380},
+		{"type": "booster", "id": &"bomb", "amount": 1},
+	], {"title": "Milestone Chest!"})
+	await _frames(120)
+	await _shot("08_reward_chest")
+	if is_instance_valid(rp):
+		rp.queue_free()
+	await _frames(3)
+
+	# Fever mode (forced on)
+	board = app._board
+	app._fever.moves_remaining = 6
+	app._was_fever = false
+	board.set_fever(true)
+	app._backdrop.set_accent_target(Color(1.0, 0.24, 0.52), 0.1)
+	app._hud.set_fever(60.0, 100.0, true)
+	board.play_fever_burst()
+	await _frames(20)
+	var fp := _find_path(board.board)
+	if fp.size() >= board.board.min_group_size:
+		var fpath: Array[Vector2i] = []
+		for p in fp:
+			fpath.append(p)
+		await board._play_move(fpath)
+	await _frames(30)
+	await _shot("09_fever")
+
+	# Time bomb level
+	board.set_fever(false)
+	await app._go_to_level(28)
+	await _frames(40)
+	await _shot("10_timebomb_level")
 
 	print("shots -> ", ProjectSettings.globalize_path(OUT))
 	quit(0)

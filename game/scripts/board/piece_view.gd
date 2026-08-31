@@ -266,12 +266,23 @@ func _draw_ice_overlay() -> void:
 		draw_line(Vector2(-cell_size * 0.02, -cell_size * 0.22), Vector2(cell_size * 0.02, cell_size * 0.24), crack, 1.5)
 
 func _draw_timebomb_overlay() -> void:
-	var warn := 0.5 + 0.5 * sin(_phase * 6.0)
-	VisualTheme.draw_glow(self, Vector2.ZERO, cell_size * 0.5, Color(1.0, 0.3, 0.2, 0.35 * warn), 4)
-	draw_circle(Vector2.ZERO, cell_size * 0.22, Color(0.1, 0.1, 0.13, 0.92))
-	draw_arc(Vector2.ZERO, cell_size * 0.22, 0, TAU, 24, Color(1.0, 0.4, 0.3, 0.6 + 0.4 * warn), max(cell_size * 0.03, 2.0), true)
-	var hand := _phase * 3.0
-	draw_line(Vector2.ZERO, Vector2(cos(hand), sin(hand)) * cell_size * 0.16, Color(1, 0.9, 0.85), max(cell_size * 0.03, 2.0))
+	# The closer the countdown gets to zero, the harder it pulses.
+	var urgency: float = clampf(1.0 - float(max(obstacle_hp, 0)) / 5.0, 0.15, 1.0)
+	var warn := 0.5 + 0.5 * sin(_phase * (5.0 + 8.0 * urgency))
+	VisualTheme.draw_glow(self, Vector2.ZERO, cell_size * 0.55, Color(1.0, 0.3, 0.2, (0.25 + 0.35 * urgency) * warn), 4)
+	draw_circle(Vector2.ZERO, cell_size * 0.34, Color(0.09, 0.09, 0.12, 0.96))
+	draw_arc(Vector2.ZERO, cell_size * 0.34, 0, TAU, 26, Color(1.0, 0.42, 0.32, 0.65 + 0.35 * warn), max(cell_size * 0.045, 2.5), true)
+	# countdown ring: fraction of the fuse left (assumes a 7-turn fuse)
+	var frac: float = clampf(float(max(obstacle_hp, 0)) / 7.0, 0.0, 1.0)
+	draw_arc(Vector2.ZERO, cell_size * 0.34, -PI / 2.0, -PI / 2.0 + TAU * frac, 26, Color(1, 0.85, 0.4, 0.9), max(cell_size * 0.05, 2.5), true)
+	# big countdown number
+	var font := ThemeDB.fallback_font
+	var txt := str(max(obstacle_hp, 0))
+	var fs := int(cell_size * 0.56)
+	var ts := font.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+	var col := Color(1, 0.96, 0.9).lerp(Color(1, 0.45, 0.35), urgency)
+	draw_string_outline(font, -ts * 0.5 + Vector2(0, ts.y * 0.33), txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 5, Color(0, 0, 0, 0.85))
+	draw_string(font, -ts * 0.5 + Vector2(0, ts.y * 0.33), txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, col)
 
 func _draw_selection() -> void:
 	var body := ShapeDrawUtils.gem_points(cell_size * 1.12)

@@ -63,12 +63,18 @@ game/
   scripts/
     board/                BoardModel, CellData, PowerResolver, ChainResolver
                            (pure logic, no Node dependency) + BoardView/
-                           PieceView (presentation + touch input)
+                           PieceView (presentation + touch input). Powers:
+                           bomb, lightning, freeze (small diamond shatter +
+                           freezes the ring into ice), rainbow, chain.
+                           Obstacles: ice, stone, lock, timebomb (a
+                           per-move countdown that detonates in a 3x3 blast
+                           and burns moves if not cleared/defused).
     combo/                ComboSystem, FeverSystem
     levels/                LevelConfig, LevelDatabase, ObjectiveTracker
-    economy/               ScoreCalculator/StarRating (pure), EconomyService,
-                           BoosterInventory, ProgressService (autoloads —
-                           campaign unlock/completion/star state)
+    economy/               ScoreCalculator/StarRating/DailyRewards (pure),
+                           EconomyService, BoosterInventory, ProgressService
+                           (autoloads — currency / booster stock / campaign
+                           unlock+star state)
     core/                  JsonLoader, GameData (autoload — boot-time
                            config loader)
     save/                  SaveService (autoload — local JSON save)
@@ -86,14 +92,17 @@ game/
                            control, SFX playback, adaptive music director)
     services/              IapService, AdsService, FirebaseService —
                            interface stubs only, not wired into gameplay
-    ui/                    HUD (top pills, Fever meter, booster tray,
-                           win/lose + pause + settings overlays, code-drawn
-                           GemIcon/MiniIcon/StarRow) + LevelMap (parallax
-                           MapEnvironment, colour wordmark) /LevelNodeButton
-                           /LevelPathCanvas — all built in code, no scenes
+    ui/                    SplashScreen, MainMenu, DailyRewardsScreen,
+                           RewardPopup (chest-open celebration), HUD (top
+                           pills, Fever meter, booster tray, win/lose +
+                           pause + settings overlays), LevelMap (parallax
+                           MapEnvironment, colour wordmark) + LevelNodeButton
+                           / LevelPathCanvas — all built in code, no scenes
                            or art assets
-    app.gd                 top-level GameController: screen flow (Map <->
-                           Play, faded transitions) + level session state
+    app.gd                 top-level GameController: screen flow
+                           (Splash -> Menu -> Map <-> Play, Daily from Menu,
+                           Pause + milestone chest from Play) + level
+                           session state + Fever spectacle orchestration
   scenes/main.tscn         entry scene; everything else is built in code
   tests/                   headless unit tests + manual smoke scripts
 tools/level_gen/           level-data authoring script (regenerates

@@ -97,6 +97,25 @@
       "layers": [
         { "kind": "tone", "wave": "sine", "freq_mode": "absolute", "base_freq": 220, "freq_range": 0, "duration": 0.32, "attack": 0.05, "decay_curve": 1.4, "volume": 0.2 }
       ]
+    },
+    "power_freeze": {
+      "layers": [
+        { "kind": "tone", "wave": "sine", "freq_mode": "absolute", "base_freq": 1400, "freq_range": 200, "end_freq_ratio": 0.45, "duration": 0.32, "attack": 0.002, "decay_curve": 1.8, "volume": 0.3 },
+        { "kind": "tone", "wave": "triangle", "freq_mode": "scale", "scale_root": 880, "scale_degree": 7, "start": 0.04, "duration": 0.26, "attack": 0.003, "decay_curve": 2.2, "volume": 0.24 },
+        { "kind": "noise", "start": 0.0, "duration": 0.36, "attack": 0.004, "decay_curve": 1.5, "brightness": 0.85, "volume": 0.12 }
+      ]
+    },
+    "timebomb_explode": {
+      "layers": [
+        { "kind": "noise", "start": 0.0, "duration": 0.42, "attack": 0.002, "decay_curve": 2.4, "brightness": 0.2, "volume": 0.5 },
+        { "kind": "tone", "wave": "sine", "freq_mode": "absolute", "base_freq": 62, "freq_range": 10, "end_freq_ratio": 0.5, "duration": 0.46, "attack": 0.001, "decay_curve": 1.8, "volume": 0.7 },
+        { "kind": "tone", "wave": "square", "freq_mode": "absolute", "base_freq": 150, "freq_range": 20, "end_freq_ratio": 0.4, "duration": 0.2, "attack": 0.001, "decay_curve": 2.6, "volume": 0.22 }
+      ]
+    },
+    "timebomb_tick": {
+      "layers": [
+        { "kind": "tone", "wave": "square", "freq_mode": "absolute", "base_freq": 1200, "freq_range": 0, "duration": 0.03, "attack": 0.001, "decay_curve": 3.5, "volume": 0.16 }
+      ]
     }
   }
 }

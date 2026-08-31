@@ -134,6 +134,44 @@ func damage_stone(pos: Vector2i) -> bool:
 	cell.color_id = CellData.COLOR_EMPTY
 	return true
 
+## Encases a plain colored piece in ice (Freeze power's ring effect). No-op
+## on empty / stone / powered / already-obstructed / locked cells. Returns
+## true if a piece was frozen.
+func freeze_cell(pos: Vector2i, hp: int = 2) -> bool:
+	var cell := get_cell(pos)
+	if cell == null or cell.is_empty() or cell.is_stone() or cell.has_power() or cell.has_obstacle() or cell.locked_empty:
+		return false
+	cell.obstacle_id = &"ice"
+	cell.obstacle_hp = hp
+	return true
+
+## Clears a time-bomb's countdown without detonating it — used when the
+## piece occupying the time-bomb cell is cleared by a match or blast.
+func defuse_timebomb(pos: Vector2i) -> bool:
+	var cell := get_cell(pos)
+	if cell == null or not cell.is_timebomb():
+		return false
+	cell.obstacle_id = CellData.OBSTACLE_NONE
+	cell.obstacle_hp = 0
+	return true
+
+## Decrements one time-bomb's countdown by a turn. Returns true if it just
+## reached zero (the caller detonates it).
+func tick_timebomb(pos: Vector2i) -> bool:
+	var cell := get_cell(pos)
+	if cell == null or not cell.is_timebomb():
+		return false
+	cell.obstacle_hp -= 1
+	return cell.obstacle_hp <= 0
+
+func timebomb_positions() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in width:
+		for y in height:
+			if _grid[x][y].is_timebomb():
+				out.append(Vector2i(x, y))
+	return out
+
 ## Whenever a cell clears, orthogonal Lock neighbors take one hit and may
 ## unlock. Returns the list of newly-unlocked positions.
 func unlock_neighbors(pos: Vector2i) -> Array[Vector2i]:

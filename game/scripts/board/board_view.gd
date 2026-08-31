@@ -29,6 +29,13 @@ var _path_glow: Line2D
 var _path_line: Line2D
 var _path_color: Color = Color(1, 1, 1)
 
+## Fever spectacle: while active the board wears a pulsing hot aura, the
+## selection trail runs hotter/wider, blasts throw more (and hotter)
+## particles, and the whole cascade plays back faster (`_cascade_scale`).
+var fever_active := false
+var _fever_phase := 0.0
+var _cascade_scale := 1.0
+
 func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: PowerConfig, p_rainbow_chance: float, rng_seed: int, viewport_rect: Rect2) -> void:
 	palette = p_palette
 	power_config = p_power_config
@@ -69,6 +76,9 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 	_path_line.joint_mode = Line2D.LINE_JOINT_ROUND
 	add_child(_path_line)
 
+	# _process only runs during Fever (board aura pulse) — off by default so
+	# a normal board costs nothing per frame.
+	set_process(false)
 	queue_redraw()
 
 func has_valid_moves() -> bool:
@@ -78,6 +88,37 @@ func has_valid_moves() -> bool:
 ## resolve — `_play_move` clears its own lock when it finishes.
 func set_input_locked(v: bool) -> void:
 	_locked_input = v
+
+## Toggled by the controller when FeverSystem activates / expires.
+func set_fever(v: bool) -> void:
+	if fever_active == v:
+		return
+	fever_active = v
+	_cascade_scale = 0.55 if v else 1.0
+	set_process(v)
+	_refresh_selection_visual()
+	queue_redraw()
+
+func _process(delta: float) -> void:
+	_fever_phase += delta
+	queue_redraw()
+
+## A screen-filling punctuation the instant Fever ignites: central flash,
+## a ring of bursts around the board, a hard shake and a big FEVER! title.
+func play_fever_burst() -> void:
+	var vp := _board_rect_center()
+	particles.flash(to_global(vp), VisualTheme.FEVER_HOT, _cell_size * 8.0)
+	var grid := Vector2(board.width, board.height) * _cell_size
+	for i in 10:
+		var a := TAU * float(i) / 10.0
+		var p := vp + Vector2(cos(a), sin(a)) * grid.length() * 0.42
+		particles.burst(to_global(p), VisualTheme.FEVER if i % 2 == 0 else VisualTheme.FEVER_HOT, 16)
+	ScreenShake.apply(self, 16.0, 0.4)
+	Haptics.strong(110)
+	ComboPopup.spawn(self, vp - Vector2(0, _cell_size), "FEVER!", VisualTheme.FEVER_HOT, 64, "GO WILD")
+
+func _board_rect_center() -> Vector2:
+	return _origin + Vector2(board.width, board.height) * _cell_size * 0.5
 
 func _generate_playable_board() -> void:
 	board.generate(rng, available_colors)
@@ -136,19 +177,43 @@ func _draw() -> void:
 	# outer frame: drop shadow, gradient body, bright top edge
 	var r := _cell_size * 0.5
 	draw_rect(Rect2(frame.position + Vector2(0, 10), frame.size), Color(0, 0, 0, 0.35), true)
+
+	# Fever aura: a pulsing hot halo behind the frame + charged rim
+	if fever_active:
+		var pulse := 0.5 + 0.5 * sin(_fever_phase * 7.0)
+		for i in 5:
+			var t := float(i) / 4.0
+			var col := VisualTheme.FEVER.lerp(VisualTheme.FEVER_HOT, pulse)
+			col.a = (0.28 - 0.05 * float(i)) * (0.6 + 0.4 * pulse)
+			_draw_round_rect(frame.grow(6.0 + t * 26.0 + pulse * 10.0), r + t * 20.0, col)
+
 	_draw_round_rect(frame, r, VisualTheme.PANEL_RAISED)
 	_draw_round_rect(frame.grow(-3.0), r, VisualTheme.PANEL_SOLID)
+	if fever_active:
+		var rim := VisualTheme.FEVER_HOT
+		rim.a = 0.55 + 0.35 * sin(_fever_phase * 9.0)
+		var rp := ShapeDrawUtils.rounded_rect_points(frame.size, r, 6)
+		var moved := PackedVector2Array()
+		for p in rp:
+			moved.append(p + frame.position + frame.size * 0.5)
+		moved.append(moved[0])
+		draw_polyline(moved, rim, 3.0, true)
 	# inner well
 	var well := Rect2(_origin - Vector2(pad * 0.4, pad * 0.4), grid + Vector2(pad * 0.4, pad * 0.4) * 2.0)
 	_draw_round_rect(well, _cell_size * 0.4, VisualTheme.WELL)
 
 	# per-cell sockets
+	var socket_glow := 0.0
+	if fever_active:
+		socket_glow = 0.05 + 0.05 * sin(_fever_phase * 6.0)
 	for x in board.width:
 		for y in board.height:
 			var c := _slot_center(Vector2i(x, y))
 			var s := _cell_size * 0.4
 			draw_circle(c + Vector2(0, _cell_size * 0.04), s, Color(0, 0, 0, 0.22))
 			draw_circle(c, s, Color(1, 1, 1, 0.035))
+			if socket_glow > 0.0:
+				draw_circle(c, s * 1.05, Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, socket_glow))
 
 	# selection path pips
 	if _current_path.size() >= 1:
@@ -257,8 +322,16 @@ func _refresh_selection_visual() -> void:
 			_path_color = palette.get_def(target).glow_color
 	_path_line.points = pts
 	_path_glow.points = pts
-	_path_line.default_color = Color(1, 1, 1, 0.92)
-	_path_glow.default_color = Color(_path_color.r, _path_color.g, _path_color.b, 0.28)
+	if fever_active:
+		_path_line.width = _cell_size * 0.22
+		_path_glow.width = _cell_size * 0.6
+		_path_line.default_color = Color(1, 0.95, 0.9, 0.95)
+		_path_glow.default_color = Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, 0.4)
+	else:
+		_path_line.width = _cell_size * 0.16
+		_path_glow.width = _cell_size * 0.42
+		_path_line.default_color = Color(1, 1, 1, 0.92)
+		_path_glow.default_color = Color(_path_color.r, _path_color.g, _path_color.b, 0.28)
 	queue_redraw()
 
 # ------------------------------------------------------------- resolve --
@@ -289,6 +362,8 @@ static func _power_sfx_id(power_id: StringName) -> StringName:
 			return &"power_bomb"
 		&"lightning":
 			return &"power_lightning"
+		&"freeze":
+			return &"power_freeze"
 		&"chain":
 			return &"power_chain"
 		&"rainbow":
@@ -324,6 +399,14 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 				power_node.queue_redraw()
 			Audio.play(_power_sfx_id(power_id), 0.0, 0)
 			Audio.play(&"chain_step", clampf(float(wave_index) / 6.0, 0.0, 1.0), wave_index - 1)
+		elif wave_info.has("timebomb"):
+			# A time bomb the player left on the board just went off.
+			Audio.play(&"timebomb_explode", 0.0, 0)
+			ScreenShake.apply(self, 15.0, 0.42)
+			Haptics.strong(130)
+			var tb_pos: Vector2i = wave_info["power_pos"]
+			particles.flash(_node_at(tb_pos).global_position, Color(1, 0.35, 0.2), _cell_size * 3.4)
+			ComboPopup.spawn(self, _node_at(tb_pos).position - Vector2(0, _cell_size * 0.7), "BOOM!", Color(1, 0.4, 0.25), 44, "-%d MOVES" % ChainResolver.TIMEBOMB_MOVE_PENALTY)
 		elif wave_index == 0 and group_size > 0:
 			Audio.play(&"match", clampf(float(group_size - 3) / 5.0, 0.0, 1.0))
 
@@ -347,10 +430,14 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 				pop_tween = create_tween()
 				pop_tween.set_parallel(true)
 			wave_tint = _burst_color_for(node)
-			particles.burst(node.global_position, wave_tint, 8 + wave_index * 2)
+			var amount := 8 + wave_index * 2
+			if fever_active:
+				amount = int(amount * 1.7)
+				wave_tint = wave_tint.lerp(VisualTheme.FEVER_HOT, 0.4)
+			particles.burst(node.global_position, wave_tint, amount)
 			wave_sum += node.position
 			wave_hits += 1
-			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.15).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+			pop_tween.tween_property(node, "scale", Vector2.ZERO, 0.15 * _cascade_scale).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
 		if pop_tween != null:
 			pop_tweens.append(pop_tween)
 		if wave_hits > 0:
@@ -358,12 +445,13 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			var flash_col := wave_tint
 			if wave_info.has("power_id"):
 				flash_col = Color(1, 1, 1)
-			particles.flash(to_global(wave_center), flash_col, _cell_size * (1.2 + 0.14 * float(wave_hits)))
+			var flash_r := _cell_size * (1.2 + 0.14 * float(wave_hits))
+			particles.flash(to_global(wave_center), flash_col, flash_r * (1.4 if fever_active else 1.0))
 			if wave_info.has("power_id"):
 				ScreenShake.apply(self, 4.0 + float(wave_hits) * 0.4, 0.2)
 
 		if wave_index < result.wave_cells.size() - 1:
-			await get_tree().create_timer(_WAVE_STAGGER).timeout
+			await get_tree().create_timer(_WAVE_STAGGER * _cascade_scale).timeout
 
 	if not pop_tweens.is_empty():
 		await pop_tweens[pop_tweens.size() - 1].finished
@@ -391,7 +479,7 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		if fly_tween == null:
 			fly_tween = create_tween()
 			fly_tween.set_parallel(true)
-		fly_tween.tween_property(ghost, "position", _slot_center(to_pos), 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		fly_tween.tween_property(ghost, "position", _slot_center(to_pos), 0.18 * _cascade_scale).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 	var column_refill_index: Dictionary = {}
 	for pos in result.refilled_cells:
@@ -404,7 +492,7 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		if fly_tween == null:
 			fly_tween = create_tween()
 			fly_tween.set_parallel(true)
-		fly_tween.tween_property(ghost, "position", _slot_center(pos), 0.24 + float(idx) * 0.03).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+		fly_tween.tween_property(ghost, "position", _slot_center(pos), (0.24 + float(idx) * 0.03) * _cascade_scale).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 
 	if fly_tween != null:
 		await fly_tween.finished
@@ -412,6 +500,7 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		g.queue_free()
 
 	_resync_all_from_board()
+	_settle_frozen_cells(result.frozen_cells)
 
 	if not result.cleared_cells.is_empty() and (chain_depth > 1 or result.cleared_cells.size() >= 6):
 		var anchor := Vector2.ZERO
@@ -425,6 +514,25 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		var tier := _combo_tier(chain_depth)
 		if tier >= 0:
 			Audio.play(&"combo_ding", 0.0, tier)
+
+## Frost-settle beat for cells the Freeze power just encased: an icy burst
+## and a quick over-shoot scale on each newly-frozen node.
+func _settle_frozen_cells(frozen: Array) -> void:
+	if frozen.is_empty():
+		return
+	var frost := Color(0.7, 0.92, 1.0)
+	var tw: Tween = null
+	for pos in frozen:
+		var node := _node_at(pos)
+		if node == null:
+			continue
+		particles.burst(node.global_position, frost, 10)
+		node.scale = Vector2(1.28, 1.28)
+		if tw == null:
+			tw = create_tween()
+			tw.set_parallel(true)
+		tw.tween_property(node, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	particles.flash(_node_at(frozen[0]).global_position, frost, _cell_size * 2.0)
 
 func _combo_tier(chain_depth: int) -> int:
 	var tier := -1

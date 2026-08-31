@@ -1079,7 +1079,7 @@
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 3
+          "target": 4
         }
       ],
       "obstacles": [
@@ -1099,6 +1099,12 @@
           "type": "stone",
           "x": 4,
           "y": 5
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 7
         }
       ],
       "reward": {
@@ -1154,6 +1160,12 @@
           "type": "stone",
           "x": 4,
           "y": 5
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 7
         }
       ],
       "reward": {
@@ -1205,6 +1217,12 @@
           "x": 7,
           "y": 1,
           "hp": 2
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 7
         }
       ],
       "reward": {
@@ -1255,6 +1273,12 @@
           "x": 7,
           "y": 1,
           "hp": 2
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 7
         }
       ],
       "reward": {
@@ -1306,6 +1330,12 @@
           "x": 7,
           "y": 1,
           "hp": 2
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 6
         }
       ],
       "reward": {
@@ -1331,7 +1361,7 @@
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 4
+          "target": 5
         }
       ],
       "obstacles": [
@@ -1357,6 +1387,12 @@
           "x": 7,
           "y": 1,
           "hp": 2
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 6
         }
       ],
       "reward": {
@@ -1418,6 +1454,12 @@
           "x": 7,
           "y": 1,
           "hp": 2
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 6
         }
       ],
       "reward": {
@@ -1474,6 +1516,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 6
         }
       ],
       "reward": {
@@ -1529,6 +1577,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 5
         }
       ],
       "reward": {
@@ -1585,6 +1639,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 5
         }
       ],
       "reward": {
@@ -1610,7 +1670,7 @@
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 5
+          "target": 6
         }
       ],
       "obstacles": [
@@ -1641,6 +1701,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 5
         }
       ],
       "reward": {
@@ -1707,6 +1773,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 5
         }
       ],
       "reward": {
@@ -1763,6 +1835,12 @@
           "type": "stone",
           "x": 2,
           "y": 9
+        },
+        {
+          "type": "timebomb",
+          "x": 4,
+          "y": 1,
+          "hp": 4
         }
       ],
       "reward": {

@@ -11,12 +11,39 @@ static func affected_cells(board: BoardModel, pos: Vector2i, power_id: StringNam
 			return _bomb_cells(board, pos, int(definition.get("radius", 1)))
 		&"lightning":
 			return _line_cells(board, pos, horizontal)
+		&"freeze":
+			return _diamond_cells(board, pos, int(definition.get("radius", 1)))
 		&"chain":
 			return _color_cells(board, source_color)
 		&"rainbow":
 			return _color_cells(board, source_color)
 		_:
 			return []
+
+## Freeze shatters a small diamond (Manhattan radius) and then encases the
+## ring one step further out — see ChainResolver, which applies the ring.
+static func freeze_ring_cells(board: BoardModel, pos: Vector2i, radius: int = 1) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var ring := radius + 1
+	for dx in range(-ring, ring + 1):
+		for dy in range(-ring, ring + 1):
+			if abs(dx) + abs(dy) != ring:
+				continue
+			var p := pos + Vector2i(dx, dy)
+			if board.in_bounds(p):
+				cells.append(p)
+	return cells
+
+static func _diamond_cells(board: BoardModel, pos: Vector2i, radius: int) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for dx in range(-radius, radius + 1):
+		for dy in range(-radius, radius + 1):
+			if abs(dx) + abs(dy) > radius:
+				continue
+			var p := pos + Vector2i(dx, dy)
+			if board.in_bounds(p):
+				cells.append(p)
+	return cells
 
 static func _bomb_cells(board: BoardModel, pos: Vector2i, radius: int) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []

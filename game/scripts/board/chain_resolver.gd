@@ -35,6 +35,10 @@ const _CHAIN_SAFETY_LIMIT := 400
 ## feel more like luck than skill. Six still allows a real, escalating,
 ## multi-stage cascade — it just can't run away with the whole board.
 const _MAX_SECONDARY_TRIGGERS := 6
+## Moves a player loses when a time bomb they left on the board detonates —
+## it doesn't end the level outright, but it burns turns and wrecks the
+## local board, so ignoring one is genuinely costly.
+const TIMEBOMB_MOVE_PENALTY := 2
 
 class MoveResult:
 	extends RefCounted
@@ -44,6 +48,13 @@ class MoveResult:
 	var powers_created: Array[Dictionary] = [] # [{pos, power_id}]
 	var powers_activated: Array[Dictionary] = [] # [{pos, power_id}]
 	var obstacles_broken: Array[Dictionary] = [] # [{pos, obstacle_id}]
+	## Cells the Freeze power encased in ice this move (not cleared — a
+	## deliberate side effect the view renders and tests assert on).
+	var frozen_cells: Array[Vector2i] = []
+	## Board positions where a time bomb hit zero and detonated this move.
+	var timebomb_explosions: Array[Vector2i] = []
+	## Extra moves deducted this resolve (currently only time-bomb blasts).
+	var move_penalty: int = 0
 	var chain_depth: int = 0
 	## How many waves were triggered purely by exposed board state (not by
 	## the player's path or by one power directly catching another) — proof
@@ -93,6 +104,10 @@ static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config:
 	# creates a power can still snowball into something bigger if the board
 	# state allows it.
 	_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
+
+	# A player move ticks every time bomb still on the board; any that reach
+	# zero detonate now, before gravity, as their own blast wave(s).
+	_tick_timebombs(board, result)
 
 	result.gravity_moves = board.apply_gravity()
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
@@ -188,6 +203,9 @@ static func _clear_or_damage(board: BoardModel, result: MoveResult, pos: Vector2
 	if cell.is_ice():
 		if board.damage_ice(pos):
 			result.obstacles_broken.append({"pos": pos, "obstacle_id": &"ice"})
+	if cell.is_timebomb():
+		if board.defuse_timebomb(pos):
+			result.obstacles_broken.append({"pos": pos, "obstacle_id": &"timebomb"})
 	var cleared_color := cell.color_id
 	result.cleared_cells.append(pos)
 	if cleared_color != BoardModel.RAINBOW_COLOR_ID and cleared_color != CellData.COLOR_EMPTY:
@@ -245,6 +263,14 @@ static func _process_chain_queue(board: BoardModel, result: MoveResult, power_co
 			touched.append(apos)
 			if was_occupied:
 				wave_new_cells += 1
+
+		# FREEZE: after shattering its small diamond, encase the plain pieces
+		# on the ring one step further out in ice. Existing obstacles / powers
+		# / gaps on the ring are left alone.
+		if power_id == &"freeze":
+			for rpos in PowerResolver.freeze_ring_cells(board, pos, int(definition.get("radius", 1))):
+				if board.freeze_cell(rpos, int(definition.get("freeze_hp", 2))):
+					result.frozen_cells.append(rpos)
 
 		result.score_events.append({
 			"cells": wave_new_cells,
@@ -322,3 +348,36 @@ static func _resolve_auto_chain_group(board: BoardModel, result: MoveResult, pow
 		cell.power_id = power_id
 		result.powers_created.append({"pos": pos, "power_id": power_id})
 		queue.append(pos)
+
+## Ticks every time bomb on the board down one turn (called once per player
+## move, after the cascade so a bomb cleared this move doesn't also tick).
+## Any that reach zero detonate in place as a 3x3 blast wave and add a move
+## penalty. Deterministic and order-stable (top-left to bottom-right).
+static func _tick_timebombs(board: BoardModel, result: MoveResult) -> void:
+	for pos in board.timebomb_positions():
+		if board.tick_timebomb(pos):
+			_detonate_timebomb(board, result, pos)
+
+static func _detonate_timebomb(board: BoardModel, result: MoveResult, pos: Vector2i) -> void:
+	var cell := board.get_cell(pos)
+	if cell != null:
+		cell.obstacle_id = CellData.OBSTACLE_NONE
+		cell.obstacle_hp = 0
+	result.timebomb_explosions.append(pos)
+	result.move_penalty += TIMEBOMB_MOVE_PENALTY
+	result.obstacles_broken.append({"pos": pos, "obstacle_id": &"timebomb"})
+	result.chain_depth += 1
+
+	var touched: Array[Vector2i] = []
+	var wave_new_cells := 0
+	for apos in PowerResolver.affected_cells(board, pos, &"bomb", true, CellData.COLOR_EMPTY, {"radius": 1}):
+		var acell := board.get_cell(apos)
+		if acell == null:
+			continue
+		var was_occupied := not acell.is_empty() or acell.is_stone()
+		_clear_or_damage(board, result, apos)
+		touched.append(apos)
+		if was_occupied:
+			wave_new_cells += 1
+	result.score_events.append({"cells": wave_new_cells, "power_bonus": 0, "timebomb": true, "power_pos": pos})
+	result.wave_cells.append(touched)

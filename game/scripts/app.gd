@@ -30,9 +30,11 @@ var _combo := ComboSystem.new()
 var _fever: FeverSystem
 var _objectives: ObjectiveTracker
 var _was_near_fail: bool = false
+var _was_fever: bool = false
 var _music_token: int = 0
 
 var _backdrop: Backdrop
+var _daily: DailyRewardsScreen
 
 func _ready() -> void:
 	randomize()
@@ -71,6 +73,15 @@ func _ready() -> void:
 	_menu = MainMenu.new()
 	menu_canvas.add_child(_menu)
 	_menu.play_pressed.connect(_on_menu_play_pressed)
+	_menu.daily_pressed.connect(_on_daily_pressed)
+
+	var daily_canvas := CanvasLayer.new()
+	daily_canvas.layer = 30
+	add_child(daily_canvas)
+	_daily = DailyRewardsScreen.new()
+	daily_canvas.add_child(_daily)
+	_daily.closed.connect(_on_daily_closed)
+	_daily.visible = false
 
 	var splash_canvas := CanvasLayer.new()
 	splash_canvas.layer = 100
@@ -106,6 +117,14 @@ func _on_home_pressed() -> void:
 	await _fade_out(_map, TRANSITION_DURATION)
 	_menu.refresh()
 	await _fade_in(_menu, TRANSITION_DURATION)
+
+func _on_daily_pressed() -> void:
+	_daily.refresh()
+	await _fade_in(_daily, TRANSITION_DURATION)
+
+func _on_daily_closed() -> void:
+	await _fade_out(_daily, TRANSITION_DURATION)
+	_menu.refresh()
 
 func _on_map_pressed() -> void:
 	await _go_to_map()
@@ -168,6 +187,8 @@ func _start_level(level_id: int) -> void:
 	_combo.reset()
 	_fever.reset()
 	_was_near_fail = false
+	_was_fever = false
+	_backdrop.set_accent_target(VisualTheme.ACCENT, 0.2)
 	_music_token += 1
 	_objectives = ObjectiveTracker.new(_current_level.objectives)
 
@@ -204,16 +225,30 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	_objectives.apply_move(result.colors_cleared, _score, result.powers_created, result.obstacles_broken)
 
 	if counts_as_move:
-		_moves_left = max(_moves_left - 1, 0)
+		_moves_left = max(_moves_left - 1 - result.move_penalty, 0)
 
 	_hud.set_moves(_moves_left)
 	_hud.set_coins(Economy.coins)
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 
+	# --- Fever spectacle: drive the board aura, backdrop tint, HUD flash and
+	# an ignition burst off the real FeverSystem state transition ---
+	var fever_now := _fever.is_active()
+	if fever_now != _was_fever:
+		_was_fever = fever_now
+		_board.set_fever(fever_now)
+		_backdrop.set_accent_target(VisualTheme.FEVER_HOT if fever_now else VisualTheme.ACCENT)
+		if fever_now:
+			_hud.flash_fever()
+			_board.play_fever_burst()
+
 	if fever_activated:
 		Audio.play(&"fever_activate")
 		Haptics.strong(90)
+
+	if not result.timebomb_explosions.is_empty():
+		Audio.play(&"tension_pulse")
 
 	var near_fail := _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete()
 	if near_fail and not _was_near_fail:
@@ -264,14 +299,39 @@ func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
 	_apply_move_result(result, false)
 
 func _on_level_won() -> void:
+	var first_clear := not Progress.is_completed(_current_level.id)
 	Economy.grant(_current_level.reward_coins)
 	var stars := StarRating.stars_for(_moves_left, _current_level.move_limit)
 	Progress.record_completion(_current_level.id, stars, _score)
 	var next_id := GameData.levels.next_level_id(_current_level.id)
-	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1, stars)
 	Music.fade_out_and_stop(0.7)
 	Audio.play(&"level_complete")
 	Haptics.strong(60)
+	if _board != null:
+		_board.set_fever(false)
+	_backdrop.set_accent_target(VisualTheme.ACCENT)
+
+	# Every 5th level is a "chest" node on the map — the first time it's
+	# cleared, open a milestone chest before the normal summary.
+	if first_clear and _current_level.id % 5 == 0:
+		await _present_milestone_chest()
+
+	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1, stars)
+
+func _present_milestone_chest() -> void:
+	var bonus_coins := _current_level.reward_coins * 2
+	var pool: Array[StringName] = [&"bomb", &"lightning", &"rainbow"]
+	var bid: StringName = pool[(_current_level.id / 5) % pool.size()]
+	var rewards := [
+		{"type": "coins", "amount": bonus_coins},
+		{"type": "booster", "id": bid, "amount": 1},
+	]
+	var popup := RewardPopup.present(_hud, rewards, {"title": "Milestone Chest!"})
+	await popup.claimed
+	Economy.grant(bonus_coins)
+	Boosters.add(bid, 1)
+	_hud.set_coins(Economy.coins)
+	_refresh_booster_counts()
 
 func _on_level_lost() -> void:
 	_hud.show_lose_panel(_score)

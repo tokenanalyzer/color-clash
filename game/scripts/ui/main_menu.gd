@@ -6,10 +6,13 @@ extends Control
 ## settings panel). Built in code, no scene/assets.
 
 signal play_pressed()
+signal daily_pressed()
 
 var _coins_label: Label
 var _gems_label: Label
 var _options: CenterContainer
+var _daily_btn: Button
+var _daily_dot: Control
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -39,6 +42,20 @@ func _ready() -> void:
 		play_pressed.emit()
 	)
 	col.add_child(play)
+
+	_daily_btn = _big_button("Daily Reward", VisualTheme.STAR.darkened(0.05), 20)
+	_daily_btn.custom_minimum_size = Vector2(260, 56)
+	_daily_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		daily_pressed.emit()
+	)
+	col.add_child(_daily_btn)
+	_daily_dot = ClaimDot.new()
+	_daily_dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_daily_dot.position = Vector2(-6, -6)
+	_daily_dot.custom_minimum_size = Vector2(18, 18)
+	_daily_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_daily_btn.add_child(_daily_dot)
 
 	var opt := _big_button("Settings", VisualTheme.ACCENT, 22)
 	opt.custom_minimum_size = Vector2(220, 52)
@@ -76,6 +93,8 @@ func _track_size() -> void:
 func refresh() -> void:
 	_coins_label.text = str(Economy.coins)
 	_gems_label.text = str(SaveService.get_int("gems", 0))
+	if _daily_dot != null:
+		_daily_dot.visible = DailyRewardsScreen.has_claimable()
 
 func _pill(parent: Control, kind: StringName, tc: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -156,6 +175,20 @@ func _bounce(node: Control) -> void:
 	var t := node.create_tween()
 	t.tween_property(node, "scale", Vector2(1.06, 1.06), 0.08)
 	t.tween_property(node, "scale", Vector2.ONE, 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+
+## Pulsing "you have something" badge on the Daily Reward button.
+class ClaimDot extends Control:
+	var _t := 0.0
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+	func _draw() -> void:
+		var c := size * 0.5
+		var p := 0.6 + 0.4 * sin(_t * 6.0)
+		draw_circle(c, 10.0 * p, Color(1, 0.3, 0.3, 0.4))
+		draw_circle(c, 7.0, Color(1, 0.35, 0.35))
+		draw_circle(c + Vector2(-2, -2), 2.5, Color(1, 0.8, 0.8))
 
 
 ## Wordmark + tagline, gently bobbing.

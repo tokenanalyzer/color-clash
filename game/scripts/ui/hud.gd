@@ -38,6 +38,8 @@ var _pause_center: CenterContainer
 var _pause_panel: PanelContainer
 var _scrim: ColorRect
 var _displayed_coins: int = 0
+var _fever_running := false
+var _fever_pulse: Tween
 
 const _BOOSTER_ICONS := {
 	&"bomb": "💣", &"lightning": "⚡", &"rainbow": "🌈", &"shuffle": "🔀", &"extra_moves": "➕",
@@ -522,8 +524,31 @@ func set_fever(meter: float, meter_max: float, active: bool) -> void:
 	fill.bg_color = VisualTheme.FEVER_HOT if active else VisualTheme.FEVER
 	_fever_label.text = "FEVER!" if active else "FEVER"
 	_fever_label.add_theme_color_override("font_color", Color(1, 1, 1) if active else VisualTheme.TEXT_DIM)
-	if active:
-		_pulse(_fever_wrap, 1.06)
+	if active != _fever_running:
+		_fever_running = active
+		if _fever_pulse != null and _fever_pulse.is_valid():
+			_fever_pulse.kill()
+		if active:
+			_fever_bar.value = _fever_bar.max_value
+			_fever_wrap.pivot_offset = _fever_wrap.size * 0.5
+			_fever_pulse = create_tween().set_loops()
+			_fever_pulse.tween_property(_fever_wrap, "scale", Vector2(1.04, 1.12), 0.34).set_trans(Tween.TRANS_SINE)
+			_fever_pulse.tween_property(_fever_wrap, "scale", Vector2.ONE, 0.34).set_trans(Tween.TRANS_SINE)
+		else:
+			_fever_wrap.scale = Vector2.ONE
+	elif active:
+		_fever_bar.value = _fever_bar.max_value
+
+## A one-off wallop the instant Fever ignites: the meter flares white and
+## the whole strip kicks.
+func flash_fever() -> void:
+	_fever_wrap.pivot_offset = _fever_wrap.size * 0.5
+	var fill: StyleBoxFlat = _fever_bar.get_theme_stylebox("fill")
+	fill.bg_color = Color(1, 1, 1)
+	var t := create_tween()
+	t.tween_property(_fever_wrap, "scale", Vector2(1.25, 1.4), 0.12).set_trans(Tween.TRANS_BACK)
+	t.tween_property(_fever_wrap, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_ELASTIC)
+	t.parallel().tween_method(func(v: float): fill.bg_color = Color(1, 1, 1).lerp(VisualTheme.FEVER_HOT, v), 0.0, 1.0, 0.4)
 
 func set_booster_counts(counts: Dictionary) -> void:
 	for id in _booster_badges.keys():

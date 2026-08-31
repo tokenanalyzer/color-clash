@@ -49,7 +49,7 @@ func test_all_configured_sfx_ids_build_valid_buffers() -> void:
 	var data := JsonLoader.load_json("res://data/sfx.json")
 	var cfg := SfxConfig.from_dict(data)
 	var all_ok := true
-	for id in ["select", "match", "blast", "chain_step", "power_bomb", "power_lightning", "power_chain", "power_rainbow", "combo_ding", "fever_activate", "level_complete", "level_failed", "shuffle", "button_tap", "tension_pulse"]:
+	for id in ["select", "match", "blast", "chain_step", "power_bomb", "power_lightning", "power_freeze", "power_chain", "power_rainbow", "combo_ding", "fever_activate", "level_complete", "level_failed", "shuffle", "button_tap", "tension_pulse", "timebomb_explode", "timebomb_tick"]:
 		if not cfg.has(StringName(id)):
 			all_ok = false
 			continue

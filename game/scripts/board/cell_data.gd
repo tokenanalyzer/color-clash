@@ -32,6 +32,12 @@ func is_ice() -> bool:
 func is_lock() -> bool:
 	return obstacle_id == &"lock"
 
+## A time-bomb cell holds a normal piece AND a countdown (stored in
+## obstacle_hp). Clearing the piece defuses it; letting the countdown reach
+## zero detonates it. See BoardModel.tick_timebomb / defuse_timebomb.
+func is_timebomb() -> bool:
+	return obstacle_id == &"timebomb"
+
 ## A stone cell blocks connect-selection and holds no piece.
 func is_selectable() -> bool:
 	if is_empty():

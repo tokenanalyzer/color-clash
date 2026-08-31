@@ -1,9 +1,10 @@
 {
-  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles that group size creates -- a very large connection legitimately earns multiple powers from one real move, which can then interact with each other during the cascade (see ChainResolver).",
+  "_comment": "Match-size to power thresholds are data-driven. Evaluated from highest min_size down; the first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles that group size creates -- a very large connection legitimately earns multiple powers from one real move, which can then interact with each other during the cascade (see ChainResolver). Ladder: bomb(4) -> lightning(5) -> freeze(6) -> chain(7/9/12, count 1/2/3).",
   "thresholds": [
     { "power": "chain", "min_size": 12, "count": 3 },
     { "power": "chain", "min_size": 9, "count": 2 },
-    { "power": "chain", "min_size": 6, "count": 1 },
+    { "power": "chain", "min_size": 7, "count": 1 },
+    { "power": "freeze", "min_size": 6, "count": 1 },
     { "power": "lightning", "min_size": 5, "count": 1 },
     { "power": "bomb", "min_size": 4, "count": 1 },
     { "power": "none", "min_size": 3, "count": 0 }
@@ -19,6 +20,13 @@
       "label": "Lightning",
       "base_points_per_cell": 10,
       "activation_bonus": 250
+    },
+    "freeze": {
+      "label": "Freeze",
+      "radius": 1,
+      "freeze_hp": 2,
+      "base_points_per_cell": 13,
+      "activation_bonus": 300
     },
     "chain": {
       "label": "Chain",
