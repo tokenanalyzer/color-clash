@@ -1,7 +1,8 @@
 extends SceneTree
 ## Manual dev tool: boots the real game to confirm the campaign map screen
-## works end to end — boots into the map (not straight into a level),
-## selecting an unlocked node transitions into play, winning a level
+## works end to end — boots into the main menu, PLAY opens the map (not
+## straight into a level), selecting an unlocked node transitions into
+## play, winning a level
 ## records progress/stars and unlocks the next node, and a not-yet-reached
 ## level stays locked. Not part of the CI test_runner; run manually after
 ## any map/progress change.
@@ -29,9 +30,18 @@ func _initialize() -> void:
 	# to it sequentially, so it should reliably still be locked.
 	var far_id: int = game_data.levels.ordered_ids[14]
 
-	print("App booted. Map visible=", app._map.visible, " board=", app._board)
-	if not app._map.visible or app._board != null:
-		push_error("should boot into the map with no level running")
+	print("App booted. Menu visible=", app._menu.visible, " board=", app._board)
+	if not app._menu.visible or app._board != null:
+		push_error("should boot into the main menu with no level running")
+		quit(1)
+		return
+
+	# PLAY opens the campaign map.
+	await app._on_menu_play_pressed()
+	await process_frame
+	print("After PLAY. Map visible=", app._map.visible)
+	if not app._map.visible:
+		push_error("PLAY should open the campaign map")
 		quit(1)
 		return
 

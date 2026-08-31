@@ -127,3 +127,27 @@ static func draw_v_gradient(ci: CanvasItem, rect: Rect2, top: Color, bottom: Col
 	for i in bands:
 		var t := float(i) / float(bands - 1)
 		ci.draw_rect(Rect2(rect.position + Vector2(0, bh * i), Vector2(rect.size.x, bh + 1.0)), top.lerp(bottom, t))
+
+const WORDMARK := "COLOR CLASH"
+const _WORDMARK_TINTS := [
+	Color(1.0, 0.36, 0.42), Color(1.0, 0.66, 0.24), Color(1.0, 0.86, 0.28),
+	Color(0.42, 0.82, 0.5), Color(0.36, 0.66, 1.0), Color(1, 1, 1),
+	Color(0.62, 0.44, 0.95), Color(1.0, 0.42, 0.6), Color(0.36, 0.8, 0.86),
+	Color(1.0, 0.72, 0.3), Color(0.5, 0.84, 0.56),
+]
+
+## The "COLOR CLASH" wordmark — each letter individually tinted — drawn
+## horizontally centred on `center` with the given cap height. `alpha`
+## fades the whole mark for reveal animations.
+static func draw_wordmark(ci: CanvasItem, center: Vector2, font_size: float, alpha: float = 1.0) -> void:
+	var font := ThemeDB.fallback_font
+	var fs := int(font_size)
+	var total := font.get_string_size(WORDMARK, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var x := center.x - total * 0.5
+	for i in WORDMARK.length():
+		var ch := WORDMARK[i]
+		var col: Color = _WORDMARK_TINTS[i] if i < _WORDMARK_TINTS.size() else Color.WHITE
+		col.a = alpha
+		ci.draw_string_outline(font, Vector2(x, center.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0, 0, 0, 0.6 * alpha))
+		ci.draw_string(font, Vector2(x, center.y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, col)
+		x += font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x

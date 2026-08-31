@@ -7,6 +7,7 @@ extends Control
 ## trusting anchor-preset fill under a CanvasLayer.
 
 signal level_selected(level_id: int)
+signal home_pressed()
 
 const _TOP_MARGIN := 150.0
 const _BOTTOM_MARGIN := 180.0
@@ -58,6 +59,23 @@ func _build_header() -> void:
 	var logo := WordmarkLabel.new()
 	logo.custom_minimum_size = Vector2(0, 52)
 	vbox.add_child(logo)
+
+	var home := Button.new()
+	home.text = "‹ Home"
+	home.add_theme_font_size_override("font_size", 16)
+	home.add_theme_color_override("font_color", VisualTheme.TEXT_DIM)
+	home.add_theme_stylebox_override("normal", VisualTheme.panel(VisualTheme.PANEL, 14, VisualTheme.PANEL_BORDER, 1))
+	home.add_theme_stylebox_override("hover", VisualTheme.panel(VisualTheme.PANEL_RAISED, 14))
+	home.add_theme_stylebox_override("pressed", VisualTheme.panel(VisualTheme.PANEL_SOLID, 14))
+	home.focus_mode = Control.FOCUS_NONE
+	home.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	home.position = Vector2(16, 18)
+	home.pressed.connect(func():
+		Audio.play(&"button_tap")
+		home_pressed.emit()
+	)
+	home.z_index = 5
+	add_child(home)
 
 	var currency := HBoxContainer.new()
 	currency.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -220,29 +238,10 @@ class MapEnvironment extends Control:
 			draw_circle(Vector2(fx, fy), 2.5, Color(0.8, 1.0, 0.7, 0.5 * tw))
 
 
-## "COLOR CLASH" wordmark — each letter individually tinted, drawn centred.
+## "COLOR CLASH" wordmark, centred (delegates to VisualTheme.draw_wordmark).
 class WordmarkLabel extends Control:
-	const _WORD := "COLOR CLASH"
-	const _TINTS := [
-		Color(1.0, 0.36, 0.42), Color(1.0, 0.66, 0.24), Color(1.0, 0.86, 0.28),
-		Color(0.42, 0.82, 0.5), Color(0.36, 0.66, 1.0),
-		Color(1, 1, 1),
-		Color(0.62, 0.44, 0.95), Color(1.0, 0.42, 0.6), Color(0.36, 0.8, 0.86),
-		Color(1.0, 0.72, 0.3), Color(0.5, 0.84, 0.56),
-	]
-
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func _draw() -> void:
-		var font := ThemeDB.fallback_font
-		var fs := 40
-		var total := font.get_string_size(_WORD, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-		var x := size.x * 0.5 - total * 0.5
-		var y := 42.0
-		for i in _WORD.length():
-			var ch := _WORD[i]
-			var tint: Color = _TINTS[i] if i < _TINTS.size() else Color.WHITE
-			draw_string_outline(font, Vector2(x, y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.6))
-			draw_string(font, Vector2(x, y), ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, tint)
-			x += font.get_string_size(ch, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		VisualTheme.draw_wordmark(self, Vector2(size.x * 0.5, 42.0), 40.0, 1.0)

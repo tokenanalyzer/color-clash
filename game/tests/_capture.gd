@@ -1,9 +1,9 @@
 extends SceneTree
 ## DEV TOOL (not a test): boots the real main scene and writes PNG
-## screenshots of each screen so the art can be reviewed outside the editor.
+## screenshots of each screen to user://shots/ for out-of-editor review.
 ##   godot --path game --script res://tests/_capture.gd
-## Screens land in user://shots/. Uses only `await process_frame` — a
-## SceneTree script here deadlocks on SceneTree.create_timer.
+## Uses only `await process_frame` — a SceneTree script deadlocks on
+## SceneTree.create_timer.
 
 const OUT := "user://shots"
 
@@ -14,20 +14,28 @@ func _frames(n: int) -> void:
 func _initialize() -> void:
 	await _frames(3)
 	DirAccess.make_dir_recursive_absolute(OUT)
-	# start from a clean-ish economy so numbers look real, not test-inflated
 	var save := get_root().get_node("SaveService")
 	save.set_int("coins", 1240)
 	save.set_int("gems", 350)
 
 	var app = load("res://scenes/main.tscn").instantiate()
 	get_root().add_child(app)
-	await _frames(30)
-	await _shot("01_map")
 
-	var gd := get_root().get_node("GameData")
+	await _frames(12)
+	await _shot("00_splash")
+
+	# let the splash run its ~1.25s and free itself
+	await _frames(150)
+	await _shot("01_menu")
+
+	await app._on_menu_play_pressed()
+	await _frames(30)
+	await _shot("02_map")
+
+	var gd = get_root().get_node("GameData")
 	await app._go_to_level(gd.levels.first_level_id())
 	await _frames(40)
-	await _shot("02_gameplay")
+	await _shot("03_gameplay")
 
 	var board = app._board
 	for pass_i in 3:
@@ -38,24 +46,19 @@ func _initialize() -> void:
 				path.append(p)
 			await board._play_move(path)
 			await _frames(30)
-	await _shot("03_gameplay_played")
+	await _shot("04_gameplay_played")
 
 	get_root().get_node("Economy").grant(500)
 	app._on_level_won()
 	await _frames(70)
-	await _shot("04_win")
+	await _shot("05_win")
 
 	app._hud.hide_end_panel()
 	await app._go_to_level(gd.levels.first_level_id())
 	await _frames(20)
 	app._hud.show_pause_panel(true)
 	await _frames(25)
-	await _shot("05_pause")
-
-	app._hud.show_pause_panel(false)
-	app._hud._show_settings(true)
-	await _frames(25)
-	await _shot("06_settings")
+	await _shot("06_pause")
 
 	print("shots -> ", ProjectSettings.globalize_path(OUT))
 	quit(0)
@@ -64,7 +67,7 @@ func _shot(name: String) -> void:
 	await _frames(2)
 	var tex := get_root().get_texture()
 	if tex == null:
-		print("  no texture (headless) -> skip ", name); return
+		print("  no texture -> skip ", name); return
 	var img := tex.get_image()
 	if img == null:
 		print("  null image -> skip ", name); return

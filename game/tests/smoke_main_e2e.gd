@@ -14,9 +14,14 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	assert(app._map != null, "map screen not created")
-	assert(app._map.visible, "app should boot into the level map, not straight into a level")
-	assert(app._board == null, "board should not exist before a level is selected from the map")
+	assert(app._menu != null, "main menu not created")
+	assert(app._menu.visible, "app should boot into the main menu")
+	assert(app._board == null, "board should not exist before a level is selected")
+
+	# PLAY on the menu opens the campaign map.
+	await app._on_menu_play_pressed()
+	await process_frame
+	assert(app._map.visible, "PLAY should open the level map")
 
 	var game_data := get_root().get_node("GameData")
 	var first_id: int = game_data.levels.first_level_id()

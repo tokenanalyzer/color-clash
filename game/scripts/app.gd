@@ -20,6 +20,8 @@ var _board: BoardView
 var _hud: HUD
 var _board_layer: Node2D
 var _map: LevelMap
+var _menu: MainMenu
+var _splash: SplashScreen
 
 var _current_level: LevelConfig
 var _moves_left: int = 0
@@ -61,11 +63,27 @@ func _ready() -> void:
 	_map = LevelMap.new()
 	map_canvas.add_child(_map)
 	_map.level_selected.connect(_on_level_selected_from_map)
+	_map.home_pressed.connect(_on_home_pressed)
+
+	var menu_canvas := CanvasLayer.new()
+	menu_canvas.layer = 20
+	add_child(menu_canvas)
+	_menu = MainMenu.new()
+	menu_canvas.add_child(_menu)
+	_menu.play_pressed.connect(_on_menu_play_pressed)
+
+	var splash_canvas := CanvasLayer.new()
+	splash_canvas.layer = 100
+	add_child(splash_canvas)
+	_splash = SplashScreen.new()
+	splash_canvas.add_child(_splash)
+	_splash.finished.connect(_on_splash_finished)
 
 	_hud.visible = false
 	_board_layer.visible = false
-	_map.visible = true
-	_map.modulate.a = 1.0
+	_map.visible = false
+	_menu.visible = true
+	_menu.modulate.a = 1.0
 
 func _board_rect() -> Rect2:
 	var vp_size := get_viewport().get_visible_rect().size
@@ -73,6 +91,21 @@ func _board_rect() -> Rect2:
 	return Rect2(Vector2.ZERO, Vector2(vp_size.x, height))
 
 # --------------------------------------------------------- screen flow --
+
+func _on_splash_finished() -> void:
+	# SplashScreen frees itself; the menu is already the visible screen.
+	pass
+
+func _on_menu_play_pressed() -> void:
+	_menu.refresh()
+	await _fade_out(_menu, TRANSITION_DURATION)
+	_map.refresh()
+	await _fade_in(_map, TRANSITION_DURATION)
+
+func _on_home_pressed() -> void:
+	await _fade_out(_map, TRANSITION_DURATION)
+	_menu.refresh()
+	await _fade_in(_menu, TRANSITION_DURATION)
 
 func _on_map_pressed() -> void:
 	await _go_to_map()

@@ -30,6 +30,7 @@ func _initialize() -> void:
 	music.state_changed.connect(func(state): _states.append(String(state)))
 
 	var game_data := get_root().get_node("GameData")
+	await app._on_menu_play_pressed()
 	await app._go_to_level(game_data.levels.first_level_id())
 	await process_frame
 	var board = app._board
