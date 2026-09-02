@@ -17,17 +17,33 @@ const _RARITY_TINT := {
 	&"epic": Color(0.62, 0.36, 0.92),
 	&"legendary": Color(1.0, 0.78, 0.24),
 }
+## Rarity -> which prepared chest sprite opens (33 reward / 34 premium /
+## 35 booster). `opts.chest` overrides it explicitly (milestone -> booster).
+const _RARITY_CHEST := {
+	&"common": &"eco_reward_chest", &"rare": &"eco_reward_chest",
+	&"epic": &"eco_premium_chest", &"legendary": &"eco_premium_chest",
+}
+const _CHEST_KEY := {
+	&"reward": &"eco_reward_chest", &"premium": &"eco_premium_chest", &"booster": &"eco_booster_chest",
+}
+
 var _rewards: Array = []
 var _rarity: StringName = &"common"
+var _chest_tex: StringName = &"eco_reward_chest"
 var _rows: VBoxContainer
 var _burst: CPUParticles2D
 var _chest: ChestArt
+var _fx: SpriteFX
 
 static func present(parent: Node, rewards: Array, opts: Dictionary = {}) -> RewardPopup:
 	var p := RewardPopup.new()
 	p._rewards = rewards
 	p._rarity = StringName(String(opts.get("rarity", _auto_rarity(rewards))))
 	p._title_text = String(opts.get("title", "Reward!"))
+	if opts.has("chest"):
+		p._chest_tex = _CHEST_KEY.get(StringName(String(opts["chest"])), &"eco_reward_chest")
+	else:
+		p._chest_tex = _RARITY_CHEST.get(p._rarity, &"eco_reward_chest")
 	parent.add_child(p)
 	return p
 
@@ -65,8 +81,8 @@ func _ready() -> void:
 	add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(440, 520)
-	panel.add_theme_stylebox_override("panel", VisualTheme.panel(Color(0.09, 0.10, 0.19, 0.98), 28, _tint(), 3))
+	panel.custom_minimum_size = Vector2(520, 560)
+	panel.add_theme_stylebox_override("panel", VisualTheme.panel(Color(0.09, 0.10, 0.19, 0.98), 30, _tint(), 3))
 	center.add_child(panel)
 
 	var vb := VBoxContainer.new()
@@ -74,14 +90,18 @@ func _ready() -> void:
 	vb.add_theme_constant_override("separation", 14)
 	panel.add_child(vb)
 
-	var title := VisualTheme.label(_title_text, 26, VisualTheme.TEXT_GOLD)
+	var title := VisualTheme.label(_title_text, VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(title)
 
 	_chest = ChestArt.new()
 	_chest.tint = _tint()
-	_chest.custom_minimum_size = Vector2(220, 170)
+	_chest.sprite_key = _chest_tex
+	_chest.custom_minimum_size = Vector2(240, 200)
 	vb.add_child(_chest)
+
+	_fx = SpriteFX.new()
+	add_child(_fx)
 
 	_burst = CPUParticles2D.new()
 	_burst.emitting = false
@@ -106,10 +126,12 @@ func _ready() -> void:
 	vb.add_child(_rows)
 
 	var collect := Button.new()
-	collect.text = "Collect"
-	collect.custom_minimum_size = Vector2(240, 58)
-	collect.add_theme_font_size_override("font_size", 22)
+	collect.text = "COLLECT"
+	collect.custom_minimum_size = Vector2(280, 70)
+	collect.add_theme_font_size_override("font_size", VisualTheme.FS_BUTTON)
 	collect.add_theme_color_override("font_color", VisualTheme.TEXT)
+	collect.add_theme_constant_override("outline_size", 5)
+	collect.add_theme_color_override("font_outline_color", VisualTheme.OUTLINE)
 	collect.add_theme_stylebox_override("normal", VisualTheme.button_face(VisualTheme.GOOD.darkened(0.1)))
 	collect.add_theme_stylebox_override("hover", VisualTheme.button_face(VisualTheme.GOOD))
 	collect.add_theme_stylebox_override("pressed", VisualTheme.button_face(VisualTheme.GOOD.darkened(0.3)))
@@ -145,12 +167,16 @@ func _run_sequence() -> void:
 	await _chest.rattle()
 	Audio.play(&"level_complete")
 	_chest.open()
+	var cc := _chest.global_position + _chest.size * 0.5
+	_fx.play_hold(&"cel_treasure_explosion", cc, 320.0, Color(1, 1, 1), 0.7, true, 0.5)
 	_burst.restart()
 	_burst.emitting = true
 	await get_tree().create_timer(0.25).timeout
 
 	for r in _rewards:
 		_add_reward_row(r)
+		if String(r.get("type", "")) == "coins":
+			_fx.play(&"eco_coin_burst", cc + Vector2(0, 40.0), 180.0, Color(1, 1, 1), 0.5, true)
 		Audio.play(&"combo_ding", 0.4)
 		await get_tree().create_timer(0.16).timeout
 
@@ -165,7 +191,7 @@ func _add_reward_row(r: Dictionary) -> void:
 
 	var kind := String(r.get("type", ""))
 	var amount := int(r.get("amount", 1))
-	var label := VisualTheme.label("", 24, VisualTheme.TEXT)
+	var label := VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT)
 
 	if kind == "coins":
 		var icon := HUD.GemIcon.new()
@@ -176,10 +202,20 @@ func _add_reward_row(r: Dictionary) -> void:
 		label.create_tween().tween_method(
 			func(v: float): label.text = "+%d" % int(round(v)), 0.0, float(amount), 0.5)
 	elif kind == "booster":
-		var g := IconDraw.IconRect.new()
-		g.id = StringName(String(r.get("id", "bomb")))
-		g.custom_minimum_size = Vector2(32, 32)
-		row.add_child(g)
+		var bid := StringName(String(r.get("id", "bomb")))
+		var ptex := AssetLibrary.power(bid)
+		if ptex != null:
+			var tr := TextureRect.new()
+			tr.texture = ptex
+			tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			tr.custom_minimum_size = Vector2(44, 44)
+			row.add_child(tr)
+		else:
+			var g := IconDraw.IconRect.new()
+			g.id = bid
+			g.custom_minimum_size = Vector2(32, 32)
+			row.add_child(g)
 		label.text = "%s  x%d" % [String(r.get("id", "booster")).capitalize().replace("_", " "), amount]
 		row.add_child(label)
 	elif kind == "stars":
@@ -215,7 +251,8 @@ func _on_collect() -> void:
 ## offsets (not `position`) so a parent container can't fight it.
 class ChestArt extends Control:
 	var tint: Color = Color(0.4, 0.7, 0.5)
-	var lid_angle := 0.0          # radians, 0 = closed, negative = open
+	var sprite_key: StringName = &"eco_reward_chest"
+	var lid_angle := 0.0          # radians, 0 = closed, negative = open (tilt cue)
 	var _shake := 0.0
 	var _drop := 0.0             # extra Y offset for the drop-in
 
@@ -244,6 +281,26 @@ class ChestArt extends Control:
 		var w := size.x
 		var h := size.y
 		var cx := w * 0.5 + _shake * 40.0
+
+		# prepared chest sprite (33/34/35) — shake via x-offset + a slight tilt
+		# as it "opens", glow spilling once open. No vector chest when present.
+		var tex := AssetLibrary.tex(sprite_key)
+		if tex != null:
+			var s := minf(w, h * 1.05) * 0.92
+			var m: float = maxf(float(tex.get_width()), float(tex.get_height()))
+			var iw := s * tex.get_width() / m
+			var ih := s * tex.get_height() / m
+			var cy := h * 0.52 + _drop
+			VisualTheme.draw_glow(self, Vector2(cx, cy + ih * 0.2), iw * 0.62,
+				Color(tint.r, tint.g, tint.b, 0.4 + 0.3 * clampf(-lid_angle, 0.0, 1.0)), 5)
+			draw_set_transform(Vector2(cx, cy), _shake * 0.35 + lid_angle * 0.06, Vector2.ONE)
+			draw_texture_rect(tex, Rect2(-iw * 0.5, -ih * 0.5, iw, ih), false)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+			if lid_angle < -0.4:
+				VisualTheme.draw_glow(self, Vector2(cx, cy - ih * 0.15), iw * 0.5,
+					Color(1, 0.95, 0.7, 0.55 * clampf(-lid_angle, 0.0, 1.0)), 4)
+			return
+
 		var base_y := h * 0.60 + _drop
 		var bw := w * 0.62
 		var bh := h * 0.34

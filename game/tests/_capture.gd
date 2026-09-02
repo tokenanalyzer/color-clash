@@ -6,6 +6,12 @@ extends SceneTree
 ## SceneTree.create_timer.
 
 const OUT := "user://shots"
+## OnePlus Nord 5 panel is 20:9. With `stretch=expand` on a 1080-wide base
+## the logical viewport becomes 1080 x 2377, so render the whole app into an
+## offscreen SubViewport of exactly that size — accurate on any monitor.
+const SHOT_SIZE := Vector2i(1080, 2377)
+
+var _svp: SubViewport
 
 func _frames(n: int) -> void:
 	for i in n:
@@ -18,8 +24,14 @@ func _initialize() -> void:
 	save.set_int("coins", 1240)
 	save.set_int("gems", 350)
 
+	_svp = SubViewport.new()
+	_svp.size = SHOT_SIZE
+	_svp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_svp.transparent_bg = false
+	get_root().add_child(_svp)
+
 	var app = load("res://scenes/main.tscn").instantiate()
-	get_root().add_child(app)
+	_svp.add_child(app)
 
 	await _frames(12)
 	await _shot("00_splash")
@@ -135,7 +147,7 @@ func _initialize() -> void:
 
 func _shot(name: String) -> void:
 	await _frames(2)
-	var tex := get_root().get_texture()
+	var tex := _svp.get_texture() if _svp != null else get_root().get_texture()
 	if tex == null:
 		print("  no texture -> skip ", name); return
 	var img := tex.get_image()

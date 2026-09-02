@@ -6,11 +6,10 @@ extends Node2D
 ## Board/HUD/Map are built entirely in code — see board_view.gd, hud.gd,
 ## level_map.gd — so there is no hand-authored scene file to keep in sync.
 
-## Reserved bands above / below the playfield for the HUD top bar + fever
-## meter and the booster tray. `_safe_inset()` widens them on notched
-## phones so the board never slides under the chrome.
-const BOARD_TOP_MARGIN := 240.0
-const BOARD_BOTTOM_MARGIN := 230.0
+## The playfield's top/bottom bounds are owned by the HUD (`playfield_top()`
+## / `playfield_bottom()`), which measures its own built chrome and folds in
+## the device safe-area — so the board fills the screen on any aspect ratio
+## and never slides under the top bar or the booster tray.
 ## Moves-remaining threshold (with the objective still incomplete) at which
 ## the music eases into a "tension" mix — a subtle nudge, not a punishment.
 const NEAR_FAIL_MOVES := 3
@@ -40,11 +39,20 @@ var _music_token: int = 0
 var _backdrop: Backdrop
 var _daily: DailyRewardsScreen
 
+## Debug-only rolling FPS sampler — printed to the Android log so on-device
+## performance can be verified without a profiler build. Stripped in release.
+var _fps_accum := 0.0
+var _fps_min := 999.0
+var _fps_frames := 0
+
 func _ready() -> void:
 	randomize()
 	_fever = FeverSystem.new(GameData.fever_config)
+	if OS.is_debug_build():
+		set_process(true)
 
 	_backdrop = Backdrop.new()
+	_backdrop.scene_id = &"env_main_background"
 	add_child(_backdrop)
 
 	var game_canvas := CanvasLayer.new()
@@ -61,7 +69,7 @@ func _ready() -> void:
 	_hud.resume_pressed.connect(_on_resume_pressed)
 
 	_board_layer = Node2D.new()
-	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN + _safe_inset().x)
+	_board_layer.position = Vector2(0, _hud.playfield_top())
 	add_child(_board_layer)
 
 	var map_canvas := CanvasLayer.new()
@@ -101,27 +109,33 @@ func _ready() -> void:
 	_menu.visible = true
 	_menu.modulate.a = 1.0
 
-func _safe_inset() -> Vector2:
-	var safe := DisplayServer.get_display_safe_area()
-	var win := DisplayServer.window_get_size()
-	if win.y <= 0 or safe.size.y <= 0:
-		return Vector2.ZERO
-	var sy := get_viewport().get_visible_rect().size.y / float(win.y)
-	return Vector2(maxf(safe.position.y * sy, 0.0), maxf((win.y - safe.end.y) * sy, 0.0))
+func _process(delta: float) -> void:
+	# debug FPS sampler only (set_process is off in release builds)
+	_fps_accum += delta
+	_fps_frames += 1
+	var fps := Engine.get_frames_per_second()
+	if fps > 0.0 and fps < _fps_min:
+		_fps_min = fps
+	if _fps_accum >= 2.0:
+		print("[FPS] avg~%.0f  min_2s=%.0f" % [float(_fps_frames) / _fps_accum, _fps_min])
+		_fps_accum = 0.0
+		_fps_frames = 0
+		_fps_min = 999.0
 
 func _board_rect() -> Rect2:
 	var vp_size := get_viewport().get_visible_rect().size
-	var inset := _safe_inset()
-	var top := BOARD_TOP_MARGIN + inset.x
-	var bottom := BOARD_BOTTOM_MARGIN + inset.y
+	# The playable band is whatever's left between the top HUD column and the
+	# booster tray — the HUD is the single source of truth for both so the
+	# board fills the screen on any aspect ratio instead of leaving dead bands.
+	var top := _hud.playfield_top()
+	var bottom := _hud.playfield_bottom()
 	var height := maxf(vp_size.y - top - bottom, vp_size.x * 0.6)
 	return Rect2(Vector2.ZERO, Vector2(vp_size.x, height))
 
 ## Reposition the board layer + re-fit the board when the viewport/orientation
 ## changes (portrait aspect-ratio adaptation).
 func _relayout_board() -> void:
-	var inset := _safe_inset()
-	_board_layer.position = Vector2(0, BOARD_TOP_MARGIN + inset.x)
+	_board_layer.position = Vector2(0, _hud.playfield_top())
 	if _board != null and _current_level != null:
 		_board.refit(_board_rect())
 
@@ -214,6 +228,7 @@ func _start_level(level_id: int) -> void:
 	_was_fever = false
 	_armed_booster = &""
 	_backdrop.set_accent_target(VisualTheme.ACCENT, 0.2)
+	_backdrop.set_scene_for_level(_current_level.id)
 	_music_token += 1
 	_objectives = ObjectiveTracker.new(_current_level.objectives)
 
@@ -339,6 +354,7 @@ func _on_level_won() -> void:
 	Haptics.strong(60)
 	if _board != null:
 		_board.set_fever(false)
+		_board.play_win_flourish()
 	_backdrop.set_accent_target(VisualTheme.ACCENT)
 
 	# Every 5th level is a "chest" node on the map — the first time it's
@@ -356,7 +372,7 @@ func _present_milestone_chest() -> void:
 		{"type": "coins", "amount": bonus_coins},
 		{"type": "booster", "id": bid, "amount": 1},
 	]
-	var popup := RewardPopup.present(_hud, rewards, {"title": "Milestone Chest!"})
+	var popup := RewardPopup.present(_hud, rewards, {"title": "Milestone Chest!", "chest": "booster"})
 	await popup.claimed
 	Economy.grant(bonus_coins)
 	Boosters.add(bid, 1)

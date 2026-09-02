@@ -1,15 +1,17 @@
 class_name GemTextures
 extends RefCounted
-## Bakes the premium jewel look ONCE into cached ImageTextures, then the
-## board just blits textured quads — the Android-friendly "draw heavy once,
-## blit cheap forever" technique. A full board is ~1 texture draw per cell
-## instead of dozens of vector ops, and the result scales crisply with
-## linear+mipmap filtering across every phone resolution.
+## Jewel textures for the board. When the prepared gem art (assets 1-6) is
+## present it is served directly; otherwise the premium look is BAKED ONCE into
+## a cached ImageTexture (a rounded flat-top hexagon with a lit body gradient,
+## faint facets, specular, rim light and a crisp AA edge). Either way the board
+## just blits one textured quad per cell — the Android "draw heavy once, blit
+## cheap forever" technique — and it scales crisply with linear+mipmap
+## filtering across every phone resolution.
 ##
-## All procedural, no art assets: a rounded flat-top hexagon with a lit
-## vertical body gradient, faint internal facets, a soft specular, a top
-## rim light, a crisp AA edge, plus shared soft-shadow and additive-glow
-## sprites tinted per gem at draw time.
+## The multicolour Rainbow jewel stays procedural (`_bake_rainbow`) — there is
+## no dedicated art asset for it and the baked one already matches the set.
+## Shared soft-shadow / additive-glow sprites are procedural falloffs tinted per
+## draw and are also kept.
 
 const RES := 176          # baked gem resolution (downscaled on screen)
 const PAD := 16           # room for the AA edge / rim
@@ -20,19 +22,24 @@ static var _shadow: ImageTexture
 static var _glow: ImageTexture
 static var _rainbow: ImageTexture
 
-## Bakes every colour in the palette up front (call from BoardView.setup so
-## the one-time cost is hidden by the level-in fade). Idempotent.
+## Prepares the jewel textures up front (call from BoardView.setup so any
+## one-time bake cost is hidden by the level-in fade). Colours that have a
+## prepared art asset skip the bake entirely. Idempotent.
 static func prime(palette: PieceColorPalette) -> void:
 	_ensure_shared()
 	for id in palette.ordered_ids:
-		if not _gems.has(id):
+		if _gems.has(id):
+			continue
+		if AssetLibrary.gem(id) != null:
+			_gems[id] = AssetLibrary.gem(id)
+		else:
 			_gems[id] = _bake_gem(palette.get_def(id))
 	if _rainbow == null:
 		_rainbow = _bake_rainbow()
 
 ## A baked jewel in an arbitrary solid colour (power tiles / obstacles),
 ## cached under `key`. `base` is the mid tone; the rest are derived.
-static func solid_gem(key: StringName, base: Color) -> ImageTexture:
+static func solid_gem(key: StringName, base: Color) -> Texture2D:
 	if not _gems.has(key):
 		var d := ColorDef.new()
 		d.base_color = base
@@ -43,13 +50,16 @@ static func solid_gem(key: StringName, base: Color) -> ImageTexture:
 		_gems[key] = _bake_gem(d)
 	return _gems[key]
 
-static func gem(color_id: StringName, palette: PieceColorPalette) -> ImageTexture:
+static func gem(color_id: StringName, palette: PieceColorPalette) -> Texture2D:
 	if color_id == BoardModel.RAINBOW_COLOR_ID:
 		if _rainbow == null:
 			_rainbow = _bake_rainbow()
 		return _rainbow
 	if not _gems.has(color_id):
-		if palette != null and palette.has(color_id):
+		var art := AssetLibrary.gem(color_id)
+		if art != null:
+			_gems[color_id] = art
+		elif palette != null and palette.has(color_id):
 			_gems[color_id] = _bake_gem(palette.get_def(color_id))
 		else:
 			return null
@@ -90,18 +100,20 @@ static func _bake_gem(def: ColorDef) -> ImageTexture:
 	var buf := PackedByteArray()
 	buf.resize(_SIZE * _SIZE * 4)
 
-	var top := def.accent_color.lerp(def.base_color, 0.12)
+	# Brighter lit cap, deeper shaded base — a wider tonal range reads as a
+	# thicker, glossier jewel rather than a flat chip.
+	var top := def.accent_color.lightened(0.14)
 	var mid := def.base_color
-	var deep := def.base_color.lerp(def.deep_color, 0.7)
+	var deep := def.base_color.lerp(def.deep_color, 0.95).darkened(0.1)
 	var rim := def.rim_color
 	var glow_c := def.glow_color
 
 	var cx := float(_SIZE) * 0.5
 	var cy := float(_SIZE) * 0.5
 	var r := float(RES) * 0.5 - 1.0
-	var round_r := float(RES) * 0.115
-	var spec_c := Vector2(cx - RES * 0.17, cy - RES * 0.24)
-	var spec_r := RES * 0.32
+	var round_r := float(RES) * 0.16
+	var spec_c := Vector2(cx - RES * 0.16, cy - RES * 0.25)
+	var spec_r := RES * 0.36
 
 	var i := 0
 	for y in _SIZE:
@@ -126,22 +138,30 @@ static func _bake_gem(def: ColorDef) -> ImageTexture:
 				# inner colour bloom toward the centre
 				var cd: float = 1.0 - clampf(p.length() / (r * 0.9), 0.0, 1.0)
 				body = body.lerp(glow_c, cd * 0.12)
-				# specular blob
+				# broad soft specular + a tight hot glint = glossy bead
 				var s: float = clampf(1.0 - (Vector2(float(x), float(y)) - spec_c).length() / spec_r, 0.0, 1.0)
-				s = s * s * 0.8
+				s = s * s * 0.9
 				body = body.lerp(Color(1, 1, 1), s)
-				var hot: float = clampf(1.0 - (Vector2(float(x), float(y)) - spec_c).length() / (spec_r * 0.32), 0.0, 1.0)
-				body = body.lerp(Color(1, 1, 1), hot * hot * 0.9)
+				var hot: float = clampf(1.0 - (Vector2(float(x), float(y)) - spec_c).length() / (spec_r * 0.26), 0.0, 1.0)
+				body = body.lerp(Color(1, 1, 1), hot * hot * 0.95)
+				# small counter-highlight on the lower-right (bounce light)
+				var bl := Vector2(cx + RES * 0.19, cy + RES * 0.2)
+				var b2: float = clampf(1.0 - (Vector2(float(x), float(y)) - bl).length() / (RES * 0.24), 0.0, 1.0)
+				body = body.lerp(rim, b2 * b2 * 0.22)
 				# top rim light (bright band just inside the upper edge)
 				var edge: float = clampf(1.0 + sd / 6.0, 0.0, 1.0)  # 1 at edge -> 0 at 6px in
 				if p.y < 0.0:
-					body = body.lerp(rim, edge * clampf(-p.y / r, 0.0, 1.0) * 0.85)
-				# bottom inner shade
-				if p.y > r * 0.2:
-					body = body.darkened(edge * 0.25)
-				# crisp dark outline right at the boundary
-				var outline: float = clampf(1.0 - absf(sd) / 1.6, 0.0, 1.0)
-				body = body.darkened(outline * 0.35)
+					body = body.lerp(rim, edge * clampf(-p.y / r, 0.0, 1.0) * 1.0)
+				# bottom inner shade — deeper, for a domed bead look
+				if p.y > r * 0.15:
+					body = body.darkened(edge * 0.34)
+				# ambient-occlusion ring hugging the lower boundary all round
+				var ao: float = clampf(1.0 + sd / 10.0, 0.0, 1.0)
+				body = body.darkened((1.0 - ao) * 0.18)
+				# crisp dark contour just inside the boundary — a defined edge
+				# so touching jewels never bleed into one another
+				var outline: float = clampf(1.0 - absf(sd + 1.5) / 3.0, 0.0, 1.0)
+				body = body.darkened(outline * 0.55)
 				col = Color(body.r, body.g, body.b, a)
 			buf[i] = int(round(clampf(col.r, 0.0, 1.0) * 255.0))
 			buf[i + 1] = int(round(clampf(col.g, 0.0, 1.0) * 255.0))

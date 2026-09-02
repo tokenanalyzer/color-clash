@@ -6,8 +6,8 @@ extends Button
 ## star arc above a cleared level and a crowned, rotating-ring treatment on
 ## the current one. Every Nth node is flagged `is_chest` for a reward beat.
 
-const NODE_RADIUS := 44.0
-const _TOP_PADDING := 34.0
+const NODE_RADIUS := 50.0
+const _TOP_PADDING := 38.0
 
 var level_id: int = 0
 var state: StringName = &"locked" # locked | unlocked | current | completed
@@ -48,10 +48,65 @@ func _center() -> Vector2:
 	var y_off := sin(_bob * 2.2) * 2.5 if state == &"current" else 0.0
 	return Vector2(size.x * 0.5, _TOP_PADDING + NODE_RADIUS + y_off)
 
+const _STATE_SPRITE := {
+	&"locked": &"map_locked_node", &"unlocked": &"map_level_node",
+	&"current": &"map_current_node", &"completed": &"map_completed_node",
+}
+
 func _draw() -> void:
 	pivot_offset = size * 0.5
 	var c := _center()
 	var r := NODE_RADIUS
+	var font := ThemeDB.fallback_font
+
+	var sprite := AssetLibrary.tex(_STATE_SPRITE.get(state, &"map_level_node"))
+	if sprite != null:
+		if state == &"current":
+			VisualTheme.draw_glow(self, c, r * 2.1, Color(1.0, 0.8, 0.3, 0.35), 5)
+		# node disc art, fit to the button width (aspect kept), centred on c
+		var dw := r * 2.5
+		var dh := dw * float(sprite.get_height()) / float(sprite.get_width())
+		draw_texture_rect(sprite, Rect2(c - Vector2(dw, dh) * 0.5, Vector2(dw, dh)), false)
+		# rotating dashed ring + crown on the current node
+		if state == &"current":
+			for i in 12:
+				var a := _spin + TAU * float(i) / 12.0
+				draw_line(c + Vector2(cos(a), sin(a)) * (r + 8.0),
+					c + Vector2(cos(a), sin(a)) * (r + 14.0), Color(1.0, 0.9, 0.5, 0.9), 3.0, true)
+			var crown := AssetLibrary.tex(&"ui_crown_trophy")
+			if crown != null:
+				var cw := r * 1.5
+				var chh := cw * float(crown.get_height()) / float(crown.get_width())
+				draw_texture_rect(crown, Rect2(c + Vector2(-cw * 0.5, -r - chh * 0.8), Vector2(cw, chh)), false)
+			else:
+				_draw_crown(c + Vector2(0, -r - 16.0))
+		# label / chest
+		if is_chest and AssetLibrary.has(&"map_milestone_chest"):
+			var chest := AssetLibrary.tex(&"map_milestone_chest")
+			var kw := r * 1.7
+			var kh := kw * float(chest.get_height()) / float(chest.get_width())
+			draw_texture_rect(chest, Rect2(c - Vector2(kw, kh) * 0.5, Vector2(kw, kh)), false)
+		elif is_chest:
+			_draw_chest(c)
+		elif state != &"locked":
+			var label := str(level_id)
+			var fs := 32
+			var ts := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+			draw_string_outline(font, c - ts * 0.5 + Vector2(0, ts.y * 0.30), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0, 0, 0, 0.7))
+			draw_string(font, c - ts * 0.5 + Vector2(0, ts.y * 0.30), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+		# earned-star rating above a cleared node (player's real score)
+		if state == &"completed":
+			var star_tex := AssetLibrary.tex(&"eco_star")
+			for i in 3:
+				var a := deg_to_rad(-128.0 + float(i) * 38.0)
+				var sc := c + Vector2(cos(a), sin(a)) * (r + 18.0)
+				if star_tex != null:
+					var ss := 26.0
+					draw_texture_rect(star_tex, Rect2(sc - Vector2(ss, ss) * 0.5, Vector2(ss, ss)), false,
+						Color(1, 1, 1) if i < stars else Color(0.32, 0.33, 0.4, 0.85))
+				else:
+					_draw_star(sc, 9.0, VisualTheme.STAR if i < stars else Color(0.3, 0.31, 0.38))
+		return
 
 	var base: Color
 	var ring: Color
@@ -69,12 +124,17 @@ func _draw() -> void:
 	if state == &"current":
 		VisualTheme.draw_glow(self, c, r * 2.0, Color(1.0, 0.8, 0.3, 0.35), 5)
 
-	# shadow + disc + gloss
-	draw_circle(c + Vector2(0, 5), r, Color(0, 0, 0, 0.4))
-	var disc := ShapeDrawUtils.regular_polygon(28, r, 0.0, c)
-	draw_polygon(disc, ShapeDrawUtils.vertical_shade(disc, base.lightened(0.3), base.darkened(0.35)))
-	draw_arc(c, r - 2.0, 0, TAU, 32, ring, 4.0, true)
-	draw_circle(c + Vector2(-r * 0.3, -r * 0.34), r * 0.28, Color(1, 1, 1, 0.28))
+	# cast shadow + glossy domed disc + lit rim + rim-light highlight
+	draw_circle(c + Vector2(0, 7), r * 1.03, Color(0, 0, 0, 0.42))
+	var disc := ShapeDrawUtils.regular_polygon(32, r, 0.0, c)
+	draw_polygon(disc, ShapeDrawUtils.vertical_shade(disc, base.lightened(0.42), base.darkened(0.42)))
+	# inner bloom
+	VisualTheme.draw_glow(self, c + Vector2(0, r * 0.05), r * 0.5, Color(base.lightened(0.2).r, base.lightened(0.2).g, base.lightened(0.2).b, 0.28), 4)
+	draw_arc(c, r - 2.0, 0, TAU, 40, ring, 5.0, true)
+	draw_arc(c, r - 2.0, PI * 0.15, PI * 0.85, 20, Color(0, 0, 0, 0.28), 5.0, true)
+	# top gloss cap
+	draw_circle(c + Vector2(-r * 0.28, -r * 0.34), r * 0.3, Color(1, 1, 1, 0.34))
+	draw_circle(c + Vector2(-r * 0.18, -r * 0.22), r * 0.12, Color(1, 1, 1, 0.55))
 
 	# rotating dashed ring on the current node
 	if state == &"current":
@@ -85,17 +145,17 @@ func _draw() -> void:
 			draw_line(p1, p2, Color(1.0, 0.9, 0.5, 0.9), 3.0, true)
 		_draw_crown(c + Vector2(0, -r - 16.0))
 
-	var font := ThemeDB.fallback_font
 	if state == &"locked":
-		draw_arc(c + Vector2(0, -7), 11.0, PI, TAU, 14, Color(0.8, 0.82, 0.9), 3.5, true)
-		draw_rect(Rect2(c + Vector2(-12, -5), Vector2(24, 18)), Color(0.8, 0.82, 0.9))
+		draw_arc(c + Vector2(0, -9), 13.0, PI, TAU, 16, Color(0.82, 0.85, 0.94), 4.0, true)
+		draw_rect(Rect2(c + Vector2(-14, -6), Vector2(28, 20)), Color(0.82, 0.85, 0.94))
+		draw_circle(c + Vector2(0, 2), 3.5, Color(0.2, 0.2, 0.26))
 	elif is_chest:
 		_draw_chest(c)
 	else:
 		var label := str(level_id)
-		var fs := 30
+		var fs := 36
 		var ts := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-		draw_string_outline(font, c - ts * 0.5 + Vector2(0, ts.y * 0.32), label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 4, Color(0, 0, 0, 0.5))
+		draw_string_outline(font, c - ts * 0.5 + Vector2(0, ts.y * 0.32), label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, 6, Color(0, 0, 0, 0.6))
 		draw_string(font, c - ts * 0.5 + Vector2(0, ts.y * 0.32), label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs, Color.WHITE)
 
 	if state == &"completed":

@@ -18,6 +18,8 @@ var rainbow_chance: float = 0.0
 var rng := RandomNumberGenerator.new()
 
 var particles: ParticlePool
+var sfx: SpriteFX               # prepared burst artwork (assets 19-26, 72-74)
+var _path_head: Sprite2D        # comet head on the live end of the connection
 
 var _piece_nodes: Array = [] # [x][y] -> PieceView
 var _cell_size: float = 64.0
@@ -59,6 +61,18 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 
 	particles = ParticlePool.new()
 	add_child(particles)
+	sfx = SpriteFX.new()
+	add_child(sfx)
+
+	_path_head = Sprite2D.new()
+	_path_head.texture = AssetLibrary.tex(&"vfx_energy_trail_head")
+	_path_head.z_index = 52
+	_path_head.visible = false
+	_path_head.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if _path_head.texture != null:
+		var hs := _cell_size * 0.9 / float(maxi(_path_head.texture.get_width(), _path_head.texture.get_height()))
+		_path_head.scale = Vector2(hs, hs)
+	add_child(_path_head)
 
 	_path_glow = Line2D.new()
 	_path_glow.width = _cell_size * 0.42
@@ -71,13 +85,20 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 	add_child(_path_glow)
 
 	_path_line = Line2D.new()
-	_path_line.width = _cell_size * 0.16
-	_path_line.default_color = Color(1, 1, 1, 0.9)
+	_path_line.width = _cell_size * 0.18
+	_path_line.default_color = Color(1, 1, 1, 0.95)
 	_path_line.z_index = 50
 	_path_line.antialiased = true
 	_path_line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	_path_line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	_path_line.joint_mode = Line2D.LINE_JOINT_ROUND
+	# comet taper — the trail thins towards its tail so the drawing hand reads
+	# as the "live" end of the connection.
+	var taper := Curve.new()
+	taper.add_point(Vector2(0.0, 0.35))
+	taper.add_point(Vector2(0.12, 1.0))
+	taper.add_point(Vector2(1.0, 0.9))
+	_path_line.width_curve = taper
 	add_child(_path_line)
 
 	# _process only runs during Fever (board aura pulse) — off by default so
@@ -142,14 +163,18 @@ func _idle_sparkle() -> void:
 		if cell != null and not cell.is_empty() and not cell.has_power():
 			var node := _node_at(p)
 			if node != null:
-				particles.burst(node.global_position + Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * _cell_size * 0.25,
-					Color(1, 1, 1, 0.8), 2)
+				var jitter := Vector2(rng.randf_range(-1, 1), rng.randf_range(-1, 1)) * _cell_size * 0.22
+				if sfx != null and AssetLibrary.has(&"vfx_glow_orb"):
+					sfx.play(&"vfx_glow_orb", node.global_position + jitter, _cell_size * 0.8, Color(1, 1, 1, 0.85), 0.5, true)
+				else:
+					particles.burst(node.global_position + jitter, Color(1, 1, 1, 0.8), 2)
 			return
 
 ## A screen-filling punctuation the instant Fever ignites: central flash,
 ## a ring of bursts around the board, a hard shake and a big FEVER! title.
 func play_fever_burst() -> void:
 	var vp := _board_rect_center()
+	sfx.play_hold(&"cel_fever_activation_emblem", to_global(vp), _cell_size * 6.5, Color(1, 1, 1), 0.75, true, 0.6)
 	particles.flash(to_global(vp), VisualTheme.FEVER_HOT, _cell_size * 8.0)
 	var grid := _grid_px()
 	for i in 10:
@@ -159,6 +184,15 @@ func play_fever_burst() -> void:
 	ScreenShake.apply(self, 16.0, 0.4)
 	Haptics.strong(110)
 	ComboPopup.spawn(self, vp - Vector2(0, _cell_size), "FEVER!", VisualTheme.FEVER_HOT, 64, "GO WILD")
+
+## Level-clear flourish over the board — a rising Level Complete Portal (#73)
+## and a firework burst. Called by GameController just before the win panel.
+func play_win_flourish() -> void:
+	if sfx == null:
+		return
+	var c := _board_rect_center()
+	sfx.play_hold(&"cel_level_complete_portal", to_global(c), _cell_size * 6.5, Color(1, 1, 1), 0.9, true, 0.4)
+	sfx.play(&"cel_firework_burst", to_global(c) - Vector2(0, _cell_size * 1.5), _cell_size * 5.0, Color(1, 1, 1), 0.7, true)
 
 ## Pixel span of the honeycomb playfield (top-left at _origin).
 func _grid_px() -> Vector2:
@@ -180,14 +214,27 @@ func _generate_playable_board() -> void:
 ## therefore spans (width + 0.5) cells across and (height·0.866 + 0.134) down.
 const HEX_ROW := 0.866025
 
+## The full band the controller handed us (HUD-bottom → tray-top). The
+## decorative board panel fills this; the honeycomb is centred inside it, so
+## a width-bound board reads as a big framed playfield instead of a small
+## grid marooned in empty space.
+var _band_rect: Rect2 = Rect2(0, 0, 1080, 1500)
+
 func _fit_layout(viewport_rect: Rect2, width: int, height: int) -> void:
-	var margin := 20.0
-	var avail := viewport_rect.size - Vector2(margin, margin) * 2.0
+	_band_rect = viewport_rect
+	var margin_x := 14.0
+	var margin_y := 24.0
+	var avail := viewport_rect.size - Vector2(margin_x * 2.0, margin_y * 2.0)
 	var span_x := float(width) + 0.5
 	var span_y := float(height - 1) * HEX_ROW + 1.0
-	_cell_size = min(avail.x / span_x, avail.y / span_y)
+	# Portrait boards are almost always width-constrained; cap the cell so a
+	# short-but-wide board can't inflate into cartoonish tiles.
+	_cell_size = min(avail.x / span_x, avail.y / span_y, 168.0)
 	var grid_size := Vector2(_cell_size * span_x, _cell_size * span_y)
-	_origin = (viewport_rect.size - grid_size) * 0.5
+	# Centred inside the band; the panel drawn in _draw() fills the rest.
+	_origin.x = viewport_rect.position.x + (viewport_rect.size.x - grid_size.x) * 0.5
+	var slack_y: float = maxf(viewport_rect.size.y - grid_size.y, 0.0)
+	_origin.y = viewport_rect.position.y + slack_y * 0.5
 
 func _build_piece_pool(width: int, height: int) -> void:
 	_piece_nodes.resize(width)
@@ -248,19 +295,25 @@ func _resync_all_from_board() -> void:
 func _draw() -> void:
 	if board == null:
 		return
-	var pad := _cell_size * 0.34
+	var pad := _cell_size * 0.5
 	var grid := _grid_px()
-	var frame := Rect2(_origin - Vector2(pad, pad), grid + Vector2(pad, pad) * 2.0)
 
 	var r := _cell_size * 0.5
+
+	# The decorative panel hugs the honeycomb (generous padding), then is
+	# centred in the band by _fit_layout. A width-bound 9-wide board leaves
+	# symmetric breathing room top & bottom — the animated backdrop shows
+	# through it, which reads as intentional space, not a dead gap.
+	var frame := Rect2(_origin - Vector2(pad, pad), grid + Vector2(pad, pad) * 2.0)
+	var panel_r := minf(_cell_size * 0.6, 44.0)
 
 	# soft outer glow behind the whole board — separates it from the backdrop
 	for i in range(5, 0, -1):
 		var t := float(i) / 5.0
-		_draw_round_rect(frame.grow(6.0 + t * 22.0), r + t * 16.0,
+		_draw_round_rect(frame.grow(6.0 + t * 22.0), panel_r + t * 16.0,
 			Color(VisualTheme.ACCENT.r, VisualTheme.ACCENT.g, VisualTheme.ACCENT.b, 0.05 * (1.0 - t)))
 	# drop shadow
-	_draw_round_rect(Rect2(frame.position + Vector2(0, 12), frame.size), r, Color(0, 0, 0, 0.45))
+	_draw_round_rect(Rect2(frame.position + Vector2(0, 12), frame.size), panel_r, Color(0, 0, 0, 0.45))
 
 	# Fever aura
 	if fever_active:
@@ -269,40 +322,50 @@ func _draw() -> void:
 			var t := float(i) / 4.0
 			var col := VisualTheme.FEVER.lerp(VisualTheme.FEVER_HOT, fpulse)
 			col.a = (0.30 - 0.05 * float(i)) * (0.6 + 0.4 * fpulse)
-			_draw_round_rect(frame.grow(6.0 + t * 28.0 + fpulse * 12.0), r + t * 22.0, col)
+			_draw_round_rect(frame.grow(6.0 + t * 28.0 + fpulse * 12.0), panel_r + t * 22.0, col)
 
 	# frame body: raised bevel — lighter top band, darker base
-	_draw_round_rect(frame, r, VisualTheme.PANEL_RAISED.darkened(0.12))
-	_draw_round_rect(Rect2(frame.position, Vector2(frame.size.x, frame.size.y * 0.5)), r,
+	_draw_round_rect(frame, panel_r, VisualTheme.PANEL_RAISED.darkened(0.12))
+	_draw_round_rect(Rect2(frame.position, Vector2(frame.size.x, frame.size.y * 0.5)), panel_r,
 		VisualTheme.PANEL_RAISED.lightened(0.10))
-	_draw_round_rect(frame.grow(-4.0), r - 2.0, VisualTheme.PANEL_SOLID)
+	_draw_round_rect(frame.grow(-4.0), panel_r - 2.0, VisualTheme.PANEL_SOLID)
 
 	# accent / fever rim
 	var rim_col := Color(VisualTheme.ACCENT.r, VisualTheme.ACCENT.g, VisualTheme.ACCENT.b, 0.28)
 	if fever_active:
 		rim_col = VisualTheme.FEVER_HOT
 		rim_col.a = 0.55 + 0.35 * sin(_fever_phase * 9.0)
-	_draw_round_rect_outline(frame.grow(-3.0), r, rim_col, 2.5)
+	_draw_round_rect_outline(frame.grow(-3.0), panel_r, rim_col, 2.5)
 
 	# inner well with an inset shadow band across the top
-	var well := Rect2(_origin - Vector2(pad * 0.42, pad * 0.42), grid + Vector2(pad * 0.42, pad * 0.42) * 2.0)
-	_draw_round_rect(well, _cell_size * 0.42, VisualTheme.WELL)
-	_draw_round_rect(Rect2(well.position, Vector2(well.size.x, _cell_size * 0.5)), _cell_size * 0.42,
+	var well := Rect2(_origin - Vector2(pad * 0.5, pad * 0.5), grid + Vector2(pad * 0.5, pad * 0.5) * 2.0)
+	_draw_round_rect(well, _cell_size * 0.44, VisualTheme.WELL)
+	_draw_round_rect(Rect2(well.position, Vector2(well.size.x, _cell_size * 0.5)), _cell_size * 0.44,
 		Color(0, 0, 0, 0.3))
 
-	# per-cell sockets (recessed: dark rim + subtle bottom light)
+	# per-cell sockets — each jewel drops into a defined recessed cup so the
+	# honeycomb reads as separated pieces seated in the frame, not a mosaic:
+	# a soft cast pool, a dark inset disc a touch wider than the jewel, a
+	# crisp dark rim, a shaded upper inner wall and a lit lower lip.
 	var socket_glow := 0.0
 	if fever_active:
 		socket_glow = 0.05 + 0.05 * sin(_fever_phase * 6.0)
+	var s := _cell_size * 0.52
+	var rim_w := maxf(_cell_size * 0.035, 2.0)
 	for x in board.width:
 		for y in board.height:
 			var c := _slot_center(Vector2i(x, y))
-			var s := _cell_size * 0.42
-			draw_circle(c + Vector2(0, _cell_size * 0.05), s, Color(0, 0, 0, 0.28))
-			draw_circle(c, s * 0.96, Color(0.10, 0.12, 0.2, 0.5))
-			draw_arc(c, s * 0.96, PI * 0.15, PI * 0.85, 10, Color(1, 1, 1, 0.05), 2.0, true)
+			# cast pool below
+			draw_circle(c + Vector2(0, _cell_size * 0.05), s * 1.02, Color(0.0, 0.0, 0.02, 0.5))
+			# recessed cup
+			draw_circle(c, s, Color(0.045, 0.06, 0.11, 0.92))
+			# upper inner wall in shadow, lower lip catching light
+			draw_arc(c, s * 0.9, PI * 0.9, TAU + PI * 0.1, 16, Color(0, 0, 0, 0.55), rim_w * 1.3, true)
+			draw_arc(c, s * 0.88, PI * 0.08, PI * 0.92, 14, Color(0.5, 0.62, 0.95, 0.10), rim_w, true)
+			# crisp outer rim
+			draw_arc(c, s, 0.0, TAU, 24, Color(0, 0, 0, 0.6), rim_w, true)
 			if socket_glow > 0.0:
-				draw_circle(c, s * 1.05, Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, socket_glow))
+				draw_circle(c, s * 1.08, Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, socket_glow))
 
 	# armed-booster targeting overlay
 	if _armed_booster_id != &"":
@@ -495,10 +558,18 @@ func _power_for_booster(booster_id: StringName) -> StringName:
 func _refresh_selection_visual() -> void:
 	for x in board.width:
 		for y in board.height:
-			_node_at(Vector2i(x, y)).set_selected(false)
+			var n := _node_at(Vector2i(x, y))
+			n.set_selected(false)
+			if n.scale != Vector2.ONE and not _locked_input:
+				n.scale = Vector2.ONE
 	var pts := PackedVector2Array()
-	for pos in _current_path:
-		_node_at(pos).set_selected(true)
+	for i in _current_path.size():
+		var pos: Vector2i = _current_path[i]
+		var node := _node_at(pos)
+		node.set_selected(true)
+		# the freshest node in the chain lifts a little more — a live "picked
+		# up" feel that escalates as the connection grows.
+		node.scale = Vector2.ONE * (1.16 if i == _current_path.size() - 1 else 1.08)
 		pts.append(_slot_center(pos))
 	if not _current_path.is_empty():
 		var target := board.get_path_target_color(_current_path)
@@ -507,6 +578,14 @@ func _refresh_selection_visual() -> void:
 			_path_color = palette.get_def(target).glow_color
 	_path_line.points = pts
 	_path_glow.points = pts
+	if _path_head != null:
+		_path_head.visible = pts.size() >= 1 and _path_head.texture != null
+		if _path_head.visible:
+			_path_head.position = pts[pts.size() - 1]
+			var hc := VisualTheme.FEVER_HOT if fever_active else _path_color
+			_path_head.modulate = Color(hc.r, hc.g, hc.b, 0.95)
+			var hs := _cell_size * (1.15 if fever_active else 0.95) / float(maxi(_path_head.texture.get_width(), _path_head.texture.get_height()))
+			_path_head.scale = Vector2(hs, hs)
 	if fever_active:
 		_path_line.width = _cell_size * 0.22
 		_path_glow.width = _cell_size * 0.6
@@ -529,6 +608,161 @@ func _refresh_selection_visual() -> void:
 ## through real play, not just the first.
 const _COMBO_TIERS := [2, 4, 6]
 const _WAVE_STAGGER := 0.07
+
+const _POW_FX_TINT := {
+	&"bomb": Color(1.0, 0.42, 0.2), &"lightning": Color(0.7, 0.92, 1.0),
+	&"freeze": Color(0.7, 0.95, 1.0), &"chain": Color(0.5, 1.0, 0.7),
+	&"rainbow": Color(1.0, 0.8, 1.0),
+}
+
+## Signature per-power activation spectacle, layered on top of the generic
+## wave burst. Bomb throws a shockwave + debris + hard shake; Lightning
+## whips an actual jagged bolt down the cleared row/column; Freeze pushes a
+## cyan ring of frost outward; Chain fires an energy streak from the last
+## wave to this one; Rainbow blooms a prismatic radial burst. `combo` (a
+## power+power move) scales everything up.
+func _play_power_wave_fx(power_id: StringName, power_pos: Vector2i, cells: Array, wave_index: int, combo: bool) -> void:
+	var origin := _slot_center(power_pos)
+	var tint: Color = _POW_FX_TINT.get(power_id, Color(1, 1, 1))
+	var amp := 1.0
+	if combo:
+		amp = 1.7
+	if fever_active:
+		amp *= 1.3
+
+	match power_id:
+		&"bomb":
+			sfx.play(&"vfx_explosion_core", to_global(origin), _cell_size * (3.2 + 0.7 * wave_index) * amp, Color(1, 1, 1), 0.4)
+			if combo or fever_active:
+				sfx.play(&"vfx_fire_burst", to_global(origin), _cell_size * 3.6 * amp, Color(1, 1, 1), 0.45, true, 0.8)
+			sfx.play_hold(&"vfx_shockwave_ring", to_global(origin), _cell_size * (4.6 + 1.1 * wave_index) * amp, tint, 0.5)
+			sfx.play(&"vfx_debris_pieces", to_global(origin), _cell_size * 3.0 * amp, Color(1, 1, 1), 0.6, false, 2.4, 1.5)
+			particles.flash(to_global(origin), Color(1, 1, 1), _cell_size * 1.6 * amp)
+			for i in int(10 * amp):
+				var a := TAU * float(i) / float(int(10 * amp))
+				particles.burst(to_global(origin + Vector2(cos(a), sin(a)) * _cell_size * 0.4),
+					Color(0.2, 0.18, 0.18) if i % 2 == 0 else tint, 5)
+			ScreenShake.apply(self, (8.0 + 2.0 * wave_index) * amp, 0.3)
+			Haptics.strong(int(70 * amp))
+			# nearby tiles recoil from the blast
+			for n in board.get_orthogonal_neighbors(power_pos):
+				var node := _node_at(n)
+				if node != null and board.get_cell(n) != null and not board.get_cell(n).is_empty():
+					var dir := (_slot_center(n) - origin).normalized()
+					var kt := create_tween()
+					kt.tween_property(node, "position", _slot_center(n) + dir * _cell_size * 0.16, 0.06).set_trans(Tween.TRANS_QUAD)
+					kt.tween_property(node, "position", _slot_center(n), 0.22).set_trans(Tween.TRANS_ELASTIC)
+		&"lightning":
+			# derive the struck axis from the cleared cells
+			var horizontal := _cells_are_horizontal(cells)
+			var a := origin
+			var b := origin
+			if horizontal:
+				a = _slot_center(Vector2i(0, power_pos.y)) - Vector2(_cell_size, 0)
+				b = _slot_center(Vector2i(board.width - 1, power_pos.y)) + Vector2(_cell_size, 0)
+			else:
+				a = _slot_center(Vector2i(power_pos.x, 0)) - Vector2(0, _cell_size)
+				b = _slot_center(Vector2i(power_pos.x, board.height - 1)) + Vector2(0, _cell_size)
+			_spawn_bolt(a, b, tint, 0.26)
+			sfx.play(&"vfx_lightning_arc", to_global(origin), _cell_size * 2.8 * amp, tint, 0.3)
+			particles.flash(to_global(origin), Color(1, 1, 1), _cell_size * 2.2 * amp)
+			for pos in cells:
+				particles.burst(_to_world(pos), Color(0.8, 0.95, 1.0), int(6 * amp))
+			ScreenShake.apply(self, 5.0 * amp, 0.18)
+			Haptics.strong(int(50 * amp))
+		&"freeze":
+			sfx.play(&"vfx_ice_burst", to_global(origin), _cell_size * 3.2 * amp, Color(1, 1, 1), 0.42)
+			particles.flash(to_global(origin), tint, _cell_size * 3.0 * amp)
+			for ring_i in 3:
+				var rr := _cell_size * (0.8 + ring_i * 0.9)
+				for i in 10:
+					var a2 := TAU * float(i) / 10.0
+					particles.burst(to_global(origin + Vector2(cos(a2), sin(a2)) * rr), Color(0.85, 0.97, 1.0), 3)
+			Haptics.medium()
+		&"chain":
+			if _last_wave_center != Vector2.ZERO:
+				_spawn_bolt(_last_wave_center, origin, tint, 0.2)
+			sfx.play(&"vfx_chain_energy_burst", to_global(origin), _cell_size * (2.4 + 0.6 * wave_index) * amp, tint, 0.38)
+			particles.flash(to_global(origin), tint, _cell_size * (1.8 + 0.5 * wave_index) * amp)
+			for pos in cells:
+				particles.burst(_to_world(pos), tint, int((5 + wave_index) * amp))
+			Haptics.light()
+		&"rainbow":
+			sfx.play(&"vfx_rainbow_burst", to_global(origin), _cell_size * 4.0 * amp, Color(1, 1, 1), 0.46, true, 1.2)
+			for i in int(18 * amp):
+				var a3 := TAU * float(i) / float(int(18 * amp))
+				var col: Color = PieceView._SPECTRUM[i % PieceView._SPECTRUM.size()]
+				particles.burst(to_global(origin + Vector2(cos(a3), sin(a3)) * _cell_size * 0.5), col, 4)
+			particles.flash(to_global(origin), Color(1, 0.9, 1.0), _cell_size * 4.0 * amp)
+			# flare each target tile just before it pops
+			for pos in cells:
+				var node := _node_at(pos)
+				if node != null:
+					node.scale = Vector2(1.25, 1.25)
+			ScreenShake.apply(self, 4.0 * amp, 0.2)
+			Haptics.medium()
+
+	if cells.size() > 0:
+		var sum := Vector2.ZERO
+		for pos in cells:
+			sum += _slot_center(pos)
+		_last_wave_center = sum / float(cells.size())
+
+var _last_wave_center := Vector2.ZERO
+
+func _to_world(pos: Vector2i) -> Vector2:
+	return to_global(_slot_center(pos))
+
+func _cells_are_horizontal(cells: Array) -> bool:
+	if cells.size() < 2:
+		return true
+	var min_x := 999
+	var max_x := -999
+	var min_y := 999
+	var max_y := -999
+	for p in cells:
+		min_x = mini(min_x, p.x); max_x = maxi(max_x, p.x)
+		min_y = mini(min_y, p.y); max_y = maxi(max_y, p.y)
+	return (max_x - min_x) >= (max_y - min_y)
+
+## A transient jagged lightning/energy line drawn in board-local space that
+## flashes bright then fades and frees itself. Cheap: one Line2D, one tween.
+func _spawn_bolt(from: Vector2, to: Vector2, color: Color, life: float) -> void:
+	var bolt := Line2D.new()
+	bolt.z_index = 55
+	bolt.width = _cell_size * 0.16
+	bolt.default_color = Color(color.r, color.g, color.b, 0.95)
+	bolt.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	bolt.end_cap_mode = Line2D.LINE_CAP_ROUND
+	bolt.joint_mode = Line2D.LINE_JOINT_ROUND
+	bolt.antialiased = true
+	var seg := 10
+	var dir := (to - from)
+	var perp := Vector2(-dir.y, dir.x).normalized()
+	var pts := PackedVector2Array()
+	for i in seg + 1:
+		var f := float(i) / float(seg)
+		var j := 0.0 if (i == 0 or i == seg) else rng.randf_range(-1.0, 1.0) * _cell_size * 0.35
+		pts.append(from.lerp(to, f) + perp * j)
+	bolt.points = pts
+	# bright white core underlay
+	var core := Line2D.new()
+	core.z_index = 56
+	core.width = _cell_size * 0.06
+	core.default_color = Color(1, 1, 1, 0.95)
+	core.points = pts
+	core.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	core.end_cap_mode = Line2D.LINE_CAP_ROUND
+	add_child(bolt)
+	add_child(core)
+	var t := create_tween()
+	t.set_parallel(true)
+	t.tween_property(bolt, "modulate:a", 0.0, life).set_trans(Tween.TRANS_QUAD)
+	t.tween_property(core, "modulate:a", 0.0, life).set_trans(Tween.TRANS_QUAD)
+	t.chain().tween_callback(func():
+		bolt.queue_free()
+		core.queue_free()
+	)
 
 func _play_move(path: Array[Vector2i]) -> void:
 	var result := ChainResolver.resolve_move(board, path, power_config, rng, available_colors, rainbow_chance)
@@ -579,6 +813,23 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 	var chain_depth := result.chain_depth
 	var animated: Dictionary = {}
 	var pop_tweens: Array[Tween] = []
+	_last_wave_center = Vector2.ZERO
+
+	# POWER + POWER: two or more power detonations in one resolve is a combo —
+	# every per-wave effect is amplified and it gets its own screen-wide beat.
+	var combo_powers := result.powers_activated.size()
+	var is_combo := combo_powers >= 2
+	if is_combo:
+		var cc := _board_rect_center()
+		sfx.play(&"power_combo_core", to_global(cc), _cell_size * 4.2, Color(1, 1, 1), 0.5, true, 1.6)
+		sfx.play_hold(&"vfx_shockwave_ring", to_global(cc), _cell_size * 9.0, VisualTheme.ACCENT_HOT, 0.55)
+		particles.flash(to_global(cc), Color(1, 1, 1), _cell_size * 7.0)
+		particles.flash(to_global(cc), VisualTheme.ACCENT_HOT, _cell_size * 9.5)
+		ScreenShake.apply(self, 10.0 + float(combo_powers) * 2.0, 0.34)
+		Haptics.strong(90)
+		Audio.play(&"combo_ding", 0.0, 2)
+		ComboPopup.spawn(self, cc - Vector2(0, _cell_size * 1.4), "POWER COMBO!",
+			VisualTheme.ACCENT_HOT, 52, "x%d BLAST" % combo_powers)
 
 	for wave_index in result.wave_cells.size():
 		var cells: Array = result.wave_cells[wave_index]
@@ -596,6 +847,7 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 				power_node.queue_redraw()
 			Audio.play(_power_sfx_id(power_id), 0.0, 0)
 			Audio.play(&"chain_step", clampf(float(wave_index) / 6.0, 0.0, 1.0), wave_index - 1)
+			_play_power_wave_fx(power_id, power_pos, cells, wave_index, is_combo)
 		elif wave_info.has("timebomb"):
 			# A time bomb the player left on the board just went off.
 			Audio.play(&"timebomb_explode", 0.0, 0)
@@ -656,6 +908,8 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			if big:
 				var flash_r := _cell_size * (1.2 + 0.14 * float(wave_hits))
 				particles.flash(to_global(wave_center), flash_col, flash_r * (1.4 if fever_active else 1.0))
+				if not is_power:
+					sfx.play(&"vfx_energy_burst", to_global(wave_center), flash_r * 2.4 * (1.3 if fever_active else 1.0), flash_col, 0.34)
 			if is_power:
 				ScreenShake.apply(self, 4.0 + float(wave_hits) * 0.5, 0.2)
 				Haptics.light()
@@ -671,6 +925,12 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			continue
 		node.scale = Vector2.ONE
 		node.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, node.obstacle_id, node.obstacle_hp, _cell_size, palette)
+
+	# shattered obstacles throw a burst of prepared crystal shards
+	for ob in result.obstacles_broken:
+		var opos: Vector2i = ob.get("pos", Vector2i.ZERO)
+		sfx.play(&"vfx_crystal_shards", to_global(_slot_center(opos)), _cell_size * 2.4, Color(1, 1, 1), 0.5, false, 1.6, 1.7)
+		break
 
 	if chain_depth >= 3:
 		ScreenShake.apply(self, 6.0 + float(chain_depth), 0.28)
@@ -756,6 +1016,7 @@ func _animate_powers_formed(result: ChainResolver.MoveResult) -> void:
 			first_pid = pid
 			first_pos = node.position
 		var tint: Color = _POWER_TINTS.get(pid, Color(1, 1, 1))
+		sfx.play(&"vfx_glow_orb", node.global_position, _cell_size * 2.6, tint, 0.42, true)
 		particles.flash(node.global_position, tint, _cell_size * 2.6)
 		particles.burst(node.global_position, tint, 14)
 		node.scale = Vector2(0.2, 0.2)
@@ -796,6 +1057,7 @@ func _settle_frozen_cells(frozen: Array) -> void:
 			tw = create_tween()
 			tw.set_parallel(true)
 		tw.tween_property(node, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
+	sfx.play(&"vfx_ice_burst", _node_at(frozen[0]).global_position, _cell_size * 2.6, Color(1, 1, 1), 0.4)
 	particles.flash(_node_at(frozen[0]).global_position, frost, _cell_size * 2.0)
 
 func _combo_tier(chain_depth: int) -> int:

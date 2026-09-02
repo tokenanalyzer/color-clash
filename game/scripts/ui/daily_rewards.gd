@@ -28,7 +28,19 @@ func _ready() -> void:
 
 	var bg := Backdrop.new()
 	bg.accent = VisualTheme.STAR
+	bg.scene_id = &"env_energy_crystals"
 	add_child(bg)
+
+	if AssetLibrary.has(&"env_crystal_formations"):
+		var deco := TextureRect.new()
+		deco.texture = AssetLibrary.tex(&"env_crystal_formations")
+		deco.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		deco.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		deco.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		deco.offset_top = -360
+		deco.modulate = Color(1, 1, 1, 0.28)
+		deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(deco)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -38,24 +50,24 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 20)
 	center.add_child(col)
 
-	var title := VisualTheme.label("DAILY REWARDS", 34, VisualTheme.TEXT_GOLD)
+	var title := VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(title)
 
 	var grid := GridContainer.new()
 	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 12)
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 14)
 	col.add_child(grid)
 	for day in range(1, 8):
 		var tile := DayTile.new()
 		tile.day = day
 		tile.reward = DailyRewards.reward_for_day(day)
-		tile.custom_minimum_size = Vector2(108, 118)
+		tile.custom_minimum_size = Vector2(124, 138)
 		grid.add_child(tile)
 		_tiles.append(tile)
 
-	_status = VisualTheme.label("", 18, VisualTheme.TEXT_DIM, 0)
+	_status = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT_DIM, 0)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_status)
 
@@ -80,9 +92,11 @@ func _track_size() -> void:
 func _button(text: String, tint: Color) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(240, 56)
-	b.add_theme_font_size_override("font_size", 22)
+	b.custom_minimum_size = Vector2(280, 68)
+	b.add_theme_font_size_override("font_size", VisualTheme.FS_BUTTON)
 	b.add_theme_color_override("font_color", VisualTheme.TEXT)
+	b.add_theme_constant_override("outline_size", 5)
+	b.add_theme_color_override("font_outline_color", VisualTheme.OUTLINE)
 	b.add_theme_stylebox_override("normal", VisualTheme.button_face(tint.darkened(0.1)))
 	b.add_theme_stylebox_override("hover", VisualTheme.button_face(tint))
 	b.add_theme_stylebox_override("pressed", VisualTheme.button_face(tint.darkened(0.3)))
@@ -178,23 +192,38 @@ class DayTile extends Control:
 		draw_polyline(moved, border, 2.0, true)
 
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(8, 22), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
+		draw_string(font, Vector2(10, 26), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
 			VisualTheme.STAR if big else VisualTheme.TEXT_DIM)
 
 		var c := Vector2(r.size.x * 0.5, r.size.y * 0.56)
 		var boosters: Dictionary = reward.get("boosters", {})
 		if boosters.size() > 0:
-			var hex := ShapeDrawUtils.regular_polygon(6, 22.0, PI / 6.0, c)
-			draw_colored_polygon(hex, Color(0.42, 0.28, 0.62))
 			var bid := StringName(String(boosters.keys()[0]))
-			IconDraw.draw_icon(self, bid, c, 30.0)
+			var ptex := AssetLibrary.power(bid)
+			if ptex != null:
+				var d := 52.0
+				var m: float = maxf(float(ptex.get_width()), float(ptex.get_height()))
+				draw_texture_rect(ptex, Rect2(c - Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m) * 0.5,
+					Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m)), false)
+			else:
+				var hex := ShapeDrawUtils.regular_polygon(6, 26.0, PI / 6.0, c)
+				draw_colored_polygon(hex, Color(0.42, 0.28, 0.62))
+				IconDraw.draw_icon(self, bid, c, 36.0)
 		else:
-			draw_circle(c, 18.0, VisualTheme.COIN)
-			draw_circle(c, 13.0, VisualTheme.COIN.lightened(0.25))
+			var coin_tex := AssetLibrary.tex(&"eco_coin_stack" if big else &"eco_gold_coin")
+			if coin_tex != null:
+				var d := 58.0 if big else 46.0
+				var m: float = maxf(float(coin_tex.get_width()), float(coin_tex.get_height()))
+				draw_texture_rect(coin_tex, Rect2(c - Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m) * 0.5,
+					Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m)), false)
+			else:
+				draw_circle(c, 21.0, VisualTheme.COIN)
+				draw_circle(c, 15.0, VisualTheme.COIN.lightened(0.25))
 		var amt := int(reward.get("coins", 0))
 		var lbl := ("+%d" % amt) if amt > 0 else "BOOST"
-		var ls := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_CENTER, -1, 14)
-		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 12), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, 14, VisualTheme.TEXT)
+		var lfs := 16
+		var ls := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs)
+		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, VisualTheme.TEXT)
 
 		if state == &"claimed":
 			draw_line(Vector2(r.size.x * 0.3, r.size.y * 0.5), Vector2(r.size.x * 0.45, r.size.y * 0.62),

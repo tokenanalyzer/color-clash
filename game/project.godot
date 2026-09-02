@@ -27,6 +27,7 @@ Music="*res://scripts/audio/music_director.gd"
 Iap="*res://scripts/services/iap_service.gd"
 Ads="*res://scripts/services/ads_service.gd"
 Firebase="*res://scripts/services/firebase_service.gd"
+Assets="*res://scripts/core/asset_library.gd"
 
 [display]
 
@@ -48,6 +49,31 @@ handheld/orientation=1
 ui_accept={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":4194309,"unicode":13)]
+}
+
+[importer_defaults]
+
+; Premium art pass: every PNG under assets/ imports LOSSLESS (no VRAM block
+; compression -> no banding/blur on the baked jewels, gradients and UI), with
+; mipmaps so the board gems stay crisp when scaled down to cell size, and an
+; alpha-border fix so bilinear filtering never pulls a dark halo out of a
+; transparent edge. icon.png keeps its own .import (created earlier).
+texture={
+"compress/mode": 0,
+"compress/high_quality": false,
+"compress/hdr_compression": 1,
+"compress/normal_map": 0,
+"compress/channel_pack": 0,
+"mipmaps/generate": true,
+"mipmaps/limit": -1,
+"roughness/mode": 0,
+"process/fix_alpha_border": true,
+"process/premult_alpha": false,
+"process/normal_map_invert_y": false,
+"process/hdr_as_srgb": false,
+"process/hdr_clamp_exposure": false,
+"process/size_limit": 0,
+"detect_3d/compress_to": 0
 }
 
 [rendering]

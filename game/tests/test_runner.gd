@@ -20,6 +20,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_freeze_power.gd",
 	"res://tests/test_timebomb.gd",
 	"res://tests/test_daily_rewards.gd",
+	"res://tests/test_assets.gd",
 ]
 
 func _initialize() -> void:

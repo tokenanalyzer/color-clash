@@ -28,6 +28,46 @@ const TEXT_DIM := Color(0.66, 0.72, 0.86)
 const TEXT_GOLD := Color(1.0, 0.83, 0.32)
 const OUTLINE := Color(0.0, 0.0, 0.02, 0.65)
 
+# ------------------------------------------------------- typography scale --
+## One mobile type ramp for the whole game. Sizes are in viewport units
+## (the project renders on a 1080-wide canvas), tuned to stay clearly
+## legible on a ~6.5" 1080-wide portrait phone. Use the role, not a number.
+const FS_DISPLAY := 52   # the one hero number on a screen (SCORE value, big count-ups)
+const FS_TITLE := 40     # screen / dialog titles
+const FS_HERO_NUM := 46  # primary HUD numbers (MOVES value)
+const FS_HEADING := 30   # section headings, primary buttons
+const FS_BUTTON := 26    # standard button label
+const FS_BODY := 23      # body copy, secondary buttons, hint text
+const FS_LABEL := 22     # inline labels (LEVEL n, coin counts, objective counts)
+const FS_CAPTION := 18   # ALL-CAPS field captions (MOVES / GOAL / SCORE / FEVER)
+const FS_MICRO := 16     # dense badges only — avoid for anything a player must read
+
+## Extra clearance (viewport units) kept below the safe area when the OS
+## reports none for the gesture bar (common on Android gesture nav).
+const GESTURE_BAR_MIN := 28.0
+const STATUS_BAR_MIN := 12.0
+
+## Device-safe insets as a Rect2: position = (left, top), size = (right, bottom),
+## all in *viewport* units. Folds in a floor for unreported gesture / status
+## bars so nothing rides the screen edge. Every full-screen Control should
+## pad its top row by `.position.y` and its bottom row by `.size.y`.
+static func safe_insets(ci: CanvasItem) -> Rect2:
+	var vp := ci.get_viewport_rect().size
+	var win := DisplayServer.window_get_size()
+	var top := STATUS_BAR_MIN
+	var bottom := GESTURE_BAR_MIN
+	var left := 0.0
+	var right := 0.0
+	if win.x > 0 and win.y > 0:
+		var safe := DisplayServer.get_display_safe_area()
+		var sx := vp.x / float(win.x)
+		var sy := vp.y / float(win.y)
+		top = maxf(float(safe.position.y) * sy, STATUS_BAR_MIN)
+		bottom = maxf(float(win.y - (safe.position.y + safe.size.y)) * sy, GESTURE_BAR_MIN)
+		left = maxf(float(safe.position.x) * sx, 0.0)
+		right = maxf(float(win.x - (safe.position.x + safe.size.x)) * sx, 0.0)
+	return Rect2(Vector2(left, top), Vector2(right, bottom))
+
 # ---------------------------------------------------------------- accents --
 const ACCENT := Color(0.36, 0.62, 1.0)
 const ACCENT_HOT := Color(1.0, 0.42, 0.62)

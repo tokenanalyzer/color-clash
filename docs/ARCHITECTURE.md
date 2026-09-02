@@ -78,17 +78,30 @@ game/
     core/                  JsonLoader, GameData (autoload — boot-time
                            config loader)
     save/                  SaveService (autoload — local JSON save)
+    core/AssetLibrary      static texture registry for the prepared art set
+                           (assets 1-74 under game/assets/, keyed by logical
+                           id). Every renderer pulls sprites from here; a
+                           missing texture returns null and the caller keeps
+                           its procedural draw, so the game degrades
+                           gracefully on an asset gap. Also the `Assets`
+                           autoload (boot coverage log only). Imported
+                           LOSSLESS + mipmapped + fix_alpha_border (see
+                           project.godot [importer_defaults]) — no VRAM
+                           compression, no halo on transparent edges.
     theme/                 VisualTheme — single source of truth for the
                            premium palette, panel styleboxes, easing and
                            shared primitive draws (glow disc, v-gradient)
-    vfx/GemTextures        bakes the glossy-jewel look ONCE per colour into
-                           cached ImageTextures (per-pixel gradient + facet
-                           + specular + rim + AA) plus shared soft-shadow
-                           and additive-glow sprites; the board then blits
-                           one textured quad per cell — sharp at any phone
-                           resolution and far cheaper than per-frame vector
-                           drawing (the Android "bake once, blit forever"
-                           technique)
+    vfx/GemTextures        serves the prepared jewel art (assets 1-6) when
+                           present, else BAKES the glossy-jewel look ONCE per
+                           colour into a cached ImageTexture (per-pixel
+                           gradient + facet + specular + rim + AA). Either way
+                           the board blits one textured quad per cell — sharp
+                           at any phone resolution. The multicolour Rainbow
+                           jewel stays procedural. Shared soft-shadow /
+                           additive-glow falloffs are procedural.
+    vfx/SpriteFX           pooled one-shot textured VFX (scale-up + fade +
+                           spin, additive) for the prepared burst artwork
+                           (19-26, 39, 70-74); complements ParticlePool.
     vfx/                   ParticlePool (shard bursts + pooled ImpactFlash
                            rings), ScreenShake (re-entrant safe), ComboPopup
                            (bounce-in praise text), Haptics, Backdrop

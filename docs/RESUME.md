@@ -1,61 +1,85 @@
-# Resume point — 2026-08-31
+# Resume point — 2026-09-02 (asset integration pass)
 
-Pick up here next session.
+Two uncommitted milestones now sit in the working tree, both verified in
+headless tests + offscreen renders, **neither committed, do NOT push**:
 
-## Where things stand
+1. **Mobile-fit + presentation pass** (previous session — typography ramp,
+   safe-area, menu/splash/map/background redesign). Still not on-device verified.
+2. **Prepared-art integration (assets 1–74)** — this session. See below.
 
-- **Branch:** `main`, working tree clean. **11 commits ahead of `origin/main`, NOT pushed**
-  (standing instruction: do not push automatically — push only when the user asks).
-- **Last milestone commit:** `2f754be` — portrait lock, honeycomb hex board,
-  persistent power tiles, armed 6-booster tray, 50-level curve, visual pass.
-- **Debug APK:** `build/color-clash-debug.apk` (55 MB, v0.5.0 / code 1,
-  `com.colorclash.game`, arm64-v8a + armeabi-v7a, minSdk 21, portrait manifest).
-  `build/` is git-ignored.
+---
 
-## Verified on the physical phone (OnePlus CPH2707, Android 16)
+## Prepared-art integration — what landed
 
-- Installs with `adb install -r` (no uninstall, save preserved).
-- Launches, runs steadily, **PORTRAIT** confirmed (surface 1272×2800, `SCREEN_ORIENTATION_PORTRAIT`, ROTATION_0).
-- No crashes, no Godot script errors, no GL/resource errors, no emoji-font error.
-- Honeycomb board + persistent power tiles + 6-chip booster bar all render upright.
+The game shipped **100% procedural** (every visual code-drawn). The 74 hand-made
+PNGs in `C:\Users\Administrator\Downloads\assets` are now wired throughout, with
+the procedural draws kept as automatic fallbacks (a missing texture → old path).
+
+- **Master assets** copied to `game/assets/` (subfoldered by group). Originals in
+  `Downloads/assets` untouched. Red Gem (#1) and Level Badge (#56) use the
+  **`_transparent_fixed/`** versions (baked white bg removed → real alpha).
+- **`scripts/core/asset_library.gd`** — `class_name AssetLibrary`, STATIC API
+  (`AssetLibrary.tex/gem/power/world_for_level`), process-lifetime cache, null on
+  miss. Also the `Assets` autoload (boot coverage log only).
+- **`scripts/vfx/sprite_fx.gd`** — pooled one-shot textured VFX (scale-up + fade
+  + spin, additive) for burst art 19–26 / 39 / 70–74. Sits next to `ParticlePool`.
+- **`project.godot`** — `[importer_defaults]` forces every texture LOSSLESS
+  (`compress/mode 0`) + mipmaps + `fix_alpha_border` (no halo on transparent
+  edges, crisp gem downscale). `icon.png` keeps its own `.import`.
+- Renderers swapped to blit sprites (aspect-preserved, never stretched):
+  `gem_textures` (1–6), `piece_view` (7–18 power/obstacle tiles + ice/timebomb
+  overlays), `board_view` (19–30 VFX + trail head + win/fever flourishes),
+  `hud` (49–57 + StarRow #36/#70, victory crown #68, fever meter #52/#53,
+  level badge #56), `level_map`/`level_node_button`/`level_path_canvas`
+  (40–48 + map bg #66, world vista #67, gate/portal #46/#47),
+  `backdrop` (58–65 full-screen scenes, per-level world cycle + aurora #65),
+  `reward_popup` (31–39, chests 33–35, treasure #72), `daily_rewards`,
+  `main_menu` (play button #55, real gems in the motif), `splash_screen`.
+- **#51 Power Energy Container** → frame for the power boosters in the tray
+  (utility boosters use #50). **Rainbow board gem** stays procedural (as asked).
 
 ## Tests
 
-- 313 / 313 unit assertions pass; all 4 smoke scripts pass.
-- Run: `<godot4> --headless --path game --script res://tests/test_runner.gd`
-  Smokes: `smoke_main_e2e`, `smoke_audio_chain`, `smoke_level_map`, `smoke_all_levels`.
-- Godot 4.4.1 lives in the session scratchpad only (not in repo). Reinstall from
-  godotengine.org if the scratchpad is gone; export templates are at
-  `%APPDATA%\Godot\export_templates\4.4.1.stable\`.
+- Unit: **342 / 342** (`test_runner.gd`; +`test_assets.gd`, 29 new asserts —
+  every one of the 74 ids resolves to a real texture).
+- Smokes: all 4 pass (`smoke_main_e2e`, `smoke_level_map`, `smoke_all_levels`,
+  `smoke_audio_chain` — the full connect→power→cascade→combo→fever→win chain
+  with sprite VFX).
+- Offscreen renders reviewed at 1080×2377 (all 13 screens via `_capture.gd`
+  `--rendering-driver opengl3`): gems/powers/obstacles/VFX/map/rewards/celebration
+  all on prepared art, transparency intact, portrait, nothing stretched/cropped.
 
-## Rebuild + reinstall (quick reference)
+## Known minor polish (not blocking, no missing assets)
 
-```
-<godot4> --headless --path game --import
-<godot4> --headless --path game --export-debug "Android" <repo>\build\color-clash-debug.apk
-C:\Android\platform-tools\adb.exe install -r <repo>\build\color-clash-debug.apk
-C:\Android\platform-tools\adb.exe shell am start -n com.colorclash.game/com.godot.game.GodotApp
-C:\Android\platform-tools\adb.exe logcat -s godot GodotApp Godot
-```
-See `docs/ANDROID.md` for the full toolchain.
+- **Fever meter**: #53 Fever Meter Frame is a chunky 3:1 crowned capsule; the HUD
+  strip is a thin full-width bar, so #53 is used as a small undistorted
+  ornamental "head" on the left + a code capsule track + #52 crystal on the fill
+  edge. Legible, not gorgeous. A taller fever row or a redrawn thin-bar frame
+  would improve it.
+- Board scenes (58–65) show above/below the honeycomb panel (width-bound board on
+  20:9) — reads as a framed playfield, veiled ~0.30 for readability.
+- Backdrop procedural vignette arcs are faintly visible over the brightest scenes.
+- Splash wordmark not visible in the frame-12 capture (transient screen; fine live).
 
-## Open items / next candidates (not yet done)
+## NEXT SESSION
 
-1. **On-device play feedback** — the user will play this exact APK; act on what
-   looks/feels off (board could use more of the vertical space; steady-state FPS
-   not yet measured over a real session; check booster taps aren't eaten by the
-   bottom gesture bar).
-2. Fever meter / SCORE label area in the HUD is a bit cramped — tidy spacing.
-3. Backdrop nebula washes still slightly banded on some frames.
-4. Level-map environment is darker/moodier than the reference's sunny map.
-5. Score "+N" fly-up numbers on blasts (reference shows "AMAZING! 560").
-6. `docs/ANDROID.md` still says "40-level" in one place — trivially stale.
-7. Deferred per the user until the visual/gameplay bar is satisfactory:
-   Firebase / Ads / IAP wiring, release AAB.
+1. `adb devices` → OnePlus Nord 5. Rebuild + install (commands unchanged):
+   ```
+   C:\Godot\godot4 --headless --path game --import
+   C:\Godot\godot4 --headless --path game --export-debug "Android" C:\Users\Administrator\Documents\GitHub Projects\color-clash\build\color-clash-debug.apk
+   C:\Android\platform-tools\adb.exe install -r "...\build\color-clash-debug.apk"
+   ```
+2. On-device check every screen: transparency (no black/white/checker boxes),
+   no clipping under notch / gesture bar, no blur/stretch on gems + UI, 60 FPS
+   (`adb logcat -s godot` → `[FPS]`).
+3. Iterate on the fever meter + any device-specific safe-area issues.
+4. Decide keep/strip the `app.gd` debug FPS sampler, then commit **both**
+   milestones (mobile-fit, then asset integration) as separate commits. **No push.**
 
 ## Do NOT
 
-- Push to origin without being asked.
-- Re-detonate powers automatically on the creating match (persistence is intentional).
-- Revert the hex grid — reference-matching requires it; `BoardModel.get_neighbors()`
-  is the single source of truth.
+- Push to origin. Commit before on-device verification.
+- Re-key / cut / recolour the 7 environment scenes (#59,61,62,63,64,66,67) —
+  they are full-screen opaque paintings, used as-is by design.
+- Revert the hex grid, re-detonate powers on the creating match, or rebuild the
+  level system / ProgressService.

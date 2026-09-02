@@ -22,72 +22,104 @@ static func draw_icon(ci: CanvasItem, id: StringName, c: Vector2, s: float, t: f
 		_: ci.draw_circle(c, s * 0.3, tint)
 
 static func _bomb(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
-	var r := s * 0.34
-	ci.draw_circle(c + Vector2(0, r * 0.12), r, Color(0.10, 0.10, 0.13))
-	ci.draw_circle(c + Vector2(0, r * 0.12), r, Color(1, 1, 1, 0.0))
-	ci.draw_circle(c + Vector2(-r * 0.34, -r * 0.36), r * 0.30, Color(1, 1, 1, 0.35))
-	# fuse
-	var neck := c + Vector2(r * 0.28, -r * 0.78)
-	var tip := c + Vector2(r * 0.62, -r * 1.28)
-	ci.draw_line(c + Vector2(r * 0.2, -r * 0.55), neck, Color(0.55, 0.4, 0.28), maxf(s * 0.06, 2.0))
-	ci.draw_line(neck, tip, Color(0.55, 0.4, 0.28), maxf(s * 0.055, 2.0))
-	var spark := s * (0.11 + 0.05 * sin(t * 20.0))
-	ci.draw_circle(tip, spark, Color(1, 0.62, 0.15))
-	ci.draw_circle(tip, spark * 0.55, Color(1, 0.95, 0.7))
+	# a shaded iron sphere with a lit fuse — a real object, not a flat disc
+	var r := s * 0.36
+	ci.draw_circle(c + Vector2(r * 0.14, r * 0.2), r * 1.02, Color(0, 0, 0, 0.3))
+	for i in range(7, 0, -1):
+		var k := float(i) / 7.0
+		ci.draw_circle(c + Vector2(-r * 0.32, -r * 0.34) * (1.0 - k), r * k,
+			Color(0.24, 0.25, 0.32).lerp(Color(0.05, 0.05, 0.08), 1.0 - k))
+	ci.draw_circle(c + Vector2(-r * 0.34, -r * 0.38), r * 0.24, Color(1, 1, 1, 0.5))
+	ci.draw_circle(c + Vector2(-r * 0.3, -r * 0.34), r * 0.1, Color(1, 1, 1, 0.9))
+	ci.draw_arc(c, r, 0, TAU, 26, Color(0, 0, 0, 0.5), maxf(s * 0.03, 2.0), true)
+	# collar + curved fuse
+	var neck := c + Vector2(r * 0.14, -r * 0.9)
+	ci.draw_circle(neck, r * 0.24, Color(0.16, 0.13, 0.1))
+	var mid := c + Vector2(r * 0.5, -r * 1.14)
+	var tip := c + Vector2(r * 0.36, -r * 1.5)
+	ci.draw_polyline(PackedVector2Array([neck, mid, tip]), Color(0.58, 0.44, 0.3), maxf(s * 0.06, 3.0), true)
+	var fl := 0.7 + 0.3 * sin(t * 22.0)
+	ci.draw_circle(tip, s * (0.13 + 0.05 * fl), Color(1.0, 0.55, 0.12, 0.9))
+	ci.draw_circle(tip, s * 0.08 * fl, Color(1.0, 0.94, 0.65))
+	for i in 4:
+		var a := t * 12.0 + TAU * float(i) / 4.0
+		ci.draw_line(tip, tip + Vector2(cos(a), sin(a)) * s * (0.12 + 0.05 * fl),
+			Color(1.0, 0.8, 0.3, 0.8), maxf(s * 0.02, 1.5), true)
 
 static func _lightning(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
 	var glow := 0.7 + 0.3 * sin(t * 9.0)
-	var col := Color(1.0, 0.93, 0.45).lerp(Color(1, 1, 1), glow)
-	var top := PackedVector2Array([
-		c + Vector2(s * 0.10, -s * 0.42), c + Vector2(s * 0.24, -s * 0.02),
-		c + Vector2(-s * 0.02, -s * 0.02),
+	# outer electric bloom
+	for i in range(4, 0, -1):
+		var k := float(i) / 4.0
+		ci.draw_circle(c, s * 0.42 * k, Color(0.5, 0.8, 1.0, 0.12 * (1.0 - k) * glow))
+	var bolt := PackedVector2Array([
+		c + Vector2(s * 0.12, -s * 0.44), c + Vector2(-s * 0.08, -s * 0.02),
+		c + Vector2(s * 0.09, -s * 0.02), c + Vector2(-s * 0.14, s * 0.44),
+		c + Vector2(s * 0.24, -s * 0.05), c + Vector2(s * 0.04, -s * 0.05),
 	])
-	var bottom := PackedVector2Array([
-		c + Vector2(-s * 0.10, s * 0.42), c + Vector2(-s * 0.24, s * 0.02),
-		c + Vector2(s * 0.02, s * 0.02),
-	])
-	ci.draw_colored_polygon(top, col)
-	ci.draw_colored_polygon(bottom, col)
-	# a couple of stray arcs
+	ci.draw_colored_polygon(bolt, Color(1.0, 0.95, 0.6).lerp(Color(1, 1, 1), glow))
+	var edge := bolt.duplicate(); edge.append(bolt[0])
+	ci.draw_polyline(edge, Color(0.55, 0.82, 1.0, 0.95), maxf(s * 0.028, 1.5), true)
 	for i in 2:
 		var a := t * 6.0 + float(i) * 3.1
-		var o := c + Vector2(cos(a), sin(a)) * s * 0.42
-		ci.draw_line(o, o + Vector2(cos(a + 1.0), sin(a + 1.0)) * s * 0.14, Color(1, 1, 0.8, 0.5 * glow), maxf(s * 0.03, 1.5))
+		var o := c + Vector2(cos(a), sin(a)) * s * 0.44
+		ci.draw_line(o, o + Vector2(cos(a + 1.0), sin(a + 1.0)) * s * 0.14, Color(0.8, 0.95, 1.0, 0.6 * glow), maxf(s * 0.03, 1.5), true)
 
 static func _freeze(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
-	var spin := t * 0.9
-	var col := Color(0.9, 0.98, 1.0)
+	# faceted ice crystal + spinning snowflake
+	var spin := t * 0.5
+	var crystal := _hexagon(c, s * 0.4)
+	var rot := PackedVector2Array()
+	for p in crystal:
+		var d := p - c
+		rot.append(c + d.rotated(spin * 0.3))
+	ci.draw_colored_polygon(rot, Color(0.72, 0.9, 1.0, 0.5))
+	var re := rot.duplicate(); re.append(rot[0])
+	ci.draw_polyline(re, Color(0.95, 1.0, 1.0, 0.95), maxf(s * 0.03, 2.0), true)
+	var col := Color(1, 1, 1, 0.95)
 	for i in 3:
 		var a := spin + PI * float(i) / 3.0
-		var tip := Vector2(cos(a), sin(a)) * s * 0.44
-		ci.draw_line(c - tip, c + tip, col, maxf(s * 0.06, 2.0))
+		var tip := Vector2(cos(a), sin(a)) * s * 0.34
+		ci.draw_line(c - tip, c + tip, col, maxf(s * 0.045, 2.0), true)
 		for side in [-1.0, 1.0]:
-			var mid := c + tip * 0.5
-			var barb := Vector2(cos(a + side * 0.9), sin(a + side * 0.9)) * s * 0.18
-			ci.draw_line(mid, mid + barb, col, maxf(s * 0.045, 1.5))
-			var mid2 := c + tip * 0.82
-			ci.draw_line(mid2, mid2 + barb * 0.6, col, maxf(s * 0.04, 1.2))
-	ci.draw_circle(c, s * 0.09, Color(1, 1, 1))
+			var mid := c + tip * 0.55
+			var barb := Vector2(cos(a + side * 0.9), sin(a + side * 0.9)) * s * 0.14
+			ci.draw_line(mid, mid + barb, col, maxf(s * 0.035, 1.5), true)
+	ci.draw_circle(c, s * 0.08, Color(1, 1, 1))
 
 static func _rainbow(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
-	var spin := t * 1.3
+	# pearlescent orb with rotating spectrum wedges
+	var spin := t * 0.9
+	var r := s * 0.4
 	var spectrum := [
 		Color(0.96, 0.26, 0.38), Color(1.0, 0.6, 0.2), Color(1.0, 0.87, 0.28),
 		Color(0.3, 0.82, 0.5), Color(0.28, 0.6, 0.98), Color(0.66, 0.36, 0.95),
 	]
+	ci.draw_circle(c, r, Color(0.98, 0.98, 1.0))
 	for i in spectrum.size():
 		var a0 := spin + TAU * float(i) / 6.0
-		ci.draw_arc(c, s * 0.36, a0, a0 + 1.35, 12, spectrum[i], maxf(s * 0.11, 3.0), true)
-	ci.draw_circle(c, s * 0.11, Color(1, 1, 1))
+		var wedge := PackedVector2Array([c])
+		for j in 5:
+			var aa := a0 + (TAU / 6.0) * float(j) / 4.0
+			wedge.append(c + Vector2(cos(aa), sin(aa)) * r)
+		var sc: Color = spectrum[i]
+		sc.a = 0.62
+		ci.draw_colored_polygon(wedge, sc)
+	ci.draw_circle(c + Vector2(-r * 0.3, -r * 0.32), r * 0.26, Color(1, 1, 1, 0.7))
+	ci.draw_arc(c, r, 0, TAU, 28, Color(1, 1, 1, 0.85), maxf(s * 0.03, 2.0), true)
+	ci.draw_circle(c, s * 0.09, Color(1, 1, 1))
 
 static func _chain(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
 	var pulse := 0.8 + 0.2 * sin(t * 5.0)
 	var col := Color(0.85, 1.0, 0.9)
-	for off in [Vector2(-s * 0.16, -s * 0.05), Vector2(s * 0.16, s * 0.05)]:
-		var ring := _hexagon(c + off, s * 0.22)
+	var offs := [Vector2(-s * 0.18, -s * 0.04), Vector2(0, s * 0.16), Vector2(s * 0.18, -s * 0.04)]
+	for oi in offs.size():
+		var ring := _hexagon(c + offs[oi], s * 0.19)
 		ring.append(ring[0])
-		ci.draw_polyline(ring, col, maxf(s * 0.06, 2.0) * pulse, true)
-	ci.draw_circle(c, s * 0.07, Color(0.7, 1.0, 0.8))
+		ci.draw_polyline(ring, col, maxf(s * 0.05, 2.0) * pulse, true)
+		var tt := fmod(t * 1.5 + float(oi) * 0.33, 1.0)
+		ci.draw_circle(c + offs[oi] + Vector2(cos(tt * TAU), sin(tt * TAU)) * s * 0.19, s * 0.045, Color(1, 1, 1))
+	ci.draw_circle(c, s * 0.06, Color(0.7, 1.0, 0.8))
 
 static func _shuffle(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
 	var col := Color(0.85, 0.95, 1.0)
