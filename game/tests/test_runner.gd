@@ -24,6 +24,9 @@ const TEST_SCRIPTS := [
 	"res://tests/test_event_stream.gd",
 	"res://tests/test_island_model.gd",
 	"res://tests/test_island_assets.gd",
+	"res://tests/test_story_assets.gd",
+	"res://tests/test_enemy_model.gd",
+	"res://tests/test_story_data.gd",
 ]
 
 func _initialize() -> void:

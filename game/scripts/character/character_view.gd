@@ -55,13 +55,17 @@ func set_idle() -> void:
 
 func _draw() -> void:
 	# Real art path (none registered yet) — blit and stop.
+	# real hero art (Jamie) — pose-specific char_* override first, then the
+	# supplied Jamie portrait, then the code-drawn placeholder below.
 	var tex := AssetLibrary.tex(StringName("char_" + String(_pose)))
+	if tex == null:
+		tex = Cast.portrait(Cast.WHO_JAMIE)
 	if tex != null:
-		var s := minf(size.x, size.y) * 1.4
+		var s := minf(size.x, size.y) * 1.9
 		var m: float = maxf(float(tex.get_width()), float(tex.get_height()))
 		var w := s * tex.get_width() / m
 		var h := s * tex.get_height() / m
-		draw_texture_rect(tex, Rect2(Vector2(size.x * 0.5 - w * 0.5, size.y - h), Vector2(w, h)), false)
+		draw_texture_rect(tex, Rect2(Vector2(size.x * 0.5 - w * 0.5, size.y - h * 0.98), Vector2(w, h)), false)
 		_draw_bubble()
 		return
 

@@ -1,0 +1,23 @@
+{
+  "_comment": "Jin's servants — the 10 labelled enemies on assets/story/enemies_and_bosses.png (top row, left to right). `cell` is the 0-based column in that 10-wide row (sliced via AtlasTexture, source PNG untouched). `tier` drives base HP + how much match energy is needed to defeat one. Each island has a roster (which enemies appear on its stages) and a boss stage (every 10th). Stage 50's boss is Jinn himself (assets/story/jinn_portrait.png). Rewards + progression use the existing Economy/Progress/Boosters — nothing new here.",
+  "enemies": [
+    { "id": "shadow_ghost",   "name": "Shadow Ghost",   "tier": "normal", "cell": 0, "aura": "#7a3fd0" },
+    { "id": "fire_imp",        "name": "Fire Imp",        "tier": "normal", "cell": 1, "aura": "#ff5a1e" },
+    { "id": "stone_golem",     "name": "Stone Golem",     "tier": "strong", "cell": 2, "aura": "#8a8375" },
+    { "id": "toxic_slime",     "name": "Toxic Slime",     "tier": "normal", "cell": 3, "aura": "#5ad020" },
+    { "id": "ice_wraith",      "name": "Ice Wraith",      "tier": "mini_boss", "cell": 4, "aura": "#6ad0ff" },
+    { "id": "dark_knight",     "name": "Dark Knight",     "tier": "elite", "cell": 5, "aura": "#7d3fd0" },
+    { "id": "bone_archer",     "name": "Bone Archer",     "tier": "strong", "cell": 6, "aura": "#d9c58a" },
+    { "id": "thunder_mage",    "name": "Thunder Mage",    "tier": "elite", "cell": 7, "aura": "#4da3ff" },
+    { "id": "poison_beast",    "name": "Poison Beast",    "tier": "mini_boss", "cell": 8, "aura": "#8ad020" },
+    { "id": "chaos_sorcerer",  "name": "Chaos Sorcerer",  "tier": "mini_boss", "cell": 9, "aura": "#ff3355" }
+  ],
+  "islands": [
+    { "index": 0, "roster": ["toxic_slime", "poison_beast", "shadow_ghost"],                 "boss_stage": 10, "boss": "poison_beast" },
+    { "index": 1, "roster": ["ice_wraith", "bone_archer", "shadow_ghost"],                    "boss_stage": 20, "boss": "ice_wraith" },
+    { "index": 2, "roster": ["fire_imp", "stone_golem", "dark_knight"],                       "boss_stage": 30, "boss": "dark_knight" },
+    { "index": 3, "roster": ["bone_archer", "stone_golem", "chaos_sorcerer"],                 "boss_stage": 40, "boss": "chaos_sorcerer" },
+    { "index": 4, "roster": ["thunder_mage", "dark_knight", "chaos_sorcerer", "shadow_ghost"], "boss_stage": 50, "boss": "jinn" }
+  ],
+  "base_hp": { "normal": 3, "strong": 5, "elite": 8, "mini_boss": 14, "final_boss": 30 }
+}

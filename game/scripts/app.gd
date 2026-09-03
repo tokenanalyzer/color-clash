@@ -39,6 +39,7 @@ var _music_token: int = 0
 var _backdrop: Backdrop
 var _daily: DailyRewardsScreen
 var _character: CharacterView
+var _story_scene: StoryScene
 
 ## Debug-only rolling FPS sampler — printed to the Android log so on-device
 ## performance can be verified without a profiler build. Stripped in release.
@@ -104,6 +105,12 @@ func _ready() -> void:
 	daily_canvas.add_child(_daily)
 	_daily.closed.connect(_on_daily_closed)
 	_daily.visible = false
+
+	var story_canvas := CanvasLayer.new()
+	story_canvas.layer = 90
+	add_child(story_canvas)
+	_story_scene = StoryScene.new()
+	story_canvas.add_child(_story_scene)
 
 	var splash_canvas := CanvasLayer.new()
 	splash_canvas.layer = 100
@@ -197,8 +204,31 @@ func _go_to_map() -> void:
 
 func _go_to_level(level_id: int) -> void:
 	await _fade_out(_map, TRANSITION_DURATION)
+	await _play_pre_level_story(level_id)
 	_start_level(level_id)
 	await _fade_in_game(TRANSITION_DURATION)
+
+## Story beats that belong BEFORE a stage: the opening kidnapping cinematic
+## (once, on the very first campaign stage), a chapter card on the first
+## stage of an island, and any boss-intro beat. Each is played at most once
+## (Story records it via SaveService).
+func _play_pre_level_story(level_id: int) -> void:
+	var ids: Array = GameData.levels.ordered_ids
+	var first_id: int = ids[0] if not ids.is_empty() else -1
+	if level_id == first_id:
+		await _play_beat(Story.beat_for("campaign_start"))
+	if IslandModel.island_index_for_level(level_id) >= 0 \
+			and level_id == IslandModel.level_ids_for_island(IslandModel.island_index_for_level(level_id))[0]:
+		await _play_beat(Story.beat_for(Story.island_start_trigger(IslandModel.island_index_for_level(level_id))))
+	await _play_beat(Story.beat_for(Story.stage_start_trigger(level_id)))
+
+## Plays a story beat overlay and blocks until it is dismissed. No-op for {}.
+func _play_beat(beat: Dictionary) -> void:
+	if beat.is_empty() or _story_scene == null:
+		return
+	_story_scene.play(beat)
+	await _story_scene.finished
+	Story.mark_seen(String(beat.get("id", "")))
 
 func _fade_out(node: CanvasItem, duration: float) -> void:
 	var tween := create_tween()
@@ -434,6 +464,10 @@ func _on_level_won() -> void:
 	if first_clear and _current_level.id % 5 == 0:
 		await _present_milestone_chest()
 
+	# Story beat that belongs AFTER a stage (boss defeat, chapter close,
+	# finale) — plays once, before the win summary.
+	await _play_beat(Story.beat_for(Story.stage_complete_trigger(_current_level.id)))
+
 	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1, stars)
 
 func _present_milestone_chest() -> void:
@@ -461,6 +495,8 @@ func _on_level_lost() -> void:
 func _on_next_level_pressed() -> void:
 	var next_id := GameData.levels.next_level_id(_current_level.id)
 	if next_id != -1 and Progress.is_unlocked(next_id):
+		_hud.hide_end_panel()
+		await _play_pre_level_story(next_id)
 		_start_level(next_id)
 	else:
 		await _go_to_map()

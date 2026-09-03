@@ -150,6 +150,23 @@ const _ISLAND_ART := {
 	&"island5_map": "res://assets/islands/island5_aurora_reach_map.png",
 }
 
+## Story / cast art (user-supplied, "Jamie, Jasmine & Jinn" — 2026-09-03).
+## Transparent character portraits + pose/enemy/scene atlases. Sliced via
+## AtlasTexture in scripts/story/cast.gd + enemy_model.gd — source PNGs are
+## never modified. Verified by test_story_assets.gd (own registry).
+const _STORY_ART := {
+	&"story_jamie_portrait": "res://assets/story/jamie_portrait.png",
+	&"story_jasmine_portrait": "res://assets/story/jasmine_portrait.png",
+	&"story_jinn_portrait": "res://assets/story/jinn_portrait.png",
+	&"story_jasmine_poses": "res://assets/story/jasmine_poses_8.png",
+	&"story_cast_atlas": "res://assets/story/cast_atlas_transparent.png",
+	&"story_scenes": "res://assets/story/story_scenes_transparent.png",
+	&"story_enemies": "res://assets/story/enemies_and_bosses.png",
+	&"story_jamie_actions": "res://assets/story/jamie_actions_ref.png",
+	&"story_jinn_actions": "res://assets/story/jinn_actions_ref.png",
+	&"story_jasmine_expr": "res://assets/story/jasmine_expressions_ref.png",
+}
+
 ## Ordered full-screen environment scenes cycled through the campaign so each
 ## band of levels reads as its own "world". Index by (level-1) / band size.
 const ENV_WORLD_CYCLE: Array[StringName] = [
@@ -168,7 +185,7 @@ static func tex(id: StringName) -> Texture2D:
 	if _cache.has(id):
 		return _cache[id]
 	var t: Texture2D = null
-	var path: String = _PATHS.get(id, _ISLAND_ART.get(id, _OPTIONAL.get(id, "")))
+	var path: String = _PATHS.get(id, _ISLAND_ART.get(id, _STORY_ART.get(id, _OPTIONAL.get(id, ""))))
 	if path != "" and ResourceLoader.exists(path):
 		var res := load(path)
 		if res is Texture2D:
@@ -185,14 +202,21 @@ static func island_art(one_based_island: int, kw: String) -> Texture2D:
 
 ## {present:[], missing:[], total:int} over the 15 island-art ids.
 static func island_art_audit() -> Dictionary:
+	return _audit_over(_ISLAND_ART)
+
+## {present:[], missing:[], total:int} over the story/cast art ids.
+static func story_art_audit() -> Dictionary:
+	return _audit_over(_STORY_ART)
+
+static func _audit_over(reg: Dictionary) -> Dictionary:
 	var present: Array[StringName] = []
 	var missing: Array[StringName] = []
-	for id in _ISLAND_ART:
+	for id in reg:
 		if has(id):
 			present.append(id)
 		else:
 			missing.append(id)
-	return {"present": present, "missing": missing, "total": _ISLAND_ART.size()}
+	return {"present": present, "missing": missing, "total": reg.size()}
 
 ## Convenience: gem texture for a colour id (&"red" -> gem_red).
 static func gem(color_id: StringName) -> Texture2D:

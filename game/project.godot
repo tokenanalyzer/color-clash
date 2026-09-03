@@ -30,6 +30,7 @@ Firebase="*res://scripts/services/firebase_service.gd"
 Assets="*res://scripts/core/asset_library.gd"
 GameEvents="*res://scripts/core/game_event_bus.gd"
 CharacterDirector="*res://scripts/character/character_director.gd"
+Story="*res://scripts/story/story_director.gd"
 
 [display]
 
