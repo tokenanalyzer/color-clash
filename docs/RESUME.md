@@ -1,73 +1,78 @@
-# Resume point — 2026-09-03 (island map integration)
+# Resume point — 2026-09-03  ·  "Jamie, Jasmine & Jinn" foundation
 
-Local commits today, **NOT pushed**:
-- `bf58b3e` / `47fbd72` — Phase 1: typed gameplay event stream + character hooks + data-driven star scores.
-- `07deda9` / `36bb282` — reference-matched premium UI (glass kit, settings/daily/HUD, first island map).
-- `9875c2c` — **island campaign map from the 15 supplied PNGs** (this pass).
+Local commits today (NOT pushed). Latest: `0381efe`.
+Recent chain: island map (`9875c2c`, `638acdf`, `ac324ca`) → story foundation (`0381efe`).
 
-## Island map — what landed (9875c2c)
-15 user PNGs in `game/assets/islands/` (Downloads source untouched, descriptive
-names). No gameplay logic / save format / progression rules changed —
-`IslandModel` is a pure view of `ProgressService`. **645/645 tests pass**
-(+`test_island_assets.gd`: 15 ids load, 50 stage faces are valid in-bounds
-AtlasTexture regions).
+## Where things stand
+The game is **Color Clash / "Jamie, Jasmine & Jinn"** — a connect-3 campaign:
+5 islands × 10 stages = 50, scrollable island map, sequential unlock via
+ProgressService (all intact). Today added the **story / character / enemy
+foundation**. Everything is additive over the working map/economy/progress —
+no source PNG modified, no system rebuilt. **830/830 unit tests pass, all 4
+smoke scripts pass, Android APK builds (exit 0) and installs.**
 
-Asset map (identified by artwork, not filename):
-| # | Island | Hero | Stages sheet | Map art |
-|---|---|---|---|---|
-| 1 | Sunlit Falls (Forest) | 05_47_05 | 05_50_06 | 06_27_18 |
-| 2 | Frosthaven (Ice) | 05_52_50 | 05_55_52 | 06_30_10 |
-| 3 | Volcania (Fire) | 05_58_58 | 06_01_28 | 06_32_38 |
-| 4 | Sandoria (Desert) | 06_04_08 | 06_07_56 | 06_35_53 |
-| 5 | Aurora Reach (Crystal) | 06_10_04 | 06_20_57 | 06_38_11 |
+### Assets (assets/story/, 10 PNGs — Downloads source untouched)
+| id | file | content |
+|---|---|---|
+| story_jamie_portrait | jamie_portrait.png | Jamie hero (crown, fire sword, blue lightning hand, lightning boots) |
+| story_jasmine_portrait | jasmine_portrait.png | Jasmine princess |
+| story_jinn_portrait | jinn_portrait.png | Jinn villain (red jinn, smoke body) |
+| story_jasmine_poses | jasmine_poses_8.png | 4×2 pose sheet → 8 AtlasTexture cells |
+| story_cast_atlas / story_scenes | *_transparent.png | scene reference (Phase-12 cutscenes) |
+| story_enemies | enemies_and_bosses.png | 10 labelled "Jin's servants" (top row → AtlasTexture) |
+| story_jamie_actions / story_jinn_actions / story_jasmine_expr | *_ref.png | opaque action sheets (Phase-5 slicing) |
 
-Each stage sheet = a 5×2 grid of the 10 stage dioramas. Island 2's sheet has
-the logo + a 4+6 layout, so its 10 regions are explicit in `islands.json`;
-the other four use a uniform grid. The source PNGs are **never cropped or
-modified** — `IslandModel.stage_face()` returns a cached `AtlasTexture`
-region.
+Registered in `AssetLibrary._STORY_ART` (+ `story_art_audit()`).
 
-- `IslandModel`: `island_hero_art` / `island_map_art` / `island_stages_sheet`,
-  `stage_region_norm`, `stage_face`, `node_position_norm` (serpentine trail,
-  data-overridable per island).
-- `data/islands.json`: names/subtitles + asset ids + theme + Frosthaven's
-  explicit regions. Positions + backgrounds stay data-driven / replaceable.
-- `LevelNodeButton`: optional `face_texture` → the stage diorama becomes the
-  node (dark pop halo, gold frame, corner number/lock/chest, star ribbon,
-  current pulse+crown). Legacy vector node kept as the art-absent fallback.
-- `level_map.gd IslandSection`: bg = assembled map art (COVER), glass header
-  (name / subtitle / x-10 / lock|play|check badge), 10 positioned diorama
-  nodes, soft "travelled" trail, full-island lock overlay when locked.
-  KineticScroll + auto-centre unchanged.
+### Systems built
+- **`Cast`** (`scripts/story/cast.gd`) — `portrait(who)`, `pose(who,name)`.
+  Jasmine's 8 poses sliced by name (captured / hopeful / scared / thinking /
+  rescued / …). Jamie & Jinn → portrait until their action sheets are sliced.
+- **`EnemyModel`** (`scripts/story/enemy_model.gd` + `data/enemies.json`) —
+  10 enemies, per-island rosters, **boss-stage map**: 10 Poison Beast · 20
+  Ice Wraith · 30 Dark Knight · 40 Chaos Sorcerer · 50 **Jinn**. Tier HP
+  (`normal 3 … final_boss 30`) scaling by chapter, `enemy_face` Atlas slices.
+- **`Story`** autoload (`scripts/story/story_director.gd` + `data/story.json`)
+  — data-driven beats keyed by trigger (`campaign_start` | `island_start:N` |
+  `stage_start:N` | `stage_complete:N`). Content: opening kidnapping
+  cinematic, a chapter card per island, boss intros, a **Jinn cameo at stage
+  30**, the stage-50 finale + reunion. Each beat plays once, persisted via
+  SaveService (`story_seen`).
+- **`StoryScene`** (`scripts/story/story_scene.gd`) — reusable cutscene
+  overlay: supplied character art slides in per speaker, glass dialogue box,
+  tap **or** auto-advance (reading-speed timer). `auto_skip` / headless →
+  resolves instantly so automation never blocks.
+- **Wiring** (`app.gd`): pre-level beats in `_go_to_level` /
+  `_on_next_level_pressed` before `_start_level`; post-stage beats in
+  `_on_level_won` before the win panel. `CharacterView` now renders the real
+  Jamie portrait (code placeholder kept as fallback).
 
-## Known polish (non-blocking)
-- The supplied map-art PNGs paint the island as a vignette on a dark void,
-  so a section's edges read as "space around the island" rather than
-  edge-to-edge scenery. Acceptable / on-theme; could zoom+crop harder or
-  tint the void if you want it tighter.
-- Node density: 10 nodes over ~720px of art → some visual overlap where the
-  trail doubles back. Winding + drop shadows keep them tappable.
-- The APK is now ~268 MB (15 island PNGs import LOSSLESS). Phase 9 should
-  switch `env/*` + `islands/*` to ETC2/ASTC.
-- **On-device pass is pending** — the OnePlus test device disconnected
-  mid-session. Rebuild+install commands unchanged (`docs/ANDROID.md`);
-  APK is at `build/color-clash-debug.apk`.
+### Tests added
+`test_story_assets.gd` · `test_enemy_model.gd` · `test_story_data.gd`
+(registered in `test_runner.gd`).
 
-## NEXT
-1. On-device smoke of the island map (scroll, tap a stage, verify state +
-   60 FPS + no logcat errors).
-2. Optional: wire `IslandModel.island_hero_art(i)` as the in-level backdrop
-   for that island's 10 levels (currently the old env cycle).
-3. Bottom map nav bar (MAP/EVENTS/CHESTS/SHOP) — reference shows it.
-4. Phase 2 gameplay (PowerCombiner, coating/collectible/crate obstacles,
-   migrate board_view/audio onto the event stream).
-5. Character/storyline phase (after final character PNGs).
+## NOT done yet — clean integration points are in place
+- **Opening cinematic** plays as a dialogue beat; a richer scripted sequence
+  (backgrounds, Jinn entrance FX, kidnap animation) is Phase 4 polish.
+- **Jamie power presentation** (fire sword / lightning hand / boots states)
+  — slice `story_jamie_actions` opaque sheet; extend `Cast.pose` for Jamie.
+- **Boss HP battles** on 10/20/30/40/50 — `EnemyModel.boss_hp()` is ready;
+  needs a `BossBar` HUD element + match-energy → damage in `_apply_move_result`.
+- **Match-3 → attack energy** coupling — hook the existing `GameEvents`
+  stream (`MATCH_FOUND`, `POWER_ACTIVATED`, `CASCADE_FINISHED`) to a
+  `CombatDirector` that drives Jamie attacks + boss damage.
+- **Inventory screen** — character / powers / equipment / boosters, over the
+  existing `Boosters`/`Economy`/`Progress` save. Follow the UI/UX ref.
+- **Music/SFX** — Arabic-fantasy direction; 11 music slots + combat SFX.
+  Use the existing `Audio`/`Music` synth architecture / `Audio.register()`.
+- **On-device verification of this build is pending** — the USB test device
+  disconnected repeatedly this session. APK is at `build/color-clash-debug.apk`
+  (~302 MB); it installed successfully once before dropping.
 
 ## Do NOT
 - Push to origin.
-- Rewrite the connect-based core, hex grid, powers, ChainResolver, level
-  data, ProgressService, the event stream, or IslandModel's pure-view
-  contract.
-- Crop / modify / replace the supplied island PNGs (stage art is sliced via
-  AtlasTexture at runtime).
-- Invent branding / character art.
+- Rewrite the connect-3 core, hex grid, powers, ChainResolver, level data,
+  ProgressService, IslandModel, the event stream, or the island map.
+- Modify / crop / replace any supplied source PNG (slice via AtlasTexture).
+- Rename Jamie / Jasmine / Jinn or redesign their look.
+- Add a second save/progression/currency system.
