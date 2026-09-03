@@ -1,9 +1,11 @@
 class_name DailyRewardsScreen
 extends Control
-## The 7-day daily-reward calendar. Streak maths lives in the pure
-## DailyRewards class; this screen owns the SaveService keys
-## (`daily_last_claim_day`, `daily_streak`), the layout, and granting the
-## reward through Economy/Boosters when the player claims.
+## The 7-day daily-reward calendar, reference-matched: a gold-framed
+## frosted-glass dialog with a banner title, a 4+3 day grid whose tiles read
+## claimed / current / upcoming / locked at a glance, and a large CLAIM
+## button with a claim animation. Streak maths still lives in the pure
+## DailyRewards class; this screen owns the SaveService keys and grants the
+## reward through Economy/Boosters exactly as before.
 
 signal closed()
 
@@ -14,6 +16,8 @@ var _tiles: Array[DayTile] = []
 var _claim_btn: Button
 var _status: Label
 var _state: Dictionary = {}
+var _frame: UiKit.GoldFramePanel
+var _scrim: ColorRect
 
 ## Does the player have a daily reward waiting right now? (for the menu badge)
 static func has_claimable() -> bool:
@@ -31,39 +35,72 @@ func _ready() -> void:
 	bg.scene_id = &"env_energy_crystals"
 	add_child(bg)
 
-	if AssetLibrary.has(&"env_crystal_formations"):
-		var deco := TextureRect.new()
-		deco.texture = AssetLibrary.tex(&"env_crystal_formations")
-		deco.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		deco.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		deco.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-		deco.offset_top = -360
-		deco.modulate = Color(1, 1, 1, 0.28)
-		deco.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(deco)
+	_scrim = ColorRect.new()
+	_scrim.color = Color(0, 0, 0, 0.42)
+	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_scrim)
 
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
+
+	_frame = UiKit.GoldFramePanel.new(20)
+	_frame.set_accent(VisualTheme.STAR)
+	_frame.custom_minimum_size = Vector2(600, 0)
+	center.add_child(_frame)
+
 	var col := VBoxContainer.new()
-	col.alignment = BoxContainer.ALIGNMENT_CENTER
-	col.add_theme_constant_override("separation", 20)
-	center.add_child(col)
+	col.add_theme_constant_override("separation", 18)
+	_frame.content().add_child(col)
 
-	var title := VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(title)
+	# --- banner title + close X on its own row --------------------
+	var title_row := Control.new()
+	title_row.custom_minimum_size = Vector2(0, 66)
+	col.add_child(title_row)
 
+	var banner_center := CenterContainer.new()
+	banner_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	banner_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	title_row.add_child(banner_center)
+	var banner := PanelContainer.new()
+	var bsb := UiKit.button_face(UiKit.PURPLE_FACE, UiKit.PURPLE_DEEP, 16)
+	bsb.border_width_bottom = 4
+	bsb.content_margin_left = 34; bsb.content_margin_right = 34
+	bsb.content_margin_top = 8; bsb.content_margin_bottom = 10
+	banner.add_theme_stylebox_override("panel", bsb)
+	banner_center.add_child(banner)
+	var title := VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, Color(1, 1, 1))
+	banner.add_child(title)
+
+	var x_btn := UiKit.icon_button(&"close", 52)
+	x_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	x_btn.position = Vector2(4, -6)
+	x_btn.z_index = 5
+	var xsb := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 26)
+	xsb.content_margin_left = 0; xsb.content_margin_right = 0
+	xsb.content_margin_top = 0; xsb.content_margin_bottom = 0
+	x_btn.add_theme_stylebox_override("normal", xsb)
+	x_btn.add_theme_stylebox_override("hover", xsb)
+	x_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		closed.emit()
+	)
+	title_row.add_child(x_btn)
+
+	# --- 4 + 3 day grid ------------------------------------------
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 14)
 	grid.add_theme_constant_override("v_separation", 14)
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	col.add_child(grid)
 	for day in range(1, 8):
 		var tile := DayTile.new()
 		tile.day = day
 		tile.reward = DailyRewards.reward_for_day(day)
-		tile.custom_minimum_size = Vector2(124, 138)
+		tile.custom_minimum_size = Vector2(128, 142)
 		grid.add_child(tile)
 		_tiles.append(tile)
 
@@ -71,16 +108,11 @@ func _ready() -> void:
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_status)
 
-	_claim_btn = _button("Claim", VisualTheme.GOOD)
+	_claim_btn = UiKit.button("CLAIM", &"primary", VisualTheme.FS_HEADING)
+	_claim_btn.custom_minimum_size = Vector2(0, 80)
+	_claim_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_claim_btn.pressed.connect(_on_claim)
 	col.add_child(_claim_btn)
-
-	var close := _button("Back", VisualTheme.ACCENT)
-	close.pressed.connect(func():
-		Audio.play(&"button_tap")
-		closed.emit()
-	)
-	col.add_child(close)
 
 	refresh()
 
@@ -89,19 +121,10 @@ func _track_size() -> void:
 	size = vp
 	custom_minimum_size = vp
 
-func _button(text: String, tint: Color) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(280, 68)
-	b.add_theme_font_size_override("font_size", VisualTheme.FS_BUTTON)
-	b.add_theme_color_override("font_color", VisualTheme.TEXT)
-	b.add_theme_constant_override("outline_size", 5)
-	b.add_theme_color_override("font_outline_color", VisualTheme.OUTLINE)
-	b.add_theme_stylebox_override("normal", VisualTheme.button_face(tint.darkened(0.1)))
-	b.add_theme_stylebox_override("hover", VisualTheme.button_face(tint))
-	b.add_theme_stylebox_override("pressed", VisualTheme.button_face(tint.darkened(0.3)))
-	b.focus_mode = Control.FOCUS_NONE
-	return b
+## Called by app.gd when the screen becomes visible — play the entrance.
+func play_entrance() -> void:
+	if _frame != null:
+		UiKit.pop_in(_frame)
 
 func refresh() -> void:
 	var last := SaveService.get_int(KEY_LAST, -1)
@@ -114,6 +137,8 @@ func refresh() -> void:
 			st = &"current"
 		elif tile.day <= claimed_through:
 			st = &"claimed"
+		elif tile.day == claimed_through + 1:
+			st = &"upcoming"
 		tile.set_state(st)
 
 	if _state["claimable"]:
@@ -131,6 +156,11 @@ func _on_claim() -> void:
 	Audio.play(&"button_tap")
 	var day := int(_state["day"])
 	var reward: Dictionary = DailyRewards.reward_for_day(day)
+
+	# claim-burst on the current tile
+	for tile in _tiles:
+		if tile.day == day:
+			tile.play_claim_burst()
 
 	SaveService.set_int(KEY_LAST, DailyRewards.today())
 	SaveService.set_int(KEY_STREAK, DailyRewards.streak_after_claim(day))
@@ -150,20 +180,27 @@ func _on_claim() -> void:
 	RewardPopup.present(self, popup_rewards, {"title": "Day %d Reward" % day})
 
 
-## One day cell in the calendar.
+## One day cell in the calendar. States: claimed | current | upcoming | future.
 class DayTile extends Control:
 	var day := 1
 	var reward: Dictionary = {}
 	var state: StringName = &"future"
 	var _t := 0.0
+	var _burst := 0.0
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	func set_state(s: StringName) -> void:
 		state = s
-		set_process(s == &"current")
+		set_process(s == &"current" or _burst > 0.0)
 		queue_redraw()
+
+	func play_claim_burst() -> void:
+		_burst = 1.0
+		set_process(true)
+		var t := create_tween()
+		t.tween_method(func(v): _burst = v; queue_redraw(), 1.0, 0.0, 0.7)
 
 	func _process(delta: float) -> void:
 		_t += delta
@@ -172,64 +209,82 @@ class DayTile extends Control:
 	func _draw() -> void:
 		var r := Rect2(Vector2.ZERO, size)
 		var big := day == 7
-		var body := VisualTheme.PANEL_RAISED
-		var border := VisualTheme.PANEL_BORDER
+		var body := UiKit.GLASS_BG_DEEP
+		var border := UiKit.GLASS_BORDER
 		match state:
 			&"claimed":
-				body = Color(0.10, 0.16, 0.12, 0.95)
-				border = Color(0.4, 0.8, 0.5, 0.5)
+				body = Color(0.09, 0.17, 0.11, 0.9)
+				border = Color(0.4, 0.85, 0.5, 0.55)
 			&"current":
 				var p := 0.5 + 0.5 * sin(_t * 6.0)
-				body = Color(0.16, 0.15, 0.10, 0.98)
+				body = Color(0.17, 0.15, 0.08, 0.95)
 				border = VisualTheme.STAR.lerp(Color(1, 1, 1), p)
-				VisualTheme.draw_glow(self, r.size * 0.5, r.size.x * 0.7, Color(1, 0.85, 0.3, 0.25 + 0.15 * p), 4)
+				VisualTheme.draw_glow(self, r.size * 0.5, r.size.x * 0.75, Color(1, 0.85, 0.3, 0.22 + 0.16 * p), 4)
+			&"upcoming":
+				body = Color(0.10, 0.12, 0.22, 0.82)
+				border = Color(0.7, 0.8, 1.0, 0.4)
+			_:
+				body = Color(0.07, 0.08, 0.15, 0.7)
+				border = Color(1, 1, 1, 0.10)
 		_round_rect(r, 16.0, body)
 		var rp := ShapeDrawUtils.rounded_rect_points(r.size, 16.0, 5)
 		var moved := PackedVector2Array()
 		for pt in rp:
 			moved.append(pt + r.size * 0.5)
 		moved.append(moved[0])
-		draw_polyline(moved, border, 2.0, true)
+		draw_polyline(moved, border, 2.5 if state == &"current" else 2.0, true)
 
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(10, 26), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
-			VisualTheme.STAR if big else VisualTheme.TEXT_DIM)
+		draw_string(font, Vector2(11, 25), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
+			VisualTheme.STAR if (big or state == &"current") else VisualTheme.TEXT_DIM)
 
-		var c := Vector2(r.size.x * 0.5, r.size.y * 0.56)
+		var c := Vector2(r.size.x * 0.5, r.size.y * 0.55)
+		var dim := state == &"future"
+		var mod := Color(1, 1, 1, 0.4) if dim else Color(1, 1, 1)
 		var boosters: Dictionary = reward.get("boosters", {})
 		if boosters.size() > 0:
 			var bid := StringName(String(boosters.keys()[0]))
 			var ptex := AssetLibrary.power(bid)
 			if ptex != null:
-				var d := 52.0
+				var d := 54.0
 				var m: float = maxf(float(ptex.get_width()), float(ptex.get_height()))
 				draw_texture_rect(ptex, Rect2(c - Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m) * 0.5,
-					Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m)), false)
+					Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m)), false, mod)
 			else:
-				var hex := ShapeDrawUtils.regular_polygon(6, 26.0, PI / 6.0, c)
-				draw_colored_polygon(hex, Color(0.42, 0.28, 0.62))
-				IconDraw.draw_icon(self, bid, c, 36.0)
+				IconDraw.draw_icon(self, bid, c, 40.0)
 		else:
 			var coin_tex := AssetLibrary.tex(&"eco_coin_stack" if big else &"eco_gold_coin")
 			if coin_tex != null:
-				var d := 58.0 if big else 46.0
+				var d := 60.0 if big else 48.0
 				var m: float = maxf(float(coin_tex.get_width()), float(coin_tex.get_height()))
 				draw_texture_rect(coin_tex, Rect2(c - Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m) * 0.5,
-					Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m)), false)
+					Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m)), false, mod)
 			else:
 				draw_circle(c, 21.0, VisualTheme.COIN)
-				draw_circle(c, 15.0, VisualTheme.COIN.lightened(0.25))
+
 		var amt := int(reward.get("coins", 0))
-		var lbl := ("+%d" % amt) if amt > 0 else "BOOST"
-		var lfs := 16
+		var lbl := ("%d" % amt) if amt > 0 else "BOOST"
+		var lfs := 17
 		var ls := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs)
-		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, VisualTheme.TEXT)
+		draw_string_outline(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, 4, Color(0, 0, 0, 0.7))
+		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, VisualTheme.TEXT if not dim else VisualTheme.TEXT_DIM)
 
 		if state == &"claimed":
-			draw_line(Vector2(r.size.x * 0.3, r.size.y * 0.5), Vector2(r.size.x * 0.45, r.size.y * 0.62),
-				Color(0.5, 0.95, 0.6), 4.0)
-			draw_line(Vector2(r.size.x * 0.45, r.size.y * 0.62), Vector2(r.size.x * 0.72, r.size.y * 0.32),
-				Color(0.5, 0.95, 0.6), 4.0)
+			# green check badge, top-right
+			var bc := Vector2(r.size.x - 20.0, 20.0)
+			draw_circle(bc, 13.0, Color(0.2, 0.6, 0.28))
+			draw_circle(bc, 13.0, Color(0.4, 0.85, 0.5)); draw_circle(bc, 10.0, Color(0.14, 0.4, 0.18))
+			draw_line(bc + Vector2(-5, 0), bc + Vector2(-1, 4), Color.WHITE, 3.0, true)
+			draw_line(bc + Vector2(-1, 4), bc + Vector2(6, -5), Color.WHITE, 3.0, true)
+		elif state == &"future":
+			var lc := Vector2(r.size.x - 20.0, 20.0)
+			draw_arc(lc + Vector2(0, -3), 6.0, PI, TAU, 10, Color(0.7, 0.73, 0.82), 3.0, true)
+			draw_rect(Rect2(lc + Vector2(-6, -3), Vector2(12, 10)), Color(0.7, 0.73, 0.82))
+
+		if _burst > 0.0:
+			var rad := (1.0 - _burst) * r.size.x * 0.9
+			draw_arc(r.size * 0.5, rad, 0, TAU, 28, Color(1, 0.9, 0.4, _burst), 4.0, true)
+			VisualTheme.draw_glow(self, r.size * 0.5, rad * 0.7, Color(1, 0.85, 0.3, _burst * 0.5), 4)
 
 	func _round_rect(rect: Rect2, radius: float, color: Color) -> void:
 		var pts := ShapeDrawUtils.rounded_rect_points(rect.size, radius, 5)

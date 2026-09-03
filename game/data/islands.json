@@ -1,0 +1,10 @@
+{
+  "_comment": "Campaign islands for the scrollable island map (game/scripts/levels/island_model.gd). Each island is exactly 10 consecutive campaign levels; add an entry per 10 levels. `theme` is the AssetLibrary env id used as that island's backdrop. Unlock rules are NOT set here — they come from the existing sequential ProgressService rule (an island opens when the previous island's last level is cleared).",
+  "islands": [
+    { "name": "Sunlit Falls",   "theme": "env_floating_islands" },
+    { "name": "Crystal Caves",   "theme": "env_crystal_formations" },
+    { "name": "Lava Peaks",      "theme": "env_large_structures" },
+    { "name": "Cloud Spires",    "theme": "env_clouds_mists" },
+    { "name": "Aurora Reach",    "theme": "env_aurora_energy_bands" }
+  ]
+}

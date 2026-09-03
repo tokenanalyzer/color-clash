@@ -178,6 +178,7 @@ func _on_home_pressed() -> void:
 func _on_daily_pressed() -> void:
 	_daily.refresh()
 	await _fade_in(_daily, TRANSITION_DURATION)
+	_daily.play_entrance()
 
 func _on_daily_closed() -> void:
 	await _fade_out(_daily, TRANSITION_DURATION)

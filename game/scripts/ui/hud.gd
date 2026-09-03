@@ -37,8 +37,7 @@ var _end_body: Label
 var _end_button: Button
 var _end_map_button: Button
 var _end_confetti: CPUParticles2D
-var _settings_panel: PanelContainer
-var _settings_center: CenterContainer
+var _settings_dialog: SettingsPanel
 var _pause_center: CenterContainer
 var _pause_panel: PanelContainer
 var _scrim: ColorRect
@@ -110,7 +109,8 @@ func _ready() -> void:
 	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_scrim)
 	_build_end_panel()
-	_build_settings_panel()
+	_settings_dialog = SettingsPanel.new()
+	add_child(_settings_dialog)
 	_build_pause_panel()
 	_fx = SpriteFX.new()
 	_fx.z_index = 300
@@ -145,22 +145,12 @@ func _resolve_safe_area() -> void:
 # ------------------------------------------------------------- top bar --
 
 func _icon_button(kind: StringName, size: int = 46) -> Button:
-	var b := Button.new()
-	b.custom_minimum_size = Vector2(size, size)
-	b.add_theme_stylebox_override("normal", VisualTheme.panel(VisualTheme.PANEL_RAISED, size / 2, VisualTheme.PANEL_BORDER, 2))
-	b.add_theme_stylebox_override("hover", VisualTheme.panel(VisualTheme.PANEL_RAISED.lightened(0.1), size / 2))
-	b.add_theme_stylebox_override("pressed", VisualTheme.panel(VisualTheme.PANEL_SOLID, size / 2))
-	b.focus_mode = Control.FOCUS_NONE
-	var icon := MiniIcon.new()
-	icon.kind = kind
-	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(icon)
-	return b
+	# frosted-glass disc (shared UiKit style)
+	return UiKit.icon_button(kind, size)
 
 func _pill(child: Control, min_w: float = 0.0) -> PanelContainer:
 	var pc := PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", VisualTheme.panel(VisualTheme.PANEL, 22, VisualTheme.PANEL_BORDER, 2))
+	pc.add_theme_stylebox_override("panel", UiKit.glass(22, true))
 	pc.custom_minimum_size = Vector2(min_w, 0)
 	pc.add_child(child)
 	return pc
@@ -259,39 +249,27 @@ func _build_top_bar() -> void:
 
 func _build_fever_meter() -> void:
 	_fever_wrap = Control.new()
-	_fever_wrap.custom_minimum_size = Vector2(0, 64)
+	_fever_wrap.custom_minimum_size = Vector2(0, 72)
 	_top_col.add_child(_fever_wrap)
 
-	# Thin code-drawn capsule frame (see FeverArt below): a slim gold-ringed
-	# track that fills left->right by the charge ratio, with the Fever Crystal
-	# (#52) riding the fill edge. Sized to never force the HUD row taller.
+	# The full golden Fever bar (see FeverArt below): an ornate gold double
+	# frame with a crown motif on the left, a golden energy fill with premium
+	# glow, the Fever Crystal (#52) riding the fill edge, and the x1.5 reward
+	# in a gold badge on the right. All drawn in FeverArt so it stays one node.
 	_fever_bar = FeverArt.new()
+	_fever_bar.mult_text = "x%.1f" % GameData.fever_config.score_multiplier
 	_fever_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fever_wrap.add_child(_fever_bar)
 
-	# left: FEVER caption; right: the reward it unlocks — so an empty meter
-	# still reads as "fill this for a x1.5 bonus", not a disabled field.
-	# caption sits in the clear strip ABOVE the fill track (row is 64 tall,
-	# track occupies the middle third) so it never fights the gold fill.
-	_fever_label = VisualTheme.label("FEVER", VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 4)
+	# "FEVER" caption sits in the clear strip above the fill track.
+	_fever_label = VisualTheme.label("FEVER", VisualTheme.FS_CAPTION, VisualTheme.TEXT_GOLD, 4)
 	_fever_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_fever_label.offset_left = 8
-	_fever_label.offset_top = 2
-	_fever_label.offset_bottom = 22
+	_fever_label.offset_left = 46
+	_fever_label.offset_top = 1
+	_fever_label.offset_bottom = 21
 	_fever_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fever_wrap.add_child(_fever_label)
-
-	var mult := VisualTheme.label("x%.1f" % GameData.fever_config.score_multiplier, VisualTheme.FS_CAPTION,
-		VisualTheme.FEVER, 4)
-	mult.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	mult.offset_right = -18
-	mult.offset_left = -104
-	mult.offset_top = 2
-	mult.offset_bottom = 22
-	mult.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	mult.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_fever_wrap.add_child(mult)
 
 func _bar_style(c: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
@@ -322,11 +300,12 @@ func _build_booster_bar() -> void:
 	col.add_child(_hint_label)
 
 	var tray := PanelContainer.new()
-	var tray_sb := VisualTheme.panel(Color(0.11, 0.13, 0.22, 0.99), 30, VisualTheme.PANEL_BORDER_BRIGHT, 2)
-	tray_sb.content_margin_left = 16
-	tray_sb.content_margin_right = 16
-	tray_sb.content_margin_top = 16
-	tray_sb.content_margin_bottom = 18
+	var tray_sb := UiKit.glass(30, true)
+	tray_sb.bg_color = Color(0.08, 0.10, 0.19, 0.72)
+	tray_sb.content_margin_left = 14
+	tray_sb.content_margin_right = 14
+	tray_sb.content_margin_top = 14
+	tray_sb.content_margin_bottom = 16
 	tray_sb.shadow_size = 22
 	tray.add_theme_stylebox_override("panel", tray_sb)
 	col.add_child(tray)
@@ -417,7 +396,13 @@ func _build_end_panel() -> void:
 
 	_end_panel = PanelContainer.new()
 	_end_panel.custom_minimum_size = Vector2(560, 460)
-	_end_panel.add_theme_stylebox_override("panel", VisualTheme.panel(Color(0.09, 0.10, 0.19, 0.98), 30, VisualTheme.PANEL_BORDER_BRIGHT, 2))
+	var _epsb := UiKit.glass(28, true)
+	_epsb.bg_color = Color(0.08, 0.09, 0.18, 0.94)
+	_epsb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.4)
+	_epsb.set_border_width_all(2)
+	_epsb.content_margin_left = 26; _epsb.content_margin_right = 26
+	_epsb.content_margin_top = 24; _epsb.content_margin_bottom = 24
+	_end_panel.add_theme_stylebox_override("panel", _epsb)
 	_end_center.add_child(_end_panel)
 
 	_end_confetti = CPUParticles2D.new()
@@ -491,48 +476,16 @@ func _cta_button(text: String, tint: Color) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	return b
 
-func _build_settings_panel() -> void:
-	_settings_center = CenterContainer.new()
-	_settings_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_settings_center.visible = false
-	_settings_center.z_index = 200
-	add_child(_settings_center)
-
-	_settings_panel = PanelContainer.new()
-	_settings_panel.custom_minimum_size = Vector2(520, 500)
-	_settings_panel.add_theme_stylebox_override("panel", VisualTheme.panel(Color(0.09, 0.10, 0.19, 0.98), 28, VisualTheme.PANEL_BORDER_BRIGHT, 2))
-	_settings_center.add_child(_settings_panel)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
-	_settings_panel.add_child(vbox)
-
-	var title := VisualTheme.label("SETTINGS", VisualTheme.FS_TITLE, VisualTheme.TEXT)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(title)
-
-	vbox.add_child(_toggle_row("Music", AudioSettings.music_enabled, func(v): AudioSettings.set_music_enabled(v)))
-	vbox.add_child(_toggle_row("Sound Effects", AudioSettings.sfx_enabled, func(v): AudioSettings.set_sfx_enabled(v)))
-	vbox.add_child(_toggle_row("Haptics", AudioSettings.haptics_enabled, func(v): AudioSettings.set_haptics_enabled(v)))
-	vbox.add_child(_slider_row("Master Volume", AudioSettings.master_volume, func(v): AudioSettings.set_master_volume(v)))
-	vbox.add_child(_slider_row("Music Volume", AudioSettings.music_volume, func(v): AudioSettings.set_music_volume(v)))
-	vbox.add_child(_slider_row("SFX Volume", AudioSettings.sfx_volume, func(v): AudioSettings.set_sfx_volume(v)))
-
-	var close_btn := _cta_button("Close", VisualTheme.ACCENT)
-	close_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		_show_settings(false)
-	)
-	vbox.add_child(close_btn)
-
+## The in-level Settings dialog is now the shared SettingsPanel (built in
+## _ready), so the menu and the HUD show one design.
 func _show_settings(v: bool) -> void:
-	_settings_center.visible = v
-	_refresh_scrim()
 	if v:
-		_pop_in(_settings_panel)
+		_settings_dialog.open()
+	else:
+		_settings_dialog.close()
 
 func _refresh_scrim() -> void:
-	_scrim.visible = _end_center.visible or _settings_center.visible or _pause_center.visible
+	_scrim.visible = _end_center.visible or _pause_center.visible
 
 func _build_pause_panel() -> void:
 	_pause_center = CenterContainer.new()
@@ -543,7 +496,13 @@ func _build_pause_panel() -> void:
 
 	_pause_panel = PanelContainer.new()
 	_pause_panel.custom_minimum_size = Vector2(480, 470)
-	_pause_panel.add_theme_stylebox_override("panel", VisualTheme.panel(Color(0.09, 0.10, 0.19, 0.98), 28, VisualTheme.PANEL_BORDER_BRIGHT, 2))
+	var _ppsb := UiKit.glass(26, true)
+	_ppsb.bg_color = Color(0.08, 0.09, 0.18, 0.94)
+	_ppsb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.4)
+	_ppsb.set_border_width_all(2)
+	_ppsb.content_margin_left = 24; _ppsb.content_margin_right = 24
+	_ppsb.content_margin_top = 22; _ppsb.content_margin_bottom = 22
+	_pause_panel.add_theme_stylebox_override("panel", _ppsb)
 	_pause_center.add_child(_pause_panel)
 
 	var vbox := VBoxContainer.new()
@@ -591,37 +550,6 @@ func show_pause_panel(v: bool) -> void:
 	_refresh_scrim()
 	if v:
 		_pop_in(_pause_panel)
-
-func _toggle_row(label_text: String, initial: bool, on_toggled: Callable) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var label := VisualTheme.label(label_text, VisualTheme.FS_BODY, VisualTheme.TEXT_DIM, 0)
-	label.custom_minimum_size = Vector2(280, 0)
-	row.add_child(label)
-	var toggle := CheckButton.new()
-	toggle.button_pressed = initial
-	toggle.toggled.connect(func(v):
-		Audio.play(&"button_tap")
-		on_toggled.call(v)
-	)
-	row.add_child(toggle)
-	return row
-
-func _slider_row(label_text: String, initial: float, on_changed: Callable) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	var label := VisualTheme.label(label_text, VisualTheme.FS_BODY, VisualTheme.TEXT_DIM, 0)
-	label.custom_minimum_size = Vector2(280, 0)
-	row.add_child(label)
-	var slider := HSlider.new()
-	slider.min_value = 0.0
-	slider.max_value = 1.0
-	slider.step = 0.01
-	slider.value = initial
-	slider.custom_minimum_size = Vector2(180, 0)
-	slider.value_changed.connect(func(v): on_changed.call(v))
-	row.add_child(slider)
-	return row
 
 # ----------------------------------------------------------- updates --
 
@@ -678,8 +606,9 @@ func set_objectives(tracker: ObjectiveTracker, level: LevelConfig) -> void:
 		# One objective "card": icon + count over a slim progress bar, on a
 		# rounded inset so each goal reads as a distinct tracked task.
 		var card := PanelContainer.new()
-		var csb := VisualTheme.panel(Color(0.05, 0.06, 0.12, 0.85), 14,
-			VisualTheme.GOOD if complete else VisualTheme.PANEL_BORDER, 2)
+		var csb := UiKit.glass(14, true)
+		csb.border_color = VisualTheme.GOOD if complete else UiKit.GLASS_BORDER
+		csb.set_border_width_all(2 if complete else 1)
 		csb.content_margin_left = 12
 		csb.content_margin_right = 12
 		csb.content_margin_top = 8
@@ -1101,17 +1030,16 @@ class StarRow extends Control:
 				draw_colored_polygon(ShapeDrawUtils.star_points(center, r * 0.5), VisualTheme.STAR.lightened(0.4))
 
 
-## The Fever charge meter, reworked as a thin mobile-friendly frame: a slim
-## dark capsule track spans the row, ringed by a 2px gold frame with a small
-## crown tick, and fills left->right with gold (hot-gold while active) by
-## `ratio`. The Fever Crystal (#52) rides the fill edge and flares during
-## Fever. Fully code-drawn — the chunky 3:1 Fever Meter Frame art (#53) is no
-## longer used here (it never fit a thin bar); it stays available in
-## AssetLibrary for a taller treatment or a redrawn thin frame later.
+## The full golden Fever bar (reference §13): an ornate gold double frame
+## with a crown emblem on the left, a golden energy fill with premium glow
+## and a moving sheen, the Fever Crystal (#52) riding the fill edge, and the
+## x1.5 reward in a gold badge on the right. Fully code-drawn so it stays one
+## node and one draw pass — cheap on gl_compatibility.
 class FeverArt extends Control:
 	var ratio := 0.0: set = _set_ratio
 	var active := false: set = _set_active
 	var flash := 0.0: set = _set_flash
+	var mult_text := "x1.5"
 	var _t := 0.0
 
 	func _set_ratio(v: float) -> void: ratio = clampf(v, 0.0, 1.0); queue_redraw()
@@ -1124,72 +1052,102 @@ class FeverArt extends Control:
 
 	func _process(delta: float) -> void:
 		_t += delta
-		if active or flash > 0.001:
+		if active or flash > 0.001 or ratio > 0.0:
 			queue_redraw()
 
 	func _draw() -> void:
 		var h := size.y
-		var crystal := AssetLibrary.tex(&"ui_fever_crystal")
+		var w := size.x
+		var badge_r := h * 0.36
+		var crown_w := h * 0.82
 
-		# slim capsule track in the lower-middle band (caption strip stays clear
-		# above). Height clamps so the row never needs to grow on small screens.
-		var track_h: float = clampf(h * 0.30, 16.0, 22.0)
-		var track := Rect2(4.0, h - track_h - 8.0, size.x - 8.0, track_h)
-		var cr := track_h * 0.5
+		# --- track geometry: leave room for the crown (left) + badge (right) ---
+		var track := Rect2(crown_w * 0.78, h * 0.30, w - crown_w * 0.78 - badge_r * 2.6 - 8.0, h * 0.44)
+		var cr := track.size.y * 0.5
 
-		var frame_col := VisualTheme.FEVER if not active else VisualTheme.FEVER_HOT
-		_capsule(track.grow(3.0), cr + 3.0, Color(frame_col.r, frame_col.g, frame_col.b, 0.18))
-		_capsule(track, cr, Color(0.04, 0.05, 0.11, 0.96))
+		var gold := UiKit.GOLD if not active else Color(1.0, 0.62, 0.2)
+		var gold_deep := UiKit.GOLD_DEEP
 
+		# outer glow when charged / active
+		if ratio > 0.02 or active:
+			var ga: float = (0.10 + 0.22 * ratio) * (1.4 if active else 1.0)
+			_capsule(track.grow(9.0), cr + 9.0, Color(gold.r, gold.g, gold.b, ga))
+
+		# dark well + gold double frame
+		_capsule(track.grow(4.0), cr + 4.0, Color(gold_deep.r, gold_deep.g, gold_deep.b, 0.95))
+		_capsule(track, cr, Color(0.05, 0.04, 0.02, 0.96))
+
+		# golden energy fill
 		var fill_w := track.size.x * ratio
 		if fill_w > cr:
-			var fc := VisualTheme.FEVER_HOT if active else VisualTheme.FEVER
+			var f := Rect2(track.position, Vector2(fill_w, track.size.y))
+			var base := Color(1.0, 0.66, 0.12) if not active else Color(1.0, 0.44, 0.18)
 			if flash > 0.0:
-				fc = fc.lerp(Color(1, 1, 1), flash)
-			var pulse := (0.85 + 0.15 * sin(_t * 10.0)) if active else 1.0
-			_capsule(Rect2(track.position, Vector2(fill_w, track.size.y)), cr, Color(fc.r, fc.g, fc.b, pulse))
-			_capsule(Rect2(track.position + Vector2(0, 2), Vector2(fill_w, track.size.y * 0.42)), cr,
-				Color(1, 1, 1, 0.28 * pulse))
+				base = base.lerp(Color(1, 1, 1), flash)
+			_capsule(f, cr, base)
+			# bright top third + a travelling sheen
+			_capsule(Rect2(f.position + Vector2(0, 2), Vector2(f.size.x, f.size.y * 0.4)), cr, Color(1, 0.92, 0.6, 0.5))
+			var sheen_x := track.position.x + fposmod(_t * 130.0, maxf(fill_w, 1.0))
+			draw_line(Vector2(sheen_x, f.position.y + 2), Vector2(sheen_x, f.position.y + f.size.y - 2),
+				Color(1, 1, 1, active and 0.5 or 0.3), 6.0)
 
-		# 2px frame ring + a small centred crown tick — reads as a "fever frame"
-		# without a bulky texture.
-		_capsule_outline(track, cr, Color(frame_col.r, frame_col.g, frame_col.b, 0.9), 2.0)
-		var tick_c := Vector2(track.position.x + track.size.x * 0.5, track.position.y - 3.0)
-		for k in 3:
-			var dx := float(k - 1) * 7.0
-			draw_colored_polygon(PackedVector2Array([
-				tick_c + Vector2(dx - 3.0, 2.0),
-				tick_c + Vector2(dx + 3.0, 2.0),
-				tick_c + Vector2(dx, -5.0),
-			]), Color(frame_col.r, frame_col.g, frame_col.b, 0.95))
+		# gold frame lines (outer heavy + inner hairline)
+		_capsule_outline(track, cr, Color(gold.r, gold.g, gold.b, 0.95), 3.0)
+		_capsule_outline(track.grow(-3.0), cr - 3.0, Color(UiKit.GOLD_LITE.r, UiKit.GOLD_LITE.g, UiKit.GOLD_LITE.b, 0.55), 1.5)
 
-		# Fever Crystal (#52) rides the fill edge — flares while Fever is active.
-		var edge_x := track.position.x + clampf(fill_w, cr, track.size.x - cr * 0.5)
+		# --- crown emblem on the left ---
+		var crown_c := Vector2(crown_w * 0.5, h * 0.52)
+		var crown_tex := AssetLibrary.tex(&"ui_crown_trophy")
+		if crown_tex != null:
+			var cw := crown_w
+			var ch := cw * float(crown_tex.get_height()) / float(crown_tex.get_width())
+			draw_texture_rect(crown_tex, Rect2(crown_c - Vector2(cw, ch) * 0.5, Vector2(cw, ch)), false)
+		else:
+			var cw2 := crown_w * 0.5
+			var pts := PackedVector2Array([
+				crown_c + Vector2(-cw2, 8), crown_c + Vector2(-cw2, -4), crown_c + Vector2(-cw2 * 0.4, 4),
+				crown_c + Vector2(0, -10), crown_c + Vector2(cw2 * 0.4, 4), crown_c + Vector2(cw2, -4), crown_c + Vector2(cw2, 8),
+			])
+			draw_colored_polygon(pts, gold)
+			draw_polyline(pts, gold_deep, 1.5, true)
+
+		# --- Fever Crystal (#52) on the fill edge ---
+		var edge_x := track.position.x + clampf(fill_w, cr, track.size.x - cr)
 		var cy := track.position.y + track.size.y * 0.5
-		if crystal != null:
-			var cs := h * (0.9 if active else 0.66)
+		var crystal := AssetLibrary.tex(&"ui_fever_crystal")
+		if crystal != null and ratio > 0.03:
+			var cs := h * (0.92 if active else 0.7)
 			if active:
 				cs *= 1.0 + 0.08 * sin(_t * 8.0)
 			var m: float = maxf(float(crystal.get_width()), float(crystal.get_height()))
-			var cw := cs * crystal.get_width() / m
-			var ch := cs * crystal.get_height() / m
 			if active:
-				VisualTheme.draw_glow(self, Vector2(edge_x, cy), cs,
-					Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, 0.5), 4)
-			draw_texture_rect(crystal, Rect2(Vector2(edge_x - cw * 0.5, cy - ch * 0.5), Vector2(cw, ch)), false)
-		else:
-			draw_circle(Vector2(edge_x, cy), cr * 1.15, Color(frame_col.r, frame_col.g, frame_col.b, active and 1.0 or 0.85))
+				VisualTheme.draw_glow(self, Vector2(edge_x, cy), cs, Color(1.0, 0.5, 0.2, 0.5), 4)
+			draw_texture_rect(crystal, Rect2(Vector2(edge_x - cs * crystal.get_width() / m * 0.5,
+				cy - cs * crystal.get_height() / m * 0.5),
+				Vector2(cs * crystal.get_width() / m, cs * crystal.get_height() / m)), false)
+
+		# --- x1.5 gold badge on the right ---
+		var badge_c := Vector2(w - badge_r - 12.0, h * 0.52)
+		var bpulse := (0.9 + 0.1 * sin(_t * 7.0)) if active else 1.0
+		draw_circle(badge_c, badge_r + 3.0, Color(gold_deep.r, gold_deep.g, gold_deep.b, 0.95))
+		draw_circle(badge_c, badge_r * bpulse, gold)
+		draw_circle(badge_c, badge_r * 0.72 * bpulse, Color(1.0, 0.9, 0.55))
+		var font := ThemeDB.fallback_font
+		var bfs := int(badge_r * 0.9)
+		var bs := font.get_string_size(mult_text, HORIZONTAL_ALIGNMENT_LEFT, -1, bfs)
+		draw_string_outline(font, badge_c - bs * 0.5 + Vector2(0, bs.y * 0.32), mult_text, HORIZONTAL_ALIGNMENT_LEFT, -1, bfs, 4, Color(0.3, 0.16, 0.0, 0.9))
+		draw_string(font, badge_c - bs * 0.5 + Vector2(0, bs.y * 0.32), mult_text, HORIZONTAL_ALIGNMENT_LEFT, -1, bfs, Color(0.28, 0.14, 0.0))
 
 		if flash > 0.0:
-			_capsule(track, cr, Color(1, 1, 1, 0.5 * flash))
+			_capsule(track, cr, Color(1, 1, 1, 0.45 * flash))
 
-	func _capsule_outline(r: Rect2, radius: float, col: Color, w: float) -> void:
+	func _capsule_outline(r: Rect2, radius: float, col: Color, wd: float) -> void:
 		var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 6)
 		var moved := PackedVector2Array()
 		for p in pts:
 			moved.append(p + r.position + r.size * 0.5)
 		moved.append(moved[0])
-		draw_polyline(moved, col, w, true)
+		draw_polyline(moved, col, wd, true)
 
 	func _capsule(r: Rect2, radius: float, col: Color) -> void:
 		var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 5)

@@ -105,6 +105,26 @@ const _PATHS := {
 	&"cel_fever_activation_emblem": "res://assets/celebration/fever_activation_emblem.png",
 }
 
+## Reserved paths for art the user will supply later (branding, character
+## poses). NOT part of the 74-asset audit — `tex()` checks these after
+## `_PATHS` and still returns null until the file exists, so every renderer
+## keeps its code-drawn fallback. Drop the final PNG at the path and it is
+## picked up with zero code change.
+const _OPTIONAL := {
+	&"brand_wordmark": "res://assets/branding/wordmark.png",
+	&"brand_logo": "res://assets/branding/company_logo.png",
+	&"brand_splash": "res://assets/branding/splash.png",
+	&"char_idle": "res://assets/character/idle.png",
+	&"char_wave": "res://assets/character/wave.png",
+	&"char_cheer": "res://assets/character/cheer.png",
+	&"char_hype": "res://assets/character/hype.png",
+	&"char_point": "res://assets/character/point.png",
+	&"char_power_up": "res://assets/character/power_up.png",
+	&"char_worried": "res://assets/character/worried.png",
+	&"char_victory": "res://assets/character/victory.png",
+	&"char_sad": "res://assets/character/sad.png",
+}
+
 ## Ordered full-screen environment scenes cycled through the campaign so each
 ## band of levels reads as its own "world". Index by (level-1) / band size.
 const ENV_WORLD_CYCLE: Array[StringName] = [
@@ -123,7 +143,7 @@ static func tex(id: StringName) -> Texture2D:
 	if _cache.has(id):
 		return _cache[id]
 	var t: Texture2D = null
-	var path: String = _PATHS.get(id, "")
+	var path: String = _PATHS.get(id, _OPTIONAL.get(id, ""))
 	if path != "" and ResourceLoader.exists(path):
 		var res := load(path)
 		if res is Texture2D:

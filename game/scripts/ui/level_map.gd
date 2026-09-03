@@ -1,37 +1,36 @@
 class_name LevelMap
 extends Control
-## Campaign level-select: a scrollable serpentine trail of level nodes over a
-## stylised "puzzle world" — layered glowing ridges, a hero light, drifting
-## hex-gem islands and fireflies — with locked / unlocked / current /
-## completed state, star ratings and periodic chest beats. Built entirely in
-## code (no scene, no art assets). Safe-area aware; tracks the viewport size
-## rather than trusting anchor-preset fill under a CanvasLayer.
+## Campaign map — a genuinely vertically-scrollable, ISLAND-BASED world.
+## Each island holds exactly IslandModel.LEVELS_PER_ISLAND (10) stages laid on
+## a serpentine trail beneath an island header (name, x/10 progress, stars,
+## lock). Islands stack down the scroll canvas; the whole thing scrolls with
+## finger drag + inertia and auto-centres on the current island on open.
 ##
-## Progression / unlock / star logic is untouched — it all still comes from
-## ProgressService via refresh().
+## Progression / unlock / star logic is UNTOUCHED — it all still comes from
+## ProgressService (via IslandModel, which is a pure view of it). Public API
+## (level_selected, home_pressed, refresh) is unchanged.
 
 signal level_selected(level_id: int)
 signal home_pressed()
 
-const _TOP_MARGIN := 170.0
-const _BOTTOM_MARGIN := 220.0
-const _NODE_SPACING_Y := 200.0
-const _CHEST_EVERY := 5
+const _TOP_PAD := 40.0
+const _BOTTOM_PAD := 220.0
+const _HEADER_H := 150.0
+const _NODE_STEP := 168.0
+const _SECTION_GAP := 46.0
 
-var _header: PanelContainer
-var _header_inner: MarginContainer
-var _home_btn: Button
+var _top_bar: PanelContainer
+var _top_bar_margin: MarginContainer
 var _coins_label: Label
 var _gems_label: Label
-var _stars_label: Label
-var _scroll: ScrollContainer
+var _home_btn: Button
+var _toast: Label
+var _scroll: KineticScroll
 var _canvas: Control
 var _env: MapEnvironment
-var _path_canvas: LevelPathCanvas
-var _node_buttons: Dictionary = {}
-var _node_positions: Dictionary = {}
-var _deco: Array = []      # [{node: TextureRect, id: StringName}] trail decorations
-var _header_h := 132.0
+var _sections: Array = []            # [IslandSection]
+var _node_buttons: Dictionary = {}   # level_id -> LevelNodeButton
+var _top_h := 140.0
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -39,11 +38,14 @@ func _ready() -> void:
 	_env.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_env)
 	_build_scroll_area()
-	_build_header()
+	_build_top_bar()
+	_build_toast()
 	_relayout()
 	get_viewport().size_changed.connect(_relayout)
 	refresh()
 	call_deferred("_scroll_to_current")
+
+# --------------------------------------------------------------- layout --
 
 func _relayout() -> void:
 	var vp := get_viewport_rect().size
@@ -51,53 +53,98 @@ func _relayout() -> void:
 	custom_minimum_size = vp
 	_env.size = vp
 	var si := VisualTheme.safe_insets(self)
-	_header_h = si.position.y + 120.0
-	_scroll.position = Vector2(0, _header_h)
-	_scroll.size = Vector2(vp.x, vp.y - _header_h)
-	_header.size = Vector2(vp.x, _header_h)
-	_header.position = Vector2.ZERO
-	_header_inner.add_theme_constant_override("margin_top", int(si.position.y + 14.0))
-	_home_btn.position = Vector2(20, si.position.y + 16.0)
+	_top_h = si.position.y + 128.0
+	_scroll.position = Vector2.ZERO
+	_scroll.size = vp
+	_scroll.top_inset = _top_h
+	_scroll.bottom_inset = si.size.y
+	_top_bar.position = Vector2.ZERO
+	_top_bar.size = Vector2(vp.x, _top_h)
+	_top_bar_margin.add_theme_constant_override("margin_top", int(si.position.y + 14.0))
+	_home_btn.position = Vector2(18, si.position.y + 16.0)
 	_env.gesture_inset = si.size.y
-	_layout_nodes(vp.x)
+	_layout_sections(vp.x)
 
-func _build_header() -> void:
-	_header = PanelContainer.new()
-	var hsb := VisualTheme.panel(Color(0.05, 0.06, 0.12, 0.92), 0, Color(0, 0, 0, 0), 0)
-	hsb.shadow_size = 20
-	hsb.shadow_offset = Vector2(0, 6)
-	_header.add_theme_stylebox_override("panel", hsb)
-	add_child(_header)
+func _layout_sections(width: float) -> void:
+	if width <= 0.0:
+		width = 1080.0
+	var y := _top_h + _TOP_PAD
+	for section in _sections:
+		var h: float = section.section_height()
+		section.position = Vector2(0, y)
+		section.custom_minimum_size = Vector2(width, h)
+		section.size = Vector2(width, h)
+		section.layout(width)
+		y += h + _SECTION_GAP
+	_canvas.custom_minimum_size = Vector2(width, y + _BOTTOM_PAD)
+	_canvas.size = _canvas.custom_minimum_size
 
-	_header_inner = MarginContainer.new()
-	_header_inner.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_header.add_child(_header_inner)
+# ---------------------------------------------------------------- build --
 
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 8)
-	_header_inner.add_child(vbox)
+func _build_scroll_area() -> void:
+	_scroll = KineticScroll.new()
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_scroll.scroll_deadzone = 22
+	_scroll.clip_contents = true
+	add_child(_scroll)
 
-	var logo := WordmarkLabel.new()
-	logo.custom_minimum_size = Vector2(0, 46)
-	vbox.add_child(logo)
+	_canvas = Control.new()
+	_canvas.mouse_filter = Control.MOUSE_FILTER_PASS
+	_scroll.add_child(_canvas)
 
-	var currency := HBoxContainer.new()
-	currency.alignment = BoxContainer.ALIGNMENT_CENTER
-	currency.add_theme_constant_override("separation", 16)
-	vbox.add_child(currency)
-	_coins_label = _currency_pill(currency, &"coin", VisualTheme.TEXT_GOLD)
-	_gems_label = _currency_pill(currency, &"crystal", Color(0.8, 0.7, 1.0))
-	_stars_label = _currency_pill(currency, &"trophy", VisualTheme.STAR)
+	for island_idx in IslandModel.island_count():
+		var section := IslandSection.new()
+		section.setup(island_idx)
+		for lid in section.level_ids:
+			var btn := LevelNodeButton.new()
+			btn.pressed.connect(_on_node_pressed.bind(lid))
+			section.add_node(lid, btn)
+			_node_buttons[lid] = btn
+		_canvas.add_child(section)
+		_sections.append(section)
 
-	_home_btn = Button.new()
-	_home_btn.text = "‹ HOME"
-	_home_btn.add_theme_font_size_override("font_size", VisualTheme.FS_MICRO)
-	_home_btn.add_theme_color_override("font_color", VisualTheme.TEXT)
-	_home_btn.add_theme_stylebox_override("normal", VisualTheme.panel(VisualTheme.PANEL_RAISED, 16, VisualTheme.PANEL_BORDER, 1))
-	_home_btn.add_theme_stylebox_override("hover", VisualTheme.panel(VisualTheme.PANEL_RAISED.lightened(0.1), 16))
-	_home_btn.add_theme_stylebox_override("pressed", VisualTheme.panel(VisualTheme.PANEL_SOLID, 16))
-	_home_btn.focus_mode = Control.FOCUS_NONE
+func _build_top_bar() -> void:
+	_top_bar = PanelContainer.new()
+	var sb := UiKit.glass(0, true)
+	sb.bg_color = Color(0.06, 0.07, 0.14, 0.55)
+	sb.set_corner_radius_all(0)
+	sb.border_width_bottom = 1
+	sb.border_width_top = 0
+	sb.border_color = UiKit.GLASS_BORDER
+	sb.shadow_size = 18
+	_top_bar.add_theme_stylebox_override("panel", sb)
+	add_child(_top_bar)
+
+	_top_bar_margin = MarginContainer.new()
+	_top_bar_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_top_bar_margin.add_theme_constant_override("margin_left", 78)
+	_top_bar_margin.add_theme_constant_override("margin_right", 20)
+	_top_bar.add_child(_top_bar_margin)
+
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 14)
+	_top_bar_margin.add_child(row)
+
+	var coin := UiKit.currency_chip(&"coin", VisualTheme.TEXT_GOLD, true)
+	_coins_label = coin["value"]
+	(coin["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	row.add_child(coin["root"])
+
+	var gem := UiKit.currency_chip(&"crystal", Color(0.82, 0.72, 1.0), true)
+	_gems_label = gem["value"]
+	(gem["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	row.add_child(gem["root"])
+
+	var gear := UiKit.icon_button(&"gear", 60)
+	gear.pressed.connect(func():
+		Audio.play(&"button_tap")
+		_show_toast("Settings — use the pause menu in a level")
+	)
+	row.add_child(gear)
+
+	_home_btn = UiKit.icon_button(&"chevron", 60)
 	_home_btn.pressed.connect(func():
 		Audio.play(&"button_tap")
 		home_pressed.emit()
@@ -105,180 +152,281 @@ func _build_header() -> void:
 	_home_btn.z_index = 5
 	add_child(_home_btn)
 
-func _currency_pill(parent: Control, kind: StringName, text_color: Color) -> Label:
-	var pc := PanelContainer.new()
-	pc.add_theme_stylebox_override("panel", VisualTheme.panel(VisualTheme.PANEL, 18, VisualTheme.PANEL_BORDER, 2))
-	parent.add_child(pc)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	pc.add_child(row)
-	var icon := HUD.GemIcon.new()
-	icon.kind = kind
-	icon.tint = VisualTheme.GEM
-	icon.custom_minimum_size = Vector2(24, 24)
-	row.add_child(icon)
-	var lbl := VisualTheme.label("0", VisualTheme.FS_LABEL, text_color)
-	row.add_child(lbl)
-	return lbl
+func _build_toast() -> void:
+	_toast = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT, 5)
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.set_anchors_preset(Control.PRESET_CENTER)
+	_toast.add_theme_stylebox_override("normal", UiKit.glass(18, true))
+	_toast.modulate.a = 0.0
+	_toast.z_index = 40
+	add_child(_toast)
 
-func _build_scroll_area() -> void:
-	_scroll = ScrollContainer.new()
-	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_scroll.clip_contents = true
-	add_child(_scroll)
+func _show_toast(text: String) -> void:
+	_toast.text = "  %s  " % text
+	_toast.position = Vector2((size.x - _toast.size.x) * 0.5, size.y * 0.66)
+	var t := _toast.create_tween()
+	t.tween_property(_toast, "modulate:a", 1.0, 0.14)
+	t.tween_interval(1.1)
+	t.tween_property(_toast, "modulate:a", 0.0, 0.35)
 
-	var count: int = max(GameData.levels.count(), 1)
-	var canvas_height := _TOP_MARGIN + _NODE_SPACING_Y * float(count - 1) + _BOTTOM_MARGIN
+# --------------------------------------------------------------- state --
 
-	_canvas = Control.new()
-	_canvas.custom_minimum_size = Vector2(0, canvas_height)
-	_scroll.add_child(_canvas)
-
-	# Prepared trail decorations (drawn behind the path + nodes): a World
-	# Landmark vista at the summit, a Destination Structure at the final node,
-	# a Map Gate every 10 levels and a Portal beside each chest milestone.
-	_build_decorations()
-
-	_path_canvas = LevelPathCanvas.new()
-	_path_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_path_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(_path_canvas)
-
-	for level_id in GameData.levels.ordered_ids:
-		var btn := LevelNodeButton.new()
-		btn.pressed.connect(_on_node_pressed.bind(level_id))
-		_canvas.add_child(btn)
-		_node_buttons[level_id] = btn
-
-func _deco_rect(id: StringName, sz: Vector2, alpha := 1.0, cover := false) -> TextureRect:
-	var tr := TextureRect.new()
-	tr.texture = AssetLibrary.tex(id)
-	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED if cover else TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tr.custom_minimum_size = sz
-	tr.size = sz
-	tr.modulate = Color(1, 1, 1, alpha)
-	tr.clip_contents = true
-	tr.visible = tr.texture != null
-	_canvas.add_child(tr)
-	_deco.append({"node": tr, "id": id})
-	return tr
-
-func _build_decorations() -> void:
-	_deco.clear()
-	var w := 1080.0
-	_deco_rect(&"env_world_landmark", Vector2(w, 480), 0.55, true)   # summit vista
-	_deco_rect(&"map_destination_structure", Vector2(210, 210))       # final node
-	var count: int = max(GameData.levels.count(), 1)
-	for i in range(9, count, 10):                                    # gate every 10 levels
-		_deco_rect(&"map_gate", Vector2(160, 160))
-	for i in range(4, count, _CHEST_EVERY):                          # portal by each chest
-		_deco_rect(&"map_portal", Vector2(140, 140))
-
-func _layout_nodes(width: float) -> void:
-	if width <= 0.0:
-		width = 1080.0
-	_canvas.custom_minimum_size.x = width
-	var amp: float = min(width * 0.27, 250.0)
-	var index := 0
-	for level_id in GameData.levels.ordered_ids:
-		var center := Vector2(
-			width * 0.5 + amp * sin(float(index) * 0.9),
-			_TOP_MARGIN + _NODE_SPACING_Y * float(index)
-		)
-		_node_positions[level_id] = center
-		var btn: LevelNodeButton = _node_buttons[level_id]
-		btn.position = center - btn.custom_minimum_size * 0.5
-		index += 1
-	_layout_decorations(width)
-	_rebuild_path()
-
-func _layout_decorations(width: float) -> void:
-	if _deco.is_empty():
-		return
-	var ids: Array[int] = GameData.levels.ordered_ids
-	var last_pos: Vector2 = _node_positions.get(ids[ids.size() - 1], Vector2(width * 0.5, _TOP_MARGIN))
-	var gi := 0
-	var pi := 0
-	for entry in _deco:
-		var tr: TextureRect = entry["node"]
-		var sz: Vector2 = tr.custom_minimum_size
-		var p := Vector2(width * 0.5, _TOP_MARGIN)
-		match entry["id"]:
-			&"env_world_landmark":
-				p = Vector2(width * 0.5, _TOP_MARGIN * 0.30)
-			&"map_destination_structure":
-				p = last_pos + Vector2(0, -6)
-			&"map_gate":
-				var idx := 9 + gi * 10
-				gi += 1
-				if idx + 1 < ids.size() and _node_positions.has(ids[idx]) and _node_positions.has(ids[idx + 1]):
-					p = (_node_positions[ids[idx]] + _node_positions[ids[idx + 1]]) * 0.5
-			&"map_portal":
-				var idx2 := 4 + pi * _CHEST_EVERY
-				pi += 1
-				if idx2 < ids.size() and _node_positions.has(ids[idx2]):
-					p = _node_positions[ids[idx2]] + Vector2(0, 4)
-		tr.position = p - sz * 0.5
-
-func _rebuild_path() -> void:
-	var segments: Array = []
-	var ids: Array[int] = GameData.levels.ordered_ids
-	for i in range(1, ids.size()):
-		if not _node_positions.has(ids[i]):
-			continue
-		segments.append({
-			"from": _node_positions[ids[i - 1]],
-			"to": _node_positions[ids[i]],
-			"lit": Progress.is_unlocked(ids[i]),
-		})
-	_path_canvas.set_segments(segments)
-
-## Re-reads Progress for every node — call whenever the map becomes visible.
+## Re-reads Progress for every island + node — call whenever the map shows.
 func refresh() -> void:
 	_coins_label.text = str(Economy.coins)
 	_gems_label.text = str(SaveService.get_int("gems", 0))
-	var total_stars := 0
-	for lid in GameData.levels.ordered_ids:
-		total_stars += Progress.get_stars(lid)
-	if _stars_label != null:
-		_stars_label.text = str(total_stars)
-	var current_id := Progress.current_level_id()
-	var idx := 0
-	for level_id in GameData.levels.ordered_ids:
-		var btn: LevelNodeButton = _node_buttons[level_id]
-		var st: StringName
-		if not Progress.is_unlocked(level_id):
-			st = &"locked"
-		elif Progress.is_completed(level_id):
-			st = &"completed"
-		elif level_id == current_id:
-			st = &"current"
-		else:
-			st = &"unlocked"
-		var is_chest := (idx + 1) % _CHEST_EVERY == 0
-		btn.configure(level_id, st, Progress.get_stars(level_id), is_chest)
-		if _node_positions.has(level_id):
-			btn.position = _node_positions[level_id] - btn.custom_minimum_size * 0.5
-		idx += 1
-	_rebuild_path()
+	for section in _sections:
+		section.refresh()
 
 func _scroll_to_current() -> void:
-	var current_id := Progress.current_level_id()
-	if not _node_positions.has(current_id):
+	var isl := IslandModel.current_island_index()
+	if isl < 0 or isl >= _sections.size():
 		return
-	var target_y: float = _node_positions[current_id].y
-	_scroll.scroll_vertical = int(max(target_y - _scroll.size.y * 0.5, 0.0))
+	var section: IslandSection = _sections[isl]
+	var focus_y: float = section.position.y + section.focus_offset()
+	_scroll.set_scroll_target(int(clampf(focus_y - _scroll.size.y * 0.5, 0.0,
+		maxf(_canvas.custom_minimum_size.y - _scroll.size.y, 0.0))))
 
 func _on_node_pressed(level_id: int) -> void:
+	if not Progress.is_unlocked(level_id):
+		var isl := IslandModel.island_index_for_level(level_id)
+		_show_toast("%s locks until you clear the island before it" % IslandModel.island_name(isl))
+		return
 	Audio.play(&"button_tap")
 	level_selected.emit(level_id)
 
 
-## Stylised parallax "puzzle world" behind the trail: a deep gradient sky, a
-## hero light, layered glowing ridge silhouettes, drifting hex-gem islands
-## and fireflies. Original vector art, no textures, one CanvasItem.
+# ======================================================================
+#  Island section — header + 10-node serpentine trail
+# ======================================================================
+class IslandSection extends Control:
+	var island_idx := 0
+	var level_ids: Array[int] = []
+	var _nodes: Dictionary = {}          # level_id -> LevelNodeButton
+	var _path: LevelPathCanvas
+	var _band: TextureRect
+	var _header: PanelContainer
+	var _name_label: Label
+	var _progress_label: Label
+	var _lock_badge: LockBadge
+	var _positions: Dictionary = {}
+	var _t := 0.0
+
+	func setup(idx: int) -> void:
+		island_idx = idx
+		level_ids = IslandModel.level_ids_for_island(idx)
+		mouse_filter = Control.MOUSE_FILTER_PASS
+
+		_band = TextureRect.new()
+		_band.texture = AssetLibrary.tex(IslandModel.island_theme(idx))
+		_band.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_band.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_band.clip_contents = true
+		_band.visible = _band.texture != null
+		add_child(_band)
+
+		_path = LevelPathCanvas.new()
+		_path.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_path)
+
+		_header = PanelContainer.new()
+		_header.add_theme_stylebox_override("panel", UiKit.glass(22, true))
+		add_child(_header)
+		var hrow := HBoxContainer.new()
+		hrow.add_theme_constant_override("separation", 14)
+		_header.add_child(hrow)
+		_lock_badge = LockBadge.new()
+		_lock_badge.custom_minimum_size = Vector2(40, 40)
+		hrow.add_child(_lock_badge)
+		var vb := VBoxContainer.new()
+		vb.add_theme_constant_override("separation", 2)
+		hrow.add_child(vb)
+		_name_label = VisualTheme.label(IslandModel.island_name(idx).to_upper(), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD)
+		vb.add_child(_name_label)
+		_progress_label = VisualTheme.label("0 / %d" % level_ids.size(), VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 3)
+		vb.add_child(_progress_label)
+		set_process(true)
+
+	func add_node(level_id: int, btn: LevelNodeButton) -> void:
+		_nodes[level_id] = btn
+		add_child(btn)
+
+	func section_height() -> float:
+		return LevelMap._HEADER_H + LevelMap._NODE_STEP * float(max(level_ids.size(), 1)) + 40.0
+
+	func focus_offset() -> float:
+		# y within the section of the current-or-first-incomplete node
+		var target := level_ids[0] if not level_ids.is_empty() else 0
+		for lid in level_ids:
+			if Progress.is_unlocked(lid) and not Progress.is_completed(lid):
+				target = lid
+				break
+		return _positions.get(target, Vector2(0, LevelMap._HEADER_H)).y
+
+	func layout(width: float) -> void:
+		_band.position = Vector2(0, 0)
+		_band.size = Vector2(width, section_height())
+		_header.position = Vector2(width * 0.5 - 190.0, 18.0)
+		_header.size = Vector2(380.0, 84.0)
+		_header.custom_minimum_size = _header.size
+
+		var amp: float = min(width * 0.24, 210.0)
+		var cx := width * 0.5
+		var i := 0
+		for lid in level_ids:
+			var p := Vector2(cx + amp * sin(float(i) * 0.95 + float(island_idx)),
+				LevelMap._HEADER_H + LevelMap._NODE_STEP * float(i))
+			_positions[lid] = p
+			var btn: LevelNodeButton = _nodes[lid]
+			btn.position = p - btn.custom_minimum_size * 0.5
+			i += 1
+		_path.position = Vector2.ZERO
+		_path.size = Vector2(width, section_height())
+		_rebuild_path()
+
+	func _rebuild_path() -> void:
+		var segs: Array = []
+		for i in range(1, level_ids.size()):
+			var a: int = level_ids[i - 1]
+			var b: int = level_ids[i]
+			if not _positions.has(a) or not _positions.has(b):
+				continue
+			segs.append({"from": _positions[a], "to": _positions[b], "lit": Progress.is_unlocked(b)})
+		_path.set_segments(segs)
+
+	func refresh() -> void:
+		var st := IslandModel.island_state(island_idx)
+		var done := IslandModel.island_completed_count(island_idx)
+		var total := level_ids.size()
+		_progress_label.text = "%d / %d" % [done, total]
+		_lock_badge.state = st
+		_lock_badge.queue_redraw()
+		var locked := st == &"locked"
+		_band.modulate = Color(1, 1, 1, 0.14) if locked else Color(1, 1, 1, 0.30)
+		_name_label.add_theme_color_override("font_color",
+			VisualTheme.TEXT_DIM if locked else VisualTheme.TEXT_GOLD)
+
+		var current_id := Progress.current_level_id()
+		var idx := 0
+		for lid in level_ids:
+			var node_state: StringName
+			if not Progress.is_unlocked(lid):
+				node_state = &"locked"
+			elif Progress.is_completed(lid):
+				node_state = &"completed"
+			elif lid == current_id:
+				node_state = &"current"
+			else:
+				node_state = &"unlocked"
+			var is_chest := (idx + 1) % 5 == 0
+			_nodes[lid].configure(lid, node_state, Progress.get_stars(lid), is_chest)
+			if _positions.has(lid):
+				_nodes[lid].position = _positions[lid] - _nodes[lid].custom_minimum_size * 0.5
+			idx += 1
+		_rebuild_path()
+
+	func _process(delta: float) -> void:
+		_t += delta
+
+	func _draw() -> void:
+		# top veil behind the header + a soft divider so islands read as
+		# distinct chapters without a hard opaque strip
+		var w := size.x
+		draw_rect(Rect2(0, 0, w, LevelMap._HEADER_H), Color(0.05, 0.06, 0.13, 0.28))
+		VisualTheme.draw_v_gradient(self, Rect2(0, 0, w, 90),
+			Color(0.04, 0.05, 0.11, 0.5), Color(0.04, 0.05, 0.11, 0.0), 14)
+		if IslandModel.island_state(island_idx) == &"current":
+			var pulse := 0.5 + 0.5 * sin(_t * 2.4)
+			draw_rect(Rect2(0, 0, 4, size.y), Color(1.0, 0.82, 0.36, 0.35 + 0.35 * pulse))
+
+
+	## The small round lock / check / play badge on an island header.
+	class LockBadge extends Control:
+		var state: StringName = &"locked"
+		func _ready() -> void:
+			mouse_filter = Control.MOUSE_FILTER_IGNORE
+		func _draw() -> void:
+			var c := size * 0.5
+			var r := minf(size.x, size.y) * 0.46
+			match state:
+				&"complete":
+					draw_circle(c, r, Color(0.30, 0.62, 0.32))
+					draw_circle(c, r, Color(0.5, 0.9, 0.55)); draw_circle(c, r - 3.0, Color(0.18, 0.42, 0.20))
+					draw_line(c + Vector2(-r * 0.4, 0), c + Vector2(-r * 0.05, r * 0.4), Color.WHITE, 4.0, true)
+					draw_line(c + Vector2(-r * 0.05, r * 0.4), c + Vector2(r * 0.5, -r * 0.4), Color.WHITE, 4.0, true)
+				&"current":
+					draw_circle(c, r, UiKit.GOLD_DEEP)
+					draw_circle(c, r - 3.0, UiKit.GOLD)
+					draw_colored_polygon(PackedVector2Array([
+						c + Vector2(-r * 0.3, -r * 0.45), c + Vector2(r * 0.5, 0), c + Vector2(-r * 0.3, r * 0.45),
+					]), Color(0.2, 0.14, 0.02))
+				_:
+					draw_circle(c, r, Color(0.22, 0.23, 0.30))
+					draw_circle(c, r - 3.0, Color(0.16, 0.17, 0.23))
+					draw_arc(c + Vector2(0, -r * 0.15), r * 0.42, PI, TAU, 14, Color(0.7, 0.73, 0.82), 4.0, true)
+					draw_rect(Rect2(c + Vector2(-r * 0.45, -r * 0.15), Vector2(r * 0.9, r * 0.7)), Color(0.7, 0.73, 0.82))
+
+
+# ======================================================================
+#  Kinetic (inertial) vertical scroll — makes the map feel native on touch
+# ======================================================================
+class KineticScroll extends ScrollContainer:
+	var top_inset := 0.0
+	var bottom_inset := 0.0
+	var _vel := 0.0            # px/sec, sign matches scroll_vertical delta
+	var _dragging := false
+	var _target := -1.0        # >=0 while an auto-scroll animation is running
+
+	func _ready() -> void:
+		set_process(true)
+		var vb := get_v_scroll_bar()
+		if vb != null:
+			vb.modulate.a = 0.0   # keep the range, hide the bar (reference has none)
+		gui_input.connect(_on_gui_input)
+
+	func set_scroll_target(y: int) -> void:
+		_target = float(y)
+		_vel = 0.0
+
+	## Layer inertia on top of ScrollContainer's built-in touch drag: the base
+	## class still does the 1:1 finger tracking + deadzone (so a drag that
+	## starts on a level node still scrolls); we only sample the fling velocity
+	## here and keep it rolling after release.
+	func _on_gui_input(event: InputEvent) -> void:
+		if event is InputEventScreenTouch or event is InputEventMouseButton:
+			if event.pressed:
+				_dragging = true
+				_vel = 0.0
+				_target = -1.0
+			else:
+				_dragging = false
+		elif event is InputEventScreenDrag:
+			_target = -1.0
+			_vel = lerpf(_vel, -event.relative.y * 56.0, 0.5)
+
+	func _process(delta: float) -> void:
+		var maxs := 0
+		if get_child_count() > 0:
+			maxs = int(maxf((get_child(0) as Control).size.y - size.y, 0.0))
+		if _target >= 0.0:
+			var nxt: float = lerpf(float(scroll_vertical), _target, clampf(delta * 9.0, 0.0, 1.0))
+			scroll_vertical = int(round(nxt))
+			if absf(nxt - _target) < 1.0:
+				scroll_vertical = int(_target)
+				_target = -1.0
+			return
+		if _dragging or absf(_vel) < 6.0:
+			return
+		scroll_vertical += int(round(_vel * delta))
+		if scroll_vertical <= 0 or scroll_vertical >= maxs:
+			_vel = 0.0
+		_vel *= 0.90
+
+
+# ======================================================================
+#  Parallax world backdrop (unchanged behaviour, kept for atmosphere)
+# ======================================================================
 class MapEnvironment extends Control:
 	var _t := 0.0
 	var gesture_inset := 0.0
@@ -311,73 +459,22 @@ class MapEnvironment extends Control:
 		var s := size
 		if s.x < 1.0:
 			return
-
 		var bg := AssetLibrary.tex(&"env_map_landmarks")
 		if bg != null:
-			# full-screen "world map" scene, cover-fit (aspect kept, centred),
-			# with a slight downward parallax as the trail scrolls.
 			var bw: float = float(bg.get_width())
 			var bh: float = float(bg.get_height())
 			var k: float = maxf(s.x / bw, s.y / bh)
 			var dw := bw * k
 			var dh := bh * k
-			var dx := (s.x - dw) * 0.5
-			var dy := (s.y - dh) * 0.5
-			draw_texture_rect(bg, Rect2(dx, dy, dw, dh), false)
-			# readability veil so the trail + node discs always pop, plus a
-			# stronger gradient toward the bottom where the newest nodes sit
-			draw_rect(Rect2(Vector2.ZERO, s), Color(0.05, 0.05, 0.12, 0.38))
-			_v_grad(Rect2(0, s.y * 0.55, s.x, s.y * 0.45),
-				Color(0.05, 0.05, 0.12, 0.0), Color(0.04, 0.04, 0.10, 0.22), Color(0.03, 0.03, 0.08, 0.45))
+			draw_texture_rect(bg, Rect2((s.x - dw) * 0.5, (s.y - dh) * 0.5, dw, dh), false)
+			draw_rect(Rect2(Vector2.ZERO, s), Color(0.05, 0.05, 0.12, 0.42))
 		else:
-			# deep gradient sky, indigo crown -> plum floor
-			_v_grad(Rect2(Vector2.ZERO, s),
-				Color(0.11, 0.14, 0.30), Color(0.16, 0.11, 0.26), Color(0.05, 0.05, 0.12))
-			var hero := Vector2(s.x * 0.74, s.y * 0.14)
-			for k in range(6, 0, -1):
-				var t := float(k) / 6.0
-				draw_circle(hero, s.x * 0.5 * t, Color(0.6, 0.72, 1.0, 0.05 * (1.0 - t)))
-			var ridges := [
-				{"y": 0.34, "amp": 40.0, "col": Color(0.20, 0.24, 0.46), "rim": Color(0.42, 0.52, 0.9, 0.5)},
-				{"y": 0.52, "amp": 56.0, "col": Color(0.24, 0.18, 0.40), "rim": Color(0.7, 0.42, 0.78, 0.5)},
-				{"y": 0.72, "amp": 74.0, "col": Color(0.13, 0.12, 0.26), "rim": Color(0.36, 0.5, 0.85, 0.45)},
-			]
-			var k2 := 0
-			for r in ridges:
-				var pts := PackedVector2Array()
-				var steps := 30
-				for i in steps + 1:
-					var x := s.x * float(i) / float(steps)
-					var y: float = s.y * float(r["y"]) + sin(x * 0.006 + float(k2) * 1.9 + _t * 0.04) * float(r["amp"])
-					pts.append(Vector2(x, y))
-				var poly := pts.duplicate()
-				poly.append(Vector2(s.x, s.y))
-				poly.append(Vector2(0, s.y))
-				draw_colored_polygon(poly, r["col"])
-				draw_polyline(pts, r["rim"], 3.0, true)
-				k2 += 1
-			for isl in _islands:
-				var iy: float = fposmod(isl["y"] - _t * 0.01 * isl["spd"], 1.1) - 0.05
-				var p := Vector2(isl["x"] * s.x + sin(_t * 0.2 + isl["ph"]) * 26.0, iy * s.y)
-				var col: Color = _HUES[isl["hue"]]
-				var rr: float = isl["r"]
-				for g in range(3, 0, -1):
-					var gt := float(g) / 3.0
-					draw_circle(p, rr * 1.5 * gt, Color(col.r, col.g, col.b, 0.05 * (1.0 - gt)))
-				var hx := PackedVector2Array()
-				for j in 6:
-					var a := PI / 6.0 + TAU * float(j) / 6.0
-					hx.append(p + Vector2(cos(a), sin(a)) * rr)
-				draw_colored_polygon(hx, Color(col.r, col.g, col.b, 0.12))
-				hx.append(hx[0])
-				draw_polyline(hx, Color(col.r, col.g, col.b, 0.30), 2.0, true)
-		# fireflies
-		for i in 18:
-			var fx: float = fposmod(float(i) * 97.0 + _t * 7.0, s.x)
-			var fy: float = s.y * (0.25 + 0.55 * fposmod(float(i) * 0.137, 1.0)) + sin(_t + float(i)) * 12.0
+			_v_grad(Rect2(Vector2.ZERO, s), Color(0.11, 0.14, 0.30), Color(0.16, 0.11, 0.26), Color(0.05, 0.05, 0.12))
+		for i in 16:
+			var fx: float = fposmod(float(i) * 97.0 + _t * 6.0, s.x)
+			var fy: float = s.y * (0.2 + 0.6 * fposmod(float(i) * 0.137, 1.0)) + sin(_t + float(i)) * 12.0
 			var tw: float = 0.5 + 0.5 * sin(_t * 2.0 + float(i))
-			draw_circle(Vector2(fx, fy), 2.6, Color(0.95, 0.9, 0.7, 0.55 * tw))
-		# bottom safety scrim so the last nodes never fight the gesture bar
+			draw_circle(Vector2(fx, fy), 2.4, Color(0.95, 0.9, 0.7, 0.45 * tw))
 		if gesture_inset > 0.0:
 			draw_rect(Rect2(0, s.y - gesture_inset - 8.0, s.x, gesture_inset + 8.0), Color(0.05, 0.05, 0.12, 0.5))
 
@@ -388,12 +485,3 @@ class MapEnvironment extends Control:
 			var t := float(i) / float(bands - 1)
 			var col := top.lerp(mid, t / 0.5) if t < 0.5 else mid.lerp(bottom, (t - 0.5) / 0.5)
 			draw_rect(Rect2(rect.position + Vector2(0, bh * i), Vector2(rect.size.x, bh + 1.0)), col)
-
-
-## "COLOR CLASH" wordmark, centred (delegates to VisualTheme.draw_wordmark).
-class WordmarkLabel extends Control:
-	func _ready() -> void:
-		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	func _draw() -> void:
-		VisualTheme.draw_wordmark(self, Vector2(size.x * 0.5, 40.0), 38.0, 1.0)
