@@ -171,12 +171,13 @@ static func draw_v_gradient(ci: CanvasItem, rect: Rect2, top: Color, bottom: Col
 		var t := float(i) / float(bands - 1)
 		ci.draw_rect(Rect2(rect.position + Vector2(0, bh * i), Vector2(rect.size.x, bh + 1.0)), top.lerp(bottom, t))
 
-const WORDMARK := "COLOR CLASH"
+const WORDMARK := "WAR OF LOVE"
 const _WORDMARK_TINTS := [
-	Color(1.0, 0.36, 0.42), Color(1.0, 0.66, 0.24), Color(1.0, 0.86, 0.28),
-	Color(0.42, 0.82, 0.5), Color(0.36, 0.66, 1.0), Color(1, 1, 1),
-	Color(0.62, 0.44, 0.95), Color(1.0, 0.42, 0.6), Color(0.36, 0.8, 0.86),
-	Color(1.0, 0.72, 0.3), Color(0.5, 0.84, 0.56),
+	Color(1.0, 0.84, 0.36), Color(1.0, 0.72, 0.28), Color(1.0, 0.86, 0.4),  # WAR
+	Color(1, 1, 1),                                                          # (space)
+	Color(1.0, 0.8, 0.34), Color(1.0, 0.7, 0.26),                            # OF
+	Color(1, 1, 1),                                                          # (space)
+	Color(1.0, 0.42, 0.55), Color(1.0, 0.5, 0.5), Color(1.0, 0.42, 0.55), Color(1.0, 0.58, 0.42),  # LOVE
 ]
 
 ## The "COLOR CLASH" wordmark — each letter individually tinted — drawn

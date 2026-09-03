@@ -1,0 +1,15 @@
+{
+  "_comment": "Inventory content for War of Love. Powers are Jamie's three signature abilities (upgraded with coins via the existing Economy). Equipment items have a slot (sword | boots | suit) and are granted by boss rewards / progression. Nothing here holds save state — InventoryService persists through SaveService, and spends coins through Economy.",
+  "power_upgrade_cost": [150, 350, 700, 1400],
+  "equipment": [
+    { "id": "iron_sword",     "name": "Iron Sword",       "slot": "sword", "tier": 1, "bonus": "The blade Jamie set out with.",          "starter": true },
+    { "id": "flame_brand",     "name": "Flame Brand",      "slot": "sword", "tier": 3, "bonus": "Fire Sword hits harder.",                "reward_stage": 20 },
+    { "id": "sunfang",         "name": "Sunfang",          "slot": "sword", "tier": 5, "bonus": "Forged from a fallen crown.",            "reward_stage": 40 },
+    { "id": "traveller_boots", "name": "Traveller's Boots","slot": "boots", "tier": 1, "bonus": "Worn but reliable.",                     "starter": true },
+    { "id": "storm_greaves",   "name": "Storm Greaves",    "slot": "boots", "tier": 3, "bonus": "Lightning Boots charge faster.",         "reward_stage": 30 },
+    { "id": "aurora_striders", "name": "Aurora Striders",  "slot": "boots", "tier": 5, "bonus": "Dash between heartbeats.",               "reward_stage": 50 },
+    { "id": "wander_cloak",    "name": "Wanderer's Cloak", "slot": "suit",  "tier": 1, "bonus": "Keeps the road's chill out.",            "starter": true },
+    { "id": "mage_regalia",    "name": "Mage Regalia",     "slot": "suit",  "tier": 3, "bonus": "Blue Lightning meter fills faster.",     "reward_stage": 10 },
+    { "id": "kings_raiment",   "name": "King's Raiment",   "slot": "suit",  "tier": 5, "bonus": "Every power meter +10%.",                "reward_stage": 40 }
+  ]
+}

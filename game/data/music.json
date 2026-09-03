@@ -1,43 +1,179 @@
 {
-  "_comment": "Original Color Clash score, entirely synthesized at runtime (see scripts/audio/music_director.gd + synth.gd) — no sampled/licensed music. Five short loop layers share one bar length so they always stay in sync; MusicDirector crossfades their gains per intensity `states` below. This is vertical-layering adaptive music: nothing ever restarts or hitches when intensity changes, layers just fade in/out.",
+  "_comment": "Original Color Clash score, entirely synthesized at runtime (see scripts/audio/music_director.gd + synth.gd) \u00e2\u20ac\u201d no sampled/licensed music. Five short loop layers share one bar length so they always stay in sync; MusicDirector crossfades their gains per intensity `states` below. This is vertical-layering adaptive music: nothing ever restarts or hitches when intensity changes, layers just fade in/out.",
   "bpm": 100,
   "bars": 4,
   "beats_per_bar": 4,
   "root_freq": 220,
   "layers": {
     "pad": {
-      "kind": "tone", "wave": "sine", "attack": 0.4, "decay_curve": 1.0, "volume": 0.16,
+      "kind": "tone",
+      "wave": "sine",
+      "attack": 0.4,
+      "decay_curve": 1.0,
+      "volume": 0.16,
       "notes": [
-        { "beat": 0, "degree": 0, "duration_beats": 7.5 },
-        { "beat": 0, "degree": 4, "duration_beats": 7.5 },
-        { "beat": 8, "degree": 2, "duration_beats": 7.5 },
-        { "beat": 8, "degree": 7, "duration_beats": 7.5 }
+        {
+          "beat": 0,
+          "degree": 0,
+          "duration_beats": 7.5
+        },
+        {
+          "beat": 0,
+          "degree": 4,
+          "duration_beats": 7.5
+        },
+        {
+          "beat": 8,
+          "degree": 2,
+          "duration_beats": 7.5
+        },
+        {
+          "beat": 8,
+          "degree": 7,
+          "duration_beats": 7.5
+        }
       ]
     },
     "bass_pulse": {
-      "kind": "pattern", "wave": "triangle", "attack": 0.005, "decay_curve": 3.2, "volume": 0.22,
-      "pattern_degrees": [0], "step_beats": 1.0, "note_beats": 0.35, "octave_offset": -1
+      "kind": "pattern",
+      "wave": "triangle",
+      "attack": 0.005,
+      "decay_curve": 3.2,
+      "volume": 0.22,
+      "pattern_degrees": [
+        0
+      ],
+      "step_beats": 1.0,
+      "note_beats": 0.35,
+      "octave_offset": -1
     },
     "arpeggio": {
-      "kind": "pattern", "wave": "triangle", "attack": 0.002, "decay_curve": 3.0, "volume": 0.16,
-      "pattern_degrees": [4, 7, 9, 7, 4, 2], "step_beats": 0.5, "note_beats": 0.42, "octave_offset": 1
+      "kind": "pattern",
+      "wave": "triangle",
+      "attack": 0.002,
+      "decay_curve": 3.0,
+      "volume": 0.16,
+      "pattern_degrees": [
+        4,
+        7,
+        9,
+        7,
+        4,
+        2
+      ],
+      "step_beats": 0.5,
+      "note_beats": 0.42,
+      "octave_offset": 1
     },
     "perc": {
-      "kind": "pattern_noise", "attack": 0.001, "decay_curve": 4.5, "volume": 0.11, "brightness": 0.8,
-      "step_beats": 0.5, "note_beats": 0.05, "offset_beats": 0.25
+      "kind": "pattern_noise",
+      "attack": 0.001,
+      "decay_curve": 4.5,
+      "volume": 0.11,
+      "brightness": 0.8,
+      "step_beats": 0.5,
+      "note_beats": 0.05,
+      "offset_beats": 0.25
     },
     "fever_lead": {
-      "kind": "pattern", "wave": "square", "attack": 0.003, "decay_curve": 2.2, "volume": 0.14,
-      "pattern_degrees": [7, 9, 11, 9, 7, 4, 7, 9], "step_beats": 0.5, "note_beats": 0.44, "octave_offset": 2
+      "kind": "pattern",
+      "wave": "square",
+      "attack": 0.003,
+      "decay_curve": 2.2,
+      "volume": 0.14,
+      "pattern_degrees": [
+        7,
+        9,
+        11,
+        9,
+        7,
+        4,
+        7,
+        9
+      ],
+      "step_beats": 0.5,
+      "note_beats": 0.44,
+      "octave_offset": 2
     }
   },
   "states": {
-    "idle": { "pad": 0.5, "bass_pulse": 0.0, "arpeggio": 0.0, "perc": 0.0, "fever_lead": 0.0 },
-    "base": { "pad": 1.0, "bass_pulse": 1.0, "arpeggio": 0.0, "perc": 0.0, "fever_lead": 0.0 },
-    "active": { "pad": 1.0, "bass_pulse": 1.0, "arpeggio": 1.0, "perc": 0.0, "fever_lead": 0.0 },
-    "high": { "pad": 1.0, "bass_pulse": 1.0, "arpeggio": 1.0, "perc": 1.0, "fever_lead": 0.0 },
-    "fever": { "pad": 1.0, "bass_pulse": 1.2, "arpeggio": 1.25, "perc": 1.3, "fever_lead": 1.0 },
-    "tension": { "pad": 0.55, "bass_pulse": 0.7, "arpeggio": 0.0, "perc": 0.0, "fever_lead": 0.0 }
+    "idle": {
+      "pad": 0.5,
+      "bass_pulse": 0.0,
+      "arpeggio": 0.0,
+      "perc": 0.0,
+      "fever_lead": 0.0
+    },
+    "base": {
+      "pad": 1.0,
+      "bass_pulse": 1.0,
+      "arpeggio": 0.0,
+      "perc": 0.0,
+      "fever_lead": 0.0
+    },
+    "active": {
+      "pad": 1.0,
+      "bass_pulse": 1.0,
+      "arpeggio": 1.0,
+      "perc": 0.0,
+      "fever_lead": 0.0
+    },
+    "high": {
+      "pad": 1.0,
+      "bass_pulse": 1.0,
+      "arpeggio": 1.0,
+      "perc": 1.0,
+      "fever_lead": 0.0
+    },
+    "fever": {
+      "pad": 1.0,
+      "bass_pulse": 1.2,
+      "arpeggio": 1.25,
+      "perc": 1.3,
+      "fever_lead": 1.0
+    },
+    "tension": {
+      "pad": 0.55,
+      "bass_pulse": 0.7,
+      "arpeggio": 0.0,
+      "perc": 0.0,
+      "fever_lead": 0.0
+    },
+    "battle": {
+      "pad": 0.9,
+      "bass_pulse": 1.1,
+      "arpeggio": 1.0,
+      "perc": 0.8,
+      "fever_lead": 0.0
+    },
+    "boss": {
+      "pad": 0.8,
+      "bass_pulse": 1.3,
+      "arpeggio": 1.15,
+      "perc": 1.2,
+      "fever_lead": 0.6
+    },
+    "final_boss": {
+      "pad": 0.7,
+      "bass_pulse": 1.45,
+      "arpeggio": 1.3,
+      "perc": 1.4,
+      "fever_lead": 1.15
+    },
+    "story": {
+      "pad": 0.7,
+      "bass_pulse": 0.0,
+      "arpeggio": 0.0,
+      "perc": 0.0,
+      "fever_lead": 0.0
+    },
+    "victory": {
+      "pad": 1.0,
+      "bass_pulse": 1.0,
+      "arpeggio": 1.3,
+      "perc": 0.6,
+      "fever_lead": 0.9
+    }
   },
   "crossfade_seconds": 1.1
 }

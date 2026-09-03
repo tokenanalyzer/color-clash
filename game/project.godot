@@ -5,8 +5,8 @@ config_version=5
 
 [application]
 
-config/name="Color Clash"
-config/description="Connect, blast and combo colourful jewels through a 50-level campaign."
+config/name="War of Love"
+config/description="Jamie's journey to rescue Jasmine from Jinn across five kingdoms — a fantasy adventure match-3."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4")
 config/icon="res://icon.png"
@@ -22,6 +22,7 @@ AudioSettings="*res://scripts/audio/audio_settings.gd"
 Economy="*res://scripts/economy/economy_service.gd"
 Boosters="*res://scripts/economy/booster_inventory.gd"
 Progress="*res://scripts/economy/progress_service.gd"
+Inventory="*res://scripts/economy/inventory_service.gd"
 Audio="*res://scripts/audio/audio_hooks.gd"
 Music="*res://scripts/audio/music_director.gd"
 Iap="*res://scripts/services/iap_service.gd"

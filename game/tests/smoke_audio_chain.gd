@@ -95,12 +95,14 @@ func _initialize() -> void:
 	# ---- 4) LEVEL COMPLETION ----
 	print("Step 4: level completion jingle")
 	_sounds.clear()
+	app._level_ended = false   # invoking the handler directly, out of normal sequence
 	app._on_level_won()
 	_expect_sound("level_complete", "victory jingle")
 
 	# ---- 5) LEVEL FAILURE (soft, non-punishing) ----
 	print("Step 5: level failure motif")
 	_sounds.clear()
+	app._level_ended = false
 	app._on_level_lost()
 	_expect_sound("level_failed", "try-again motif")
 

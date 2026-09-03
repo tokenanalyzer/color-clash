@@ -40,6 +40,9 @@ var _backdrop: Backdrop
 var _daily: DailyRewardsScreen
 var _character: CharacterView
 var _story_scene: StoryScene
+var _combat: CombatDirector
+var _level_ended := false
+var _inventory: InventoryScreen
 
 ## Debug-only rolling FPS sampler — printed to the Android log so on-device
 ## performance can be verified without a profiler build. Stripped in release.
@@ -97,6 +100,7 @@ func _ready() -> void:
 	menu_canvas.add_child(_menu)
 	_menu.play_pressed.connect(_on_menu_play_pressed)
 	_menu.daily_pressed.connect(_on_daily_pressed)
+	_menu.inventory_pressed.connect(func(): _inventory.open())
 
 	var daily_canvas := CanvasLayer.new()
 	daily_canvas.layer = 30
@@ -105,6 +109,13 @@ func _ready() -> void:
 	daily_canvas.add_child(_daily)
 	_daily.closed.connect(_on_daily_closed)
 	_daily.visible = false
+
+	var inv_canvas := CanvasLayer.new()
+	inv_canvas.layer = 35
+	add_child(inv_canvas)
+	_inventory = InventoryScreen.new()
+	inv_canvas.add_child(_inventory)
+	_inventory.closed.connect(func(): _menu.refresh())
 
 	var story_canvas := CanvasLayer.new()
 	story_canvas.layer = 90
@@ -309,6 +320,21 @@ func _start_level(level_id: int) -> void:
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 	_refresh_booster_counts()
 
+	# --- character combat: Jamie powers always; a boss on every 10th stage ---
+	_level_ended = false
+	_combat = CombatDirector.new(_current_level.id)
+	_combat.meters_changed.connect(_hud.set_power_meters)
+	_combat.power_fired.connect(_on_power_fired)
+	_combat.jamie_attack.connect(_on_jamie_attack)
+	_combat.boss_damaged.connect(func(_amt, hp, mx): _hud.set_boss_hp(hp, mx))
+	_combat.boss_defeated.connect(_on_boss_defeated)
+	_combat.boss_attacked.connect(_on_boss_attacked)
+	_hud.set_power_meters(_combat.powers.meter)
+	if _combat.is_boss:
+		_hud.begin_boss(_combat.boss_name, _combat.boss_face(), _combat.is_final_boss())
+	else:
+		_hud.end_boss()
+
 	Music.start()
 	Music.set_state(_compute_music_state(0), true)
 
@@ -397,8 +423,15 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	GameEvents.publish_all(MoveEventTranslator.events_for_move(result, {"kind": move_kind}))
 	_publish_session_state(gained, fever_activated)
 
+	# --- match-3 -> character combat: turn this move into Jamie attack
+	# energy + boss damage. boss_defeated fires _on_boss_defeated -> win. ---
+	if _combat != null:
+		_combat.feed_move(result, result.chain_depth, result.cleared_cells.size(), counts_as_move, _moves_left)
+
 	_update_music_state(result.chain_depth, result.cleared_cells.size())
 
+	if _level_ended:
+		return
 	if _objectives.is_complete():
 		_on_level_won()
 	elif _moves_left <= 0:
@@ -412,6 +445,9 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 func _compute_music_state(chain_depth: int, cleared_count: int = 0) -> StringName:
 	if _fever.is_active():
 		return &"fever"
+	# boss stages get their own dark, driving mix (Jinn = the biggest)
+	if _combat != null and _combat.is_boss:
+		return &"final_boss" if _combat.is_final_boss() else &"boss"
 	if _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete():
 		return &"tension"
 	if chain_depth >= 4 or cleared_count >= 10:
@@ -440,7 +476,55 @@ func _on_move_resolved(result: ChainResolver.MoveResult) -> void:
 func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
 	_apply_move_result(result, false)
 
+# ----------------------------------------------------- character combat --
+
+func _on_jamie_attack(kind: StringName, damage: int, big: bool) -> void:
+	if _board == null:
+		return
+	if kind == &"ultimate":
+		ScreenShake.apply(_board, 22.0, 0.5)
+		Haptics.strong(120)
+		_board.play_fever_burst()
+		Audio.play(&"power_up", 1.0)
+	elif big:
+		ScreenShake.apply(_board, 12.0, 0.34)
+		Haptics.strong(80)
+		Audio.play(&"sword_attack", 0.7)
+	elif damage >= 4:
+		ScreenShake.apply(_board, 5.0, 0.18)
+
+func _on_power_fired(power: StringName, combo: StringName) -> void:
+	_hud.flash_power(combo if combo != &"" else power)
+	match String(combo if combo != &"" else power):
+		"fire_sword": Audio.play(&"sword_attack")
+		"lightning_hand", "lightning_dash": Audio.play(&"lightning")
+		"lightning_boots", "dash_slash": Audio.play(&"lightning", 0.4)
+		"lightning_sword": Audio.play(&"sword_attack", 0.9)
+		"ultimate": Audio.play(&"power_up", 1.0)
+	if _character != null:
+		_character.play_reaction(&"hype", JamiePowers.label(combo if combo != &"" else power) + "!")
+
+func _on_boss_attacked() -> void:
+	if _board != null:
+		ScreenShake.apply(_board, 14.0, 0.4)
+	Haptics.strong(90)
+	Audio.play(&"boss_impact")
+	if _character != null:
+		_character.play_reaction(&"worried", "")
+
+func _on_boss_defeated() -> void:
+	if _level_ended:
+		return
+	_hud.boss_defeat_anim()
+	Audio.play(&"boss_impact", 1.0)
+	if _board != null:
+		ScreenShake.apply(_board, 18.0, 0.5)
+	_on_level_won()
+
 func _on_level_won() -> void:
+	if _level_ended:
+		return
+	_level_ended = true
 	var first_clear := not Progress.is_completed(_current_level.id)
 	Economy.grant(_current_level.reward_coins)
 	# Per-level score thresholds are the primary star rule; StarRating falls
@@ -453,11 +537,18 @@ func _on_level_won() -> void:
 	})
 	Music.fade_out_and_stop(0.7)
 	Audio.play(&"level_complete")
+	if _combat != null and _combat.is_boss:
+		Audio.play(&"boss_impact", 1.0)
 	Haptics.strong(60)
 	if _board != null:
 		_board.set_fever(false)
 		_board.play_win_flourish()
 	_backdrop.set_accent_target(VisualTheme.ACCENT)
+
+	# Boss stage (every 10th) — grant the boss's equipment drop + a shard,
+	# then let the story beat (stage_complete:N) carry the chapter transition.
+	if first_clear and _combat != null and _combat.is_boss:
+		Inventory.grant_boss_reward(_current_level.id)
 
 	# Every 5th level is a "chest" node on the map — the first time it's
 	# cleared, open a milestone chest before the normal summary.
@@ -486,6 +577,9 @@ func _present_milestone_chest() -> void:
 	_refresh_booster_counts()
 
 func _on_level_lost() -> void:
+	if _level_ended:
+		return
+	_level_ended = true
 	_hud.show_lose_panel(_score)
 	Audio.play(&"level_failed")
 	GameEvents.publish_type(EngineEvent.LEVEL_FAILED, {

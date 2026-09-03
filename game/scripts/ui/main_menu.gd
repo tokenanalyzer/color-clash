@@ -8,6 +8,7 @@ extends Control
 
 signal play_pressed()
 signal daily_pressed()
+signal inventory_pressed()
 
 const VERSION_TEXT := "v0.5  •  offline"
 
@@ -99,6 +100,15 @@ func _ready() -> void:
 	_daily_dot.custom_minimum_size = Vector2(22, 22)
 	_daily_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_daily_btn.add_child(_daily_dot)
+
+	var inv_btn := UiKit.button("INVENTORY", &"secondary", VisualTheme.FS_BUTTON)
+	inv_btn.custom_minimum_size = Vector2(0, 82)
+	inv_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inv_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		inventory_pressed.emit()
+	)
+	sub.add_child(inv_btn)
 
 	var opt := UiKit.button("SETTINGS", &"tertiary", VisualTheme.FS_BUTTON)
 	opt.custom_minimum_size = Vector2(0, 82)

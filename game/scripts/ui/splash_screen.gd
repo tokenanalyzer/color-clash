@@ -19,14 +19,27 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var bg := Backdrop.new()
-	bg.accent = VisualTheme.ACCENT
-	bg.scene_id = &"env_main_background"
-	add_child(bg)
+	# WAR OF LOVE poster splash when the composed PNG is present
+	# (assets/branding/splash.png); otherwise the code-drawn wordmark.
+	var poster := AssetLibrary.tex(&"brand_splash")
+	if poster != null:
+		var img := TextureRect.new()
+		img.texture = poster
+		img.set_anchors_preset(Control.PRESET_FULL_RECT)
+		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(img)
+	else:
+		var bg := Backdrop.new()
+		bg.accent = VisualTheme.ACCENT
+		bg.scene_id = &"env_main_background"
+		add_child(bg)
 
 	_fx = SplashFX.new()
 	_fx.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fx.poster_mode = poster != null
 	add_child(_fx)
 
 func _process(delta: float) -> void:
@@ -49,6 +62,7 @@ func _process(delta: float) -> void:
 ## All splash vector work on its own layer so it sits above the Backdrop.
 class SplashFX extends Control:
 	var t := 0.0
+	var poster_mode := false
 
 	func _draw() -> void:
 		var s := size
@@ -57,6 +71,18 @@ class SplashFX extends Control:
 		var si := VisualTheme.safe_insets(self)
 		var cx := s.x * 0.5
 		var cy: float = s.y * 0.42
+
+		# poster splash carries its own title — only draw the loading sweep
+		if poster_mode:
+			var font := ThemeDB.fallback_font
+			var bar_w := s.x * 0.5
+			var bx := cx - bar_w * 0.5
+			var by: float = s.y - si.size.y - 64.0
+			draw_line(Vector2(bx, by), Vector2(bx + bar_w, by), Color(1, 1, 1, 0.14), 6.0, true)
+			var pr: float = clampf(t / _splash_duration(), 0.0, 1.0)
+			draw_line(Vector2(bx, by), Vector2(bx + bar_w * pr, by), VisualTheme.STAR, 6.0, true)
+			draw_circle(Vector2(bx + bar_w * pr, by), 7.0, Color(1, 1, 1, 0.95))
+			return
 
 		var appear: float = clampf(t / 0.55, 0.0, 1.0)
 		var ease := 1.0 - pow(1.0 - appear, 3.0)

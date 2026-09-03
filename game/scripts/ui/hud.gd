@@ -22,6 +22,8 @@ var _objective_chips: Array[Node] = []
 var _coins_label: Label
 var _fever_bar: FeverArt
 var _fever_label: Label
+var _power_meters: PowerMeters
+var _boss_bar: BossBar
 var _fever_wrap: Control
 var _booster_buttons: Dictionary = {}
 var _booster_badges: Dictionary = {}
@@ -270,6 +272,34 @@ func _build_fever_meter() -> void:
 	_fever_label.offset_bottom = 21
 	_fever_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fever_wrap.add_child(_fever_label)
+
+	# --- combat: Jamie power meters + (boss stages only) a boss HP bar ---
+	_power_meters = PowerMeters.new()
+	_power_meters.custom_minimum_size = Vector2(0, 30)
+	_top_col.add_child(_power_meters)
+	_boss_bar = BossBar.new()
+	_boss_bar.visible = false
+	_top_col.add_child(_boss_bar)
+
+# ------------------------------------------------------------ combat --
+
+func begin_boss(boss_name: String, face: Texture2D, is_final: bool) -> void:
+	_boss_bar.configure(boss_name, face, is_final)
+
+func end_boss() -> void:
+	_boss_bar.visible = false
+
+func set_boss_hp(hp: int, hp_max: int) -> void:
+	_boss_bar.set_hp(hp, hp_max)
+
+func boss_defeat_anim() -> void:
+	_boss_bar.play_defeat()
+
+func set_power_meters(meters: Dictionary) -> void:
+	_power_meters.set_meters(meters)
+
+func flash_power(power: StringName) -> void:
+	_power_meters.flash_power(power)
 
 func _bar_style(c: Color) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
