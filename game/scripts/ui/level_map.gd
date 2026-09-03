@@ -8,10 +8,10 @@ extends Control
 signal level_selected(level_id: int)
 
 const _CANVAS_WIDTH := 1080.0
-const _TOP_MARGIN := 110.0
-const _BOTTOM_MARGIN := 140.0
-const _NODE_SPACING_Y := 175.0
-const _X_AMPLITUDE := 220.0
+const _TOP_MARGIN := 130.0
+const _BOTTOM_MARGIN := 160.0
+const _NODE_SPACING_Y := 210.0
+const _X_AMPLITUDE := 230.0
 
 var _coins_label: Label
 var _scroll: ScrollContainer
@@ -53,34 +53,34 @@ func _build_header() -> void:
 	var title := Label.new()
 	title.text = "COLOR CLASH"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 40)
+	title.add_theme_font_size_override("font_size", 50)
 	title.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	title.add_theme_constant_override("outline_size", 4)
+	title.add_theme_constant_override("outline_size", 5)
 	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.5))
 	vbox.add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "Select a Level"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.add_theme_font_size_override("font_size", 18)
+	subtitle.add_theme_font_size_override("font_size", 22)
 	subtitle.add_theme_color_override("font_color", Color(0.78, 0.84, 0.95))
 	vbox.add_child(subtitle)
 
 	_coins_label = Label.new()
 	_coins_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_coins_label.add_theme_font_size_override("font_size", 20)
+	_coins_label.add_theme_font_size_override("font_size", 26)
 	_coins_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
 	vbox.add_child(_coins_label)
 
 	# reserve room below the fixed header for the scroll area
 	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 130)
+	spacer.custom_minimum_size = Vector2(0, 150)
 	vbox.add_child(spacer)
 
 func _build_scroll_area() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_scroll.offset_top = 130
+	_scroll.offset_top = 150
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(_scroll)
 

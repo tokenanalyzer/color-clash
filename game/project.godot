@@ -16,6 +16,7 @@ size/viewport_height=1920
 size/window_width_override=540
 size/window_height_override=960
 stretch/mode="canvas_items"
+stretch/aspect="expand"
 
 [rendering]
 renderer/rendering_method="gl_compatibility"

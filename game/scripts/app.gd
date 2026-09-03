@@ -6,8 +6,12 @@ extends Node2D
 ## Board/HUD/Map are built entirely in code — see board_view.gd, hud.gd,
 ## level_map.gd — so there is no hand-authored scene file to keep in sync.
 
-const BOARD_TOP_MARGIN := 220.0
-const BOARD_BOTTOM_MARGIN := 170.0
+## Sized to clear the top HUD panel (nav/score + moves/level/coins + goal
+## chips + fever bar) and the bottom booster tray at their current heights
+## — see hud.gd. Board layout is fully dynamic (BoardView._fit_layout), so
+## these just need to leave it enough room; they don't need to be exact.
+const BOARD_TOP_MARGIN := 330.0
+const BOARD_BOTTOM_MARGIN := 210.0
 ## Moves-remaining threshold (with the objective still incomplete) at which
 ## the music eases into a "tension" mix — a subtle nudge, not a punishment.
 const NEAR_FAIL_MOVES := 3
@@ -143,6 +147,7 @@ func _start_level(level_id: int) -> void:
 	_hud.hide_end_panel()
 	_hud.set_level_info(_current_level)
 	_hud.set_moves(_moves_left)
+	_hud.set_score(_score)
 	_hud.set_coins(Economy.coins)
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
@@ -167,6 +172,7 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 		_moves_left = max(_moves_left - 1, 0)
 
 	_hud.set_moves(_moves_left)
+	_hud.set_score(_score)
 	_hud.set_coins(Economy.coins)
 	_hud.set_objectives(_objectives, _current_level)
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
