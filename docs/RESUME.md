@@ -1,68 +1,73 @@
-# Resume point — 2026-09-03 (UI/UX reference pass)
+# Resume point — 2026-09-03 (island map integration)
 
-Two milestones committed locally today, **NOT pushed**:
-- `bf58b3e` / `47fbd72` — Phase 1: typed gameplay event stream + character
-  hooks + data-driven star scores.
-- `07deda9` — reference-matched premium UI (this pass).
+Local commits today, **NOT pushed**:
+- `bf58b3e` / `47fbd72` — Phase 1: typed gameplay event stream + character hooks + data-driven star scores.
+- `07deda9` / `36bb282` — reference-matched premium UI (glass kit, settings/daily/HUD, first island map).
+- `9875c2c` — **island campaign map from the 15 supplied PNGs** (this pass).
 
-## UI pass — what landed (07deda9)
-Implements the approved `UIUX reference image color clash.png`. No gameplay
-logic, board engine, save format, progression, audio, or VFX changed — the
-UI is upgraded *around* the existing systems. **412/412 unit tests pass, all
-4 smoke scripts pass, Android debug APK built + device-verified at 60 FPS.**
+## Island map — what landed (9875c2c)
+15 user PNGs in `game/assets/islands/` (Downloads source untouched, descriptive
+names). No gameplay logic / save format / progression rules changed —
+`IslandModel` is a pure view of `ProgressService`. **645/645 tests pass**
+(+`test_island_assets.gd`: 15 ids load, 50 stage faces are valid in-bounds
+AtlasTexture regions).
 
-- **`scripts/ui/ui_kit.gd`** — shared kit: frosted-glass styleboxes (replace
-  every opaque black strip), beveled premium buttons, `GoldFramePanel`
-  (ornate gold frame + diamond corners), glass currency chips, glass icon
-  buttons, pop/press/count-up animation helpers.
-- **Home** (`main_menu.gd`) — PLAY enlarged + moved to ~40% height; frosted
-  glass currency bar; DAILY REWARD + SETTINGS beneath; wordmark uses
-  `AssetLibrary &"brand_wordmark"` PNG when supplied, else code wordmark.
-- **Island map** (`level_map.gd` + `levels/island_model.gd` +
-  `data/islands.json`) — genuinely vertical finger-drag + inertia
-  (`KineticScroll`), auto-centres on the current island. `IslandModel` is a
-  PURE view of ProgressService: 5 islands × 10 stages, **no new save state,
-  unlock rules unchanged**. Per-island header (name, x/10, lock/current/
-  complete). Nodes still `LevelNodeButton`.
-- **Settings** (`settings_panel.gd`, shared by menu + HUD) — gold-framed
-  frosted dialog, animated open/close, wired to real `AudioSettings`. HUD's
-  old inline settings panel removed → one design.
-- **Daily rewards** (`daily_rewards.gd`) — gold-framed frosted dialog, 4+3
-  grid with claimed/current/upcoming/locked tiles, claim burst. Logic
-  unchanged.
-- **Gameplay HUD** (`hud.gd`) — glass pills/cards/tray; `FeverArt` reworked
-  into the full **golden bar** (gold double frame, crown, golden fill +
-  glow + sheen, crystal on the edge, x1.5 gold badge). Win/lose/pause
-  panels glassed.
-- **`asset_library.gd`** — `_OPTIONAL` path table for branding + character
-  PNGs (NOT in the 74-asset audit; `tex()` returns null → code fallback
-  until the file is dropped at the reserved path).
+Asset map (identified by artwork, not filename):
+| # | Island | Hero | Stages sheet | Map art |
+|---|---|---|---|---|
+| 1 | Sunlit Falls (Forest) | 05_47_05 | 05_50_06 | 06_27_18 |
+| 2 | Frosthaven (Ice) | 05_52_50 | 05_55_52 | 06_30_10 |
+| 3 | Volcania (Fire) | 05_58_58 | 06_01_28 | 06_32_38 |
+| 4 | Sandoria (Desert) | 06_04_08 | 06_07_56 | 06_35_53 |
+| 5 | Aurora Reach (Crystal) | 06_10_04 | 06_20_57 | 06_38_11 |
 
-## Known follow-ups (small, non-blocking)
-- Settings Music-row toggle width tightened in code (label 150 + slider 130)
-  — verify on next device build.
-- PLAY button bevel could be more gold-framed per reference.
-- Map top bar chips a touch cramped on narrow widths.
-- `_capture.gd` doesn't cover the settings dialog — add a case.
-- Character mascot contrast low on the dark board band (character phase).
+Each stage sheet = a 5×2 grid of the 10 stage dioramas. Island 2's sheet has
+the logo + a 4+6 layout, so its 10 regions are explicit in `islands.json`;
+the other four use a uniform grid. The source PNGs are **never cropped or
+modified** — `IslandModel.stage_face()` returns a cached `AtlasTexture`
+region.
 
-## NEXT — remaining reference items / Phase 2
-1. Real branding PNGs (see §"ASSETS NEEDED" in the report / below).
-2. Bottom map nav bar (MAP/EVENTS/CHESTS/SHOP) — reference shows it; only
-   MAP exists now.
-3. Phase 2 gameplay: `PowerCombiner` recipes, coating/collectible/crate
-   obstacles + objectives, migrate board_view/audio onto the event stream.
-4. Character/storyline phase (after final character PNGs).
+- `IslandModel`: `island_hero_art` / `island_map_art` / `island_stages_sheet`,
+  `stage_region_norm`, `stage_face`, `node_position_norm` (serpentine trail,
+  data-overridable per island).
+- `data/islands.json`: names/subtitles + asset ids + theme + Frosthaven's
+  explicit regions. Positions + backgrounds stay data-driven / replaceable.
+- `LevelNodeButton`: optional `face_texture` → the stage diorama becomes the
+  node (dark pop halo, gold frame, corner number/lock/chest, star ribbon,
+  current pulse+crown). Legacy vector node kept as the art-absent fallback.
+- `level_map.gd IslandSection`: bg = assembled map art (COVER), glass header
+  (name / subtitle / x-10 / lock|play|check badge), 10 positioned diorama
+  nodes, soft "travelled" trail, full-island lock overlay when locked.
+  KineticScroll + auto-centre unchanged.
 
-## ASSETS NEEDED FROM USER (unchanged, still pending)
-- Company logo PNG · Game logo / wordmark PNG (`assets/branding/wordmark.png`)
-- Splash artwork · App icon + adaptive icon (FG/BG) · Feature graphic
-- Character pose set (`assets/character/<pose>.png`, ~9 poses)
-- Real music loops + SFX (later)
-All have reserved `AssetLibrary` paths — drop the PNG in, no code change.
+## Known polish (non-blocking)
+- The supplied map-art PNGs paint the island as a vignette on a dark void,
+  so a section's edges read as "space around the island" rather than
+  edge-to-edge scenery. Acceptable / on-theme; could zoom+crop harder or
+  tint the void if you want it tighter.
+- Node density: 10 nodes over ~720px of art → some visual overlap where the
+  trail doubles back. Winding + drop shadows keep them tappable.
+- The APK is now ~268 MB (15 island PNGs import LOSSLESS). Phase 9 should
+  switch `env/*` + `islands/*` to ETC2/ASTC.
+- **On-device pass is pending** — the OnePlus test device disconnected
+  mid-session. Rebuild+install commands unchanged (`docs/ANDROID.md`);
+  APK is at `build/color-clash-debug.apk`.
+
+## NEXT
+1. On-device smoke of the island map (scroll, tap a stage, verify state +
+   60 FPS + no logcat errors).
+2. Optional: wire `IslandModel.island_hero_art(i)` as the in-level backdrop
+   for that island's 10 levels (currently the old env cycle).
+3. Bottom map nav bar (MAP/EVENTS/CHESTS/SHOP) — reference shows it.
+4. Phase 2 gameplay (PowerCombiner, coating/collectible/crate obstacles,
+   migrate board_view/audio onto the event stream).
+5. Character/storyline phase (after final character PNGs).
 
 ## Do NOT
 - Push to origin.
 - Rewrite the connect-based core, hex grid, powers, ChainResolver, level
-  data, ProgressService, or the event stream.
-- Replace the 74 prepared art assets or invent branding/character art.
+  data, ProgressService, the event stream, or IslandModel's pure-view
+  contract.
+- Crop / modify / replace the supplied island PNGs (stage art is sliced via
+  AtlasTexture at runtime).
+- Invent branding / character art.
