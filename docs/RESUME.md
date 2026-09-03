@@ -1,63 +1,68 @@
-# Resume point — 2026-09-03 (Phase 1 complete)
+# Resume point — 2026-09-03 (UI/UX reference pass)
 
-Phase 1 of `docs/NEXT_PHASE_PLAN.md` is **implemented, verified, and
-committed locally** (`bf58b3e` — NOT pushed). Additive only; no existing
-gameplay logic was rewritten.
+Two milestones committed locally today, **NOT pushed**:
+- `bf58b3e` / `47fbd72` — Phase 1: typed gameplay event stream + character
+  hooks + data-driven star scores.
+- `07deda9` — reference-matched premium UI (this pass).
 
-## What landed in Phase 1
-- **Typed gameplay event stream.** `EngineEvent` (25 typed constants),
-  `GameplayEventStream`, `MoveEventTranslator` (pure MoveResult -> events,
-  does not re-run game logic), `GameEvents` autoload bus. `app.gd` now
-  publishes translated move events + session events every move. The old
-  `board_view -> app` signal wiring is untouched and runs alongside.
-- **Character system architecture.** `CharacterDirector` autoload
-  (data-driven `data/character.json`, debounced reactions, consumes the
-  bus), `CharacterView` code-drawn placeholder mascot (bottom-left,
-  faded with game chrome). Real art drops in via `AssetLibrary`
-  `char_<pose>` ids later — no code change.
-- **Thin Fever meter.** `HUD.FeverArt` reworked to a slim code-drawn
-  capsule frame (gold ring + crown tick + crystal on fill edge). Chunky
-  #53 frame art no longer used here. HUD row height unchanged.
-- **Score-threshold stars.** `StarRating.stars_for_score()` — per-level
-  `star_scores` from `data/levels.json` is primary, move-efficiency is
-  fallback. `stars_for()` kept. `LevelConfig` parses `star_scores` +
-  `hint`. `generate_levels.py` emits `star_scores` (first-pass model,
-  re-tune from analytics later). `levels.json` regenerated.
+## UI pass — what landed (07deda9)
+Implements the approved `UIUX reference image color clash.png`. No gameplay
+logic, board engine, save format, progression, audio, or VFX changed — the
+UI is upgraded *around* the existing systems. **412/412 unit tests pass, all
+4 smoke scripts pass, Android debug APK built + device-verified at 60 FPS.**
 
-## Verified
-- Unit: **384 / 384** (`test_runner.gd`; +`test_event_stream.gd` 11
-  tests incl. determinism, +8 star-threshold asserts). 342 prior all pass.
-- Smokes: all 4 pass against the real main scene.
-- Android: debug APK exported (~221 MB), installed + launched on device
-  `3C15CB00ABS00000`, a real level played on-device — moves, score,
-  objectives, cascades, powers, obstacles, Fever all advancing; **60 FPS
-  held**; zero script errors in `adb logcat`.
-- Offscreen renders: thin fever meter + placeholder mascot confirmed.
+- **`scripts/ui/ui_kit.gd`** — shared kit: frosted-glass styleboxes (replace
+  every opaque black strip), beveled premium buttons, `GoldFramePanel`
+  (ornate gold frame + diamond corners), glass currency chips, glass icon
+  buttons, pop/press/count-up animation helpers.
+- **Home** (`main_menu.gd`) — PLAY enlarged + moved to ~40% height; frosted
+  glass currency bar; DAILY REWARD + SETTINGS beneath; wordmark uses
+  `AssetLibrary &"brand_wordmark"` PNG when supplied, else code wordmark.
+- **Island map** (`level_map.gd` + `levels/island_model.gd` +
+  `data/islands.json`) — genuinely vertical finger-drag + inertia
+  (`KineticScroll`), auto-centres on the current island. `IslandModel` is a
+  PURE view of ProgressService: 5 islands × 10 stages, **no new save state,
+  unlock rules unchanged**. Per-island header (name, x/10, lock/current/
+  complete). Nodes still `LevelNodeButton`.
+- **Settings** (`settings_panel.gd`, shared by menu + HUD) — gold-framed
+  frosted dialog, animated open/close, wired to real `AudioSettings`. HUD's
+  old inline settings panel removed → one design.
+- **Daily rewards** (`daily_rewards.gd`) — gold-framed frosted dialog, 4+3
+  grid with claimed/current/upcoming/locked tiles, claim burst. Logic
+  unchanged.
+- **Gameplay HUD** (`hud.gd`) — glass pills/cards/tray; `FeverArt` reworked
+  into the full **golden bar** (gold double frame, crown, golden fill +
+  glow + sheen, crystal on the edge, x1.5 gold badge). Win/lose/pause
+  panels glassed.
+- **`asset_library.gd`** — `_OPTIONAL` path table for branding + character
+  PNGs (NOT in the 74-asset audit; `tex()` returns null → code fallback
+  until the file is dropped at the reserved path).
 
-## NEXT SESSION — Phase 2 (see docs/NEXT_PHASE_PLAN.md §9)
-Do NOT start before these are decided/ready:
-1. `PowerCombiner` + `data/power_combos.json` recipe table.
-2. New obstacles: coating/"Stain", collectible "Prism Shard", crate.
-3. New objectives: `clear_coating`, `collect_tokens`.
-4. Extend the generator curve to introduce them; add 3-4 showcase levels.
-5. Migrate `board_view` / `hud` / audio director onto the event stream as
-   their primary input (Phase 1 built the stream; they still use the
-   direct signals — that migration is Phase 2/3 groundwork).
+## Known follow-ups (small, non-blocking)
+- Settings Music-row toggle width tightened in code (label 150 + slider 130)
+  — verify on next device build.
+- PLAY button bevel could be more gold-framed per reference.
+- Map top bar chips a touch cramped on narrow widths.
+- `_capture.gd` doesn't cover the settings dialog — add a case.
+- Character mascot contrast low on the dark board band (character phase).
 
-Remaining Phase 1 follow-ups (small, non-blocking):
-- `MoveEventTranslator` does not emit `OBSTACLE_DAMAGED` (partial ice/lock
-  hits) — needs one additive field on `ChainResolver`. Deferred so the
-  tested resolver stayed untouched.
-- Star-threshold numbers are a first-pass model — re-tune once analytics
-  exist.
-- On-device: mascot contrast is low against the dark board band; final
-  placement + real art come with the character phase.
+## NEXT — remaining reference items / Phase 2
+1. Real branding PNGs (see §"ASSETS NEEDED" in the report / below).
+2. Bottom map nav bar (MAP/EVENTS/CHESTS/SHOP) — reference shows it; only
+   MAP exists now.
+3. Phase 2 gameplay: `PowerCombiner` recipes, coating/collectible/crate
+   obstacles + objectives, migrate board_view/audio onto the event stream.
+4. Character/storyline phase (after final character PNGs).
+
+## ASSETS NEEDED FROM USER (unchanged, still pending)
+- Company logo PNG · Game logo / wordmark PNG (`assets/branding/wordmark.png`)
+- Splash artwork · App icon + adaptive icon (FG/BG) · Feature graphic
+- Character pose set (`assets/character/<pose>.png`, ~9 poses)
+- Real music loops + SFX (later)
+All have reserved `AssetLibrary` paths — drop the PNG in, no code change.
 
 ## Do NOT
 - Push to origin.
-- Rewrite the connect-based core, hex grid, persistent powers, level
-  system, ProgressService, or ChainResolver. Phase 1 kept all of them
-  byte-for-byte; keep it that way — extend via the event stream + new
-  modules.
-- Invent branding/logo/splash/character art — request list is
-  `docs/NEXT_PHASE_PLAN.md` §8-D.
+- Rewrite the connect-based core, hex grid, powers, ChainResolver, level
+  data, ProgressService, or the event stream.
+- Replace the 74 prepared art assets or invent branding/character art.
