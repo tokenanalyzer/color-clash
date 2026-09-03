@@ -235,6 +235,9 @@ class IslandSection extends Control:
 		_bg_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_bg_fill)
 
+		# The assembled island map (scenic path baked in). Its own reference
+		# node badges are covered by our real interactive nodes, which are
+		# hand-placed over them via islands.json `node_positions`.
 		_bg = TextureRect.new()
 		_bg.texture = IslandModel.island_map_art(idx)
 		_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -278,6 +281,9 @@ class IslandSection extends Control:
 				break
 		return _positions.get(target, Vector2(0, LevelMap._HEADER_H)).y
 
+	const _ART_W := 1536.0
+	const _ART_H := 1024.0
+
 	func layout(width: float) -> void:
 		var content_h := LevelMap._content_h_for(width)
 		_content_rect = Rect2(0, LevelMap._HEADER_H, width, content_h)
@@ -286,26 +292,28 @@ class IslandSection extends Control:
 		_bg.position = _content_rect.position
 		_bg.size = _content_rect.size
 
-		# the art keeps its 3:2 aspect and is centred (no crop) — nodes clamp
-		# to where it actually sits so they always land on the island scene.
-		var art_h: float = width * LevelMap._MAP_ASPECT
-		_art_rect = Rect2(0, LevelMap._HEADER_H + (content_h - art_h) * 0.5, width, art_h)
+		# Where the COVER-fit island art actually ends up on screen (it fills
+		# the content box on its short axis and overhangs on the long one).
+		# `node_positions` in islands.json are normalised to the source image,
+		# so they must map onto THIS rect to sit over the baked path/badges.
+		var k: float = maxf(width / _ART_W, content_h / _ART_H)
+		var draw_w := _ART_W * k
+		var draw_h := _ART_H * k
+		_art_rect = Rect2((width - draw_w) * 0.5, LevelMap._HEADER_H + (content_h - draw_h) * 0.5, draw_w, draw_h)
 
 		var header_w: float = minf(width - 40.0, 460.0)
 		_header.position = Vector2((width - header_w) * 0.5, 14.0)
 		_header.size = Vector2(header_w, LevelMap._HEADER_H - 28.0)
 		_header.custom_minimum_size = _header.size
 
-		# stage 1 near the bottom, stage 10 near the top — every supplied map
-		# reference flows this way. Positions map onto the art rect, inset a
-		# little so nodes never clip the section edge.
 		var count := level_ids.size()
-		var inset := Vector2(art_h * 0.02, art_h * 0.04)
 		var i := 0
 		for lid in level_ids:
 			var n := IslandModel.node_position_norm(island_idx, i, count)
-			_positions[lid] = _art_rect.position + inset + Vector2(
-				n.x * (width - inset.x * 2.0), n.y * (art_h - inset.y * 2.0))
+			_positions[lid] = _art_rect.position + Vector2(n.x * _art_rect.size.x, n.y * _art_rect.size.y)
+			# keep the node fully inside the visible section
+			_positions[lid].x = clampf(_positions[lid].x, 70.0, width - 70.0)
+			_positions[lid].y = clampf(_positions[lid].y, LevelMap._HEADER_H + 60.0, LevelMap._HEADER_H + content_h - 60.0)
 			i += 1
 		_position_nodes()
 
@@ -352,28 +360,41 @@ class IslandSection extends Control:
 
 	func _draw() -> void:
 		var w := size.x
-		# subtle "traveled" trail: a soft dotted line through the cleared /
-		# reachable nodes (the island art already carries the scenic path).
-		var chain: Array = []
-		for lid in level_ids:
-			if _positions.has(lid) and Progress.is_unlocked(lid):
-				chain.append(_positions[lid])
-		for i in range(1, chain.size()):
-			var a: Vector2 = chain[i - 1]
-			var b: Vector2 = chain[i]
-			draw_line(a, b, Color(0, 0, 0, 0.28), 12.0, true)
-			draw_line(a, b, Color(1.0, 0.86, 0.45, 0.5), 5.0, true)
-			var dir := (b - a)
-			var L := dir.length()
-			if L > 1.0:
-				dir /= L
-				var d := fposmod(_t * 40.0, 30.0)
-				while d < L:
-					draw_circle(a + dir * d, 3.0, Color(1, 1, 1, 0.8))
-					d += 30.0
+		# The connecting trail through all 10 stage nodes — a glowing rounded
+		# ribbon for reachable stretches, dim + flat for still-locked ones,
+		# with light pips travelling toward the next stage on lit segments.
+		for i in range(1, level_ids.size()):
+			var a_id: int = level_ids[i - 1]
+			var b_id: int = level_ids[i]
+			if not (_positions.has(a_id) and _positions.has(b_id)):
+				continue
+			var a: Vector2 = _positions[a_id]
+			var b: Vector2 = _positions[b_id]
+			var lit := Progress.is_unlocked(b_id)
+			if lit:
+				draw_line(a, b, Color(0.45, 0.72, 1.0, 0.12), 26.0, true)
+				draw_line(a, b, Color(0, 0, 0, 0.32), 16.0, true)
+				draw_line(a, b, Color(1.0, 0.84, 0.42, 0.85), 9.0, true)
+				draw_line(a, b, Color(1.0, 0.96, 0.8, 0.5), 3.0, true)
+				var dir := (b - a)
+				var L := dir.length()
+				if L > 1.0:
+					dir /= L
+					var d := fposmod(_t * 46.0, 40.0)
+					while d < L:
+						draw_circle(a + dir * d, 4.0, Color(1, 1, 1, 0.9))
+						d += 40.0
+			else:
+				draw_line(a, b, Color(0, 0, 0, 0.28), 14.0, true)
+				draw_line(a, b, Color(0.22, 0.24, 0.33, 0.75), 8.0, true)
 		# top divider veil so islands read as distinct chapters
 		VisualTheme.draw_v_gradient(self, Rect2(0, 0, w, LevelMap._HEADER_H + 30.0),
 			Color(0.04, 0.05, 0.11, 0.72), Color(0.04, 0.05, 0.11, 0.0), 16)
+		# bottom veil: mutes the hero-art name banner behind the entrance nodes
+		# and blends each island into the next
+		var bh: float = size.y * 0.26
+		VisualTheme.draw_v_gradient(self, Rect2(0, size.y - bh, w, bh),
+			Color(0.04, 0.05, 0.11, 0.0), Color(0.04, 0.05, 0.11, 0.62), 16)
 		if IslandModel.island_state(island_idx) == &"locked":
 			draw_rect(Rect2(_content_rect.position, _content_rect.size), Color(0.04, 0.05, 0.12, 0.42))
 			var lc := _content_rect.position + _content_rect.size * 0.5

@@ -8,7 +8,7 @@ extends Button
 
 const NODE_RADIUS := 50.0
 const _TOP_PADDING := 38.0
-const FACE_W := 94.0           # drawn width of a stage-diorama face
+const FACE_W := 102.0          # drawn width of a stage-diorama face
 const FACE_ASPECT := 1.0       # height / width of the diorama region
 
 var level_id: int = 0
