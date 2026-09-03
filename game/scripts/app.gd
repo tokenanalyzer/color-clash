@@ -38,6 +38,7 @@ var _music_token: int = 0
 
 var _backdrop: Backdrop
 var _daily: DailyRewardsScreen
+var _character: CharacterView
 
 ## Debug-only rolling FPS sampler — printed to the Android log so on-device
 ## performance can be verified without a profiler build. Stripped in release.
@@ -72,6 +73,14 @@ func _ready() -> void:
 	_board_layer.position = Vector2(0, _hud.playfield_top())
 	add_child(_board_layer)
 
+	# Mascot (placeholder art) — a pure event-stream consumer via
+	# CharacterDirector. Docked bottom-left, just above the booster tray;
+	# shown only during a level, faded with the rest of the game chrome.
+	_character = CharacterView.new()
+	_character.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	game_canvas.add_child(_character)
+	_relayout_character()
+
 	var map_canvas := CanvasLayer.new()
 	map_canvas.layer = 10
 	add_child(map_canvas)
@@ -105,6 +114,7 @@ func _ready() -> void:
 
 	_hud.visible = false
 	_board_layer.visible = false
+	_character.visible = false
 	_map.visible = false
 	_menu.visible = true
 	_menu.modulate.a = 1.0
@@ -138,6 +148,15 @@ func _relayout_board() -> void:
 	_board_layer.position = Vector2(0, _hud.playfield_top())
 	if _board != null and _current_level != null:
 		_board.refit(_board_rect())
+	_relayout_character()
+
+## Pin the mascot just above the booster tray on the left edge (placeholder
+## placement — final anchor comes with the real art).
+func _relayout_character() -> void:
+	if _character == null:
+		return
+	var vp := get_viewport().get_visible_rect().size
+	_character.position = Vector2(6.0, vp.y - _hud.playfield_bottom() - _character.custom_minimum_size.y - 4.0)
 
 # --------------------------------------------------------- screen flow --
 
@@ -201,16 +220,21 @@ func _fade_out_game(duration: float) -> void:
 	await tween.finished
 	_hud.visible = false
 	_board_layer.visible = false
+	_character.visible = false
 
 func _fade_in_game(duration: float) -> void:
 	_hud.modulate.a = 0.0
 	_board_layer.modulate.a = 0.0
 	_hud.visible = true
 	_board_layer.visible = true
+	_character.modulate.a = 0.0
+	_character.visible = true
+	_relayout_character()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(_hud, "modulate:a", 1.0, duration)
 	tween.tween_property(_board_layer, "modulate:a", 1.0, duration)
+	tween.tween_property(_character, "modulate:a", 1.0, duration)
 	await tween.finished
 
 # -------------------------------------------------------- level session --
@@ -242,6 +266,7 @@ func _start_level(level_id: int) -> void:
 	_board.booster_resolved.connect(_on_booster_resolved)
 	_board.booster_committed.connect(_on_booster_committed)
 	_board.booster_disarmed.connect(func(): _hud.set_booster_armed(&""))
+	_board.board_shuffled.connect(func(): GameEvents.publish_type(EngineEvent.BOARD_SHUFFLED, {}))
 	_hud.set_booster_armed(&"")
 
 	_hud.hide_end_panel()
@@ -256,8 +281,43 @@ func _start_level(level_id: int) -> void:
 	Music.start()
 	Music.set_state(_compute_music_state(0), true)
 
+	_relayout_character()
+	if _character != null:
+		_character.set_idle()
+	GameEvents.publish_type(EngineEvent.LEVEL_STARTED, {
+		"level_id": _current_level.id,
+		"name": _current_level.level_name,
+	})
+	_publish_session_state(0, false)
+
 func _refresh_booster_counts() -> void:
 	_hud.set_booster_counts(Boosters.counts)
+
+## Publishes the session-level events (score / moves / combo / fever /
+## objective progress) that the per-move translator can't know about because
+## they depend on running session state, not just one MoveResult. Consumers
+## get one coherent snapshot after every move and at level start.
+func _publish_session_state(score_gained: int = 0, fever_just_activated: bool = false) -> void:
+	GameEvents.publish_type(EngineEvent.SCORE_CHANGED, {"score": _score, "gained": score_gained})
+	GameEvents.publish_type(EngineEvent.MOVES_CHANGED, {
+		"moves_left": _moves_left, "move_limit": _current_level.move_limit,
+	})
+	GameEvents.publish_type(EngineEvent.COMBO_CHANGED, {
+		"combo": _combo.last_combo, "best": _combo.best_combo,
+	})
+	GameEvents.publish_type(EngineEvent.FEVER_CHANGED, {
+		"meter": _fever.meter, "meter_max": GameData.fever_config.meter_max,
+		"active": _fever.is_active(), "just_activated": fever_just_activated,
+	})
+	if _objectives != null:
+		for i in _current_level.objectives.size():
+			var obj: Dictionary = _current_level.objectives[i]
+			var tgt := _objectives.target_for(i)
+			GameEvents.publish_type(EngineEvent.OBJECTIVE_PROGRESS, {
+				"index": i, "value": _objectives.progress[i], "target": tgt,
+				"type": String(obj.get("type", "")),
+				"complete": _objectives.progress[i] >= tgt,
+			})
 
 func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) -> void:
 	var combo_mult := ScoreCalculator.combo_multiplier_for_depth(result.chain_depth)
@@ -299,6 +359,12 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	if near_fail and not _was_near_fail:
 		Audio.play(&"tension_pulse")
 	_was_near_fail = near_fail
+
+	# --- typed event stream for this move (additive — the direct
+	# board_view -> app signal wiring above is untouched) ---
+	var move_kind := "match" if counts_as_move else "booster"
+	GameEvents.publish_all(MoveEventTranslator.events_for_move(result, {"kind": move_kind}))
+	_publish_session_state(gained, fever_activated)
 
 	_update_music_state(result.chain_depth, result.cleared_cells.size())
 
@@ -346,9 +412,14 @@ func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
 func _on_level_won() -> void:
 	var first_clear := not Progress.is_completed(_current_level.id)
 	Economy.grant(_current_level.reward_coins)
-	var stars := StarRating.stars_for(_moves_left, _current_level.move_limit)
+	# Per-level score thresholds are the primary star rule; StarRating falls
+	# back to move-efficiency when a level defines no `star_scores`.
+	var stars := StarRating.stars_for_score(_score, _current_level.star_scores, _moves_left, _current_level.move_limit)
 	Progress.record_completion(_current_level.id, stars, _score)
 	var next_id := GameData.levels.next_level_id(_current_level.id)
+	GameEvents.publish_type(EngineEvent.LEVEL_COMPLETED, {
+		"level_id": _current_level.id, "score": _score, "stars": stars,
+	})
 	Music.fade_out_and_stop(0.7)
 	Audio.play(&"level_complete")
 	Haptics.strong(60)
@@ -382,6 +453,9 @@ func _present_milestone_chest() -> void:
 func _on_level_lost() -> void:
 	_hud.show_lose_panel(_score)
 	Audio.play(&"level_failed")
+	GameEvents.publish_type(EngineEvent.LEVEL_FAILED, {
+		"level_id": _current_level.id, "score": _score,
+	})
 
 func _on_next_level_pressed() -> void:
 	var next_id := GameData.levels.next_level_id(_current_level.id)
@@ -426,12 +500,14 @@ func _on_booster_pressed(booster_id: StringName) -> void:
 			return
 		_refresh_booster_counts()
 		_hud.flash_booster(booster_id)
+		GameEvents.publish_type(EngineEvent.BOOSTER_USED, {"booster_id": booster_id, "targeted": false})
 		match String(def.get("effect", "")):
 			"shuffle_board":
 				_board.request_shuffle()
 			"add_moves":
 				_moves_left += int(def.get("value", 5))
 				_hud.set_moves(_moves_left)
+				_publish_session_state()
 		return
 
 	# Targeted: arm it.
@@ -445,3 +521,4 @@ func _on_booster_committed(booster_id: StringName) -> void:
 	_refresh_booster_counts()
 	_hud.set_booster_armed(&"")
 	_hud.flash_booster(booster_id)
+	GameEvents.publish_type(EngineEvent.BOOSTER_USED, {"booster_id": booster_id, "targeted": true})

@@ -262,10 +262,9 @@ func _build_fever_meter() -> void:
 	_fever_wrap.custom_minimum_size = Vector2(0, 64)
 	_top_col.add_child(_fever_wrap)
 
-	# The prepared Fever Meter Frame (#53, crowned gold capsule) is the whole
-	# meter; FeverArt reveals it left->right by the charge ratio over a dark
-	# track, ghosts the empty capsule behind, and pulses the Fever Crystal
-	# (#52) at the fill edge. Falls back to a flat bar if the art is absent.
+	# Thin code-drawn capsule frame (see FeverArt below): a slim gold-ringed
+	# track that fills left->right by the charge ratio, with the Fever Crystal
+	# (#52) riding the fill edge. Sized to never force the HUD row taller.
 	_fever_bar = FeverArt.new()
 	_fever_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -277,7 +276,7 @@ func _build_fever_meter() -> void:
 	# track occupies the middle third) so it never fights the gold fill.
 	_fever_label = VisualTheme.label("FEVER", VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 4)
 	_fever_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_fever_label.offset_left = 208
+	_fever_label.offset_left = 8
 	_fever_label.offset_top = 2
 	_fever_label.offset_bottom = 22
 	_fever_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1102,11 +1101,13 @@ class StarRow extends Control:
 				draw_colored_polygon(ShapeDrawUtils.star_points(center, r * 0.5), VisualTheme.STAR.lightened(0.4))
 
 
-## The Fever charge meter: the crowned Fever Meter Frame (#53) sits undistorted
-## as an ornamental "head" on the left, then a dark capsule track fills with
-## gold toward the right by `ratio`, with the Fever Crystal (#52) riding the
-## fill edge and flaring while Fever is active. Pure code fallback if the art
-## is missing.
+## The Fever charge meter, reworked as a thin mobile-friendly frame: a slim
+## dark capsule track spans the row, ringed by a 2px gold frame with a small
+## crown tick, and fills left->right with gold (hot-gold while active) by
+## `ratio`. The Fever Crystal (#52) rides the fill edge and flares during
+## Fever. Fully code-drawn — the chunky 3:1 Fever Meter Frame art (#53) is no
+## longer used here (it never fit a thin bar); it stays available in
+## AssetLibrary for a taller treatment or a redrawn thin frame later.
 class FeverArt extends Control:
 	var ratio := 0.0: set = _set_ratio
 	var active := false: set = _set_active
@@ -1128,21 +1129,16 @@ class FeverArt extends Control:
 
 	func _draw() -> void:
 		var h := size.y
-		var frame := AssetLibrary.tex(&"ui_fever_meter_frame")
 		var crystal := AssetLibrary.tex(&"ui_fever_crystal")
 
-		# ornamental crowned head — the prepared frame (#53) drawn at its native
-		# 3:1 aspect, fit to the row height, left-aligned (never stretched).
-		var head_w := 0.0
-		if frame != null:
-			head_w = h * float(frame.get_width()) / float(frame.get_height())
-			draw_texture_rect(frame, Rect2(0, 0, head_w, h), false)
+		# slim capsule track in the lower-middle band (caption strip stays clear
+		# above). Height clamps so the row never needs to grow on small screens.
+		var track_h: float = clampf(h * 0.30, 16.0, 22.0)
+		var track := Rect2(4.0, h - track_h - 8.0, size.x - 8.0, track_h)
+		var cr := track_h * 0.5
 
-		# code capsule track occupying the rest of the row (below the caption)
-		var x0: float = maxf(head_w * 0.84, h * 0.2)
-		var track := Rect2(x0, h * 0.40, size.x - x0, h * 0.34)
-		var cr := track.size.y * 0.5
-		_capsule(track.grow(3.0), cr + 3.0, Color(0.55, 0.75, 1.0, 0.16))
+		var frame_col := VisualTheme.FEVER if not active else VisualTheme.FEVER_HOT
+		_capsule(track.grow(3.0), cr + 3.0, Color(frame_col.r, frame_col.g, frame_col.b, 0.18))
 		_capsule(track, cr, Color(0.04, 0.05, 0.11, 0.96))
 
 		var fill_w := track.size.x * ratio
@@ -1155,11 +1151,23 @@ class FeverArt extends Control:
 			_capsule(Rect2(track.position + Vector2(0, 2), Vector2(fill_w, track.size.y * 0.42)), cr,
 				Color(1, 1, 1, 0.28 * pulse))
 
-		# Fever Crystal (#52) rides the fill edge — flares while Fever is active
+		# 2px frame ring + a small centred crown tick — reads as a "fever frame"
+		# without a bulky texture.
+		_capsule_outline(track, cr, Color(frame_col.r, frame_col.g, frame_col.b, 0.9), 2.0)
+		var tick_c := Vector2(track.position.x + track.size.x * 0.5, track.position.y - 3.0)
+		for k in 3:
+			var dx := float(k - 1) * 7.0
+			draw_colored_polygon(PackedVector2Array([
+				tick_c + Vector2(dx - 3.0, 2.0),
+				tick_c + Vector2(dx + 3.0, 2.0),
+				tick_c + Vector2(dx, -5.0),
+			]), Color(frame_col.r, frame_col.g, frame_col.b, 0.95))
+
+		# Fever Crystal (#52) rides the fill edge — flares while Fever is active.
 		var edge_x := track.position.x + clampf(fill_w, cr, track.size.x - cr * 0.5)
 		var cy := track.position.y + track.size.y * 0.5
 		if crystal != null:
-			var cs := h * (0.95 if active else 0.72)
+			var cs := h * (0.9 if active else 0.66)
 			if active:
 				cs *= 1.0 + 0.08 * sin(_t * 8.0)
 			var m: float = maxf(float(crystal.get_width()), float(crystal.get_height()))
@@ -1169,9 +1177,19 @@ class FeverArt extends Control:
 				VisualTheme.draw_glow(self, Vector2(edge_x, cy), cs,
 					Color(VisualTheme.FEVER_HOT.r, VisualTheme.FEVER_HOT.g, VisualTheme.FEVER_HOT.b, 0.5), 4)
 			draw_texture_rect(crystal, Rect2(Vector2(edge_x - cw * 0.5, cy - ch * 0.5), Vector2(cw, ch)), false)
+		else:
+			draw_circle(Vector2(edge_x, cy), cr * 1.15, Color(frame_col.r, frame_col.g, frame_col.b, active and 1.0 or 0.85))
 
 		if flash > 0.0:
 			_capsule(track, cr, Color(1, 1, 1, 0.5 * flash))
+
+	func _capsule_outline(r: Rect2, radius: float, col: Color, w: float) -> void:
+		var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 6)
+		var moved := PackedVector2Array()
+		for p in pts:
+			moved.append(p + r.position + r.size * 0.5)
+		moved.append(moved[0])
+		draw_polyline(moved, col, w, true)
 
 	func _capsule(r: Rect2, radius: float, col: Color) -> void:
 		var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 5)

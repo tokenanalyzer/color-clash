@@ -146,6 +146,38 @@ def objectives(lid, colors, w, h):
     return goals
 
 
+# Rough per-move score yield for a decent (not perfect) clear, by tier. Used
+# ONLY to derive first-pass per-level star thresholds — the runtime rating is
+# pure score vs. these numbers (game/scripts/economy/star_rating.gd), with
+# move-efficiency as the fallback when a level omits star_scores. These are
+# a starting point to be re-tuned from analytics / Remote Config once real
+# play data exists (see docs/GAME_DESIGN.md "Difficulty targets").
+_SCORE_YIELD = {
+    "tutorial": 450,
+    "easy": 650,
+    "medium": 950,
+    "hard": 1250,
+    "expert": 1550,
+}
+
+
+def star_scores(lid, objs):
+    ml = move_limit(lid)
+    expected = ml * _SCORE_YIELD[difficulty(lid)]
+    for o in objs:
+        if o.get("type") == "reach_score":
+            # never ask for less than the level's own score goal for 2 stars
+            expected = max(expected, int(o["target"] * 1.2))
+
+    def snap(v):
+        return int(round(v / 500.0)) * 500
+
+    s1 = snap(expected * 0.50)
+    s2 = max(snap(expected * 0.80), s1 + 500)
+    s3 = max(snap(expected * 1.20), s2 + 500)
+    return [s1, s2, s3]
+
+
 def hint(lid):
     return {
         1: "Swipe across 3+ same-colour jewels, then release.",
@@ -161,6 +193,7 @@ def hint(lid):
 def build_level(lid):
     w, h = board_size(lid)
     colors = COLOR_ORDER[:color_count(lid)]
+    objs = objectives(lid, colors, w, h)
     lvl = {
         "id": lid,
         "name": "Level %d" % lid,
@@ -168,8 +201,9 @@ def build_level(lid):
         "height": h,
         "colors": colors,
         "move_limit": move_limit(lid),
-        "objectives": objectives(lid, colors, w, h),
+        "objectives": objs,
         "obstacles": obstacles(lid, w, h),
+        "star_scores": star_scores(lid, objs),
         "reward": {"coins": 70 + lid * 16},
         "difficulty": difficulty(lid),
     }
