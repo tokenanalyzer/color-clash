@@ -8,11 +8,18 @@ extends Button
 
 const NODE_RADIUS := 50.0
 const _TOP_PADDING := 38.0
+const FACE_W := 94.0           # drawn width of a stage-diorama face
+const FACE_ASPECT := 1.0       # height / width of the diorama region
 
 var level_id: int = 0
 var state: StringName = &"locked" # locked | unlocked | current | completed
 var stars: int = 0
 var is_chest: bool = false
+## Optional per-stage diorama art (an AtlasTexture region of the island's
+## stage sheet — see IslandModel.stage_face). When set it becomes the node
+## face; all state chrome (lock veil, star arc, current glow/crown, number)
+## is still drawn on top. null -> the generic map_*_node sprite / vector disc.
+var face_texture: Texture2D = null
 var _spin := 0.0
 var _bob := 0.0
 
@@ -23,7 +30,10 @@ func configure(id: int, p_state: StringName, p_stars: int, p_is_chest: bool = fa
 	is_chest = p_is_chest
 	disabled = state == &"locked"
 	focus_mode = Control.FOCUS_NONE
-	custom_minimum_size = Vector2(NODE_RADIUS * 2.0 + 24.0, NODE_RADIUS * 2.0 + _TOP_PADDING + 16.0)
+	if face_texture != null:
+		custom_minimum_size = Vector2(FACE_W + 26.0, FACE_W * FACE_ASPECT + _TOP_PADDING + 30.0)
+	else:
+		custom_minimum_size = Vector2(NODE_RADIUS * 2.0 + 24.0, NODE_RADIUS * 2.0 + _TOP_PADDING + 16.0)
 	size = custom_minimum_size
 	var empty := StyleBoxEmpty.new()
 	for s in ["normal", "hover", "pressed", "disabled", "focus"]:
@@ -58,6 +68,11 @@ func _draw() -> void:
 	var c := _center()
 	var r := NODE_RADIUS
 	var font := ThemeDB.fallback_font
+
+	# --- per-stage diorama face (user-supplied stage art) ---------------
+	if face_texture != null:
+		_draw_diorama_face(c, r, font)
+		return
 
 	var sprite := AssetLibrary.tex(_STATE_SPRITE.get(state, &"map_level_node"))
 	if sprite != null:
@@ -164,6 +179,101 @@ func _draw() -> void:
 			var a := deg_to_rad(-130.0 + float(i) * 40.0)
 			var sc := c + Vector2(cos(a), sin(a)) * arc_r
 			_draw_star(sc, 9.0, VisualTheme.STAR if i < stars else Color(0.3, 0.31, 0.38))
+
+## Draws a user-supplied stage diorama as the node face + all state chrome.
+## Every state shows the SAME diorama on the SAME gold-framed medallion — the
+## art is the star. State is a light overlay: a number/lock/chest disc in the
+## corner, a star ribbon for a cleared stage, a pulsing gold ring + crown for
+## the current stage, and a gentle darken for a locked one.
+func _draw_diorama_face(c: Vector2, _r: float, font: Font) -> void:
+	var fw := FACE_W
+	var fh := FACE_W * FACE_ASPECT
+	var bob := sin(_bob * 2.2) * 3.0 if state == &"current" else 0.0
+	var face := Rect2(size.x * 0.5 - fw * 0.5, _TOP_PADDING + bob, fw, fh)
+	var mid := face.position + face.size * 0.5
+
+	# dark halo so every node pops off a same-colour island background
+	for k in range(4, 0, -1):
+		var kt := float(k) / 4.0
+		draw_circle(mid + Vector2(0, 4), fw * 0.72 * kt, Color(0, 0, 0, 0.16 * (1.0 - kt) + 0.06))
+	draw_circle(Vector2(mid.x, face.end.y + 2.0), fw * 0.40, Color(0, 0, 0, 0.34))
+	if state == &"current":
+		VisualTheme.draw_glow(self, mid, fw * 1.15, Color(1.0, 0.82, 0.32, 0.42), 5)
+
+	# the diorama (always full art; a locked stage is only lightly dimmed)
+	draw_texture_rect(face_texture, face, false, Color(1, 1, 1))
+	if state == &"locked":
+		_rounded(face.grow(-1.0), 12.0, Color(0.05, 0.06, 0.14, 0.44))
+
+	# consistent gold medallion frame for every state
+	var rim := UiKit.GOLD
+	var rimw := 3.0
+	match state:
+		&"locked": rim = Color(0.60, 0.64, 0.76, 0.75); rimw = 2.5
+		&"unlocked": rim = Color(1.0, 0.9, 0.55, 0.8); rimw = 3.0
+		&"completed": rim = Color(1.0, 0.86, 0.4, 0.95); rimw = 3.0
+	_rounded_outline(face.grow(1.0), 13.0, Color(0, 0, 0, 0.45), rimw + 3.0)
+	_rounded_outline(face.grow(1.0), 13.0, rim, rimw)
+
+	if state == &"current":
+		for i in 12:
+			var a := _spin + TAU * float(i) / 12.0
+			var dir := Vector2(cos(a), sin(a) * 0.92)
+			draw_line(mid + dir * (fw * 0.60), mid + dir * (fw * 0.70), Color(1.0, 0.9, 0.5, 0.9), 3.0, true)
+		var crown := AssetLibrary.tex(&"ui_crown_trophy")
+		if crown != null:
+			var cw := fw * 0.5
+			var chh := cw * float(crown.get_height()) / float(crown.get_width())
+			draw_texture_rect(crown, Rect2(mid.x - cw * 0.5, face.position.y - chh * 0.62, cw, chh), false)
+		else:
+			_draw_crown(Vector2(mid.x, face.position.y - 6.0))
+
+	# star ribbon hugging the top of a cleared stage
+	if state == &"completed":
+		var star_tex := AssetLibrary.tex(&"eco_star")
+		for i in 3:
+			var a := deg_to_rad(-116.0 + float(i) * 26.0)
+			var sc := mid + Vector2(cos(a), sin(a) * 0.86) * (fw * 0.58)
+			if star_tex != null:
+				var ss := 24.0
+				draw_texture_rect(star_tex, Rect2(sc - Vector2(ss, ss) * 0.5, Vector2(ss, ss)), false,
+					Color(1, 1, 1) if i < stars else Color(0.32, 0.34, 0.42, 0.8))
+			else:
+				_draw_star(sc, 8.0, VisualTheme.STAR if i < stars else Color(0.3, 0.31, 0.38))
+
+	# small state disc in the bottom-left corner of the medallion
+	var badge_c := face.position + Vector2(fw * 0.16, fh - 6.0)
+	var bcol := Color(0.86, 0.5, 0.12) if state == &"current" else Color(0.10, 0.12, 0.2)
+	draw_circle(badge_c, 16.0, Color(0, 0, 0, 0.55))
+	draw_circle(badge_c, 14.0, bcol.darkened(0.2) if state == &"current" else Color(0.08, 0.10, 0.18))
+	_rounded_outline(Rect2(badge_c - Vector2(14, 14), Vector2(28, 28)), 14.0,
+		rim if state != &"unlocked" else Color(1, 1, 1, 0.5), 2.0)
+	if state == &"locked":
+		draw_arc(badge_c + Vector2(0, -2.0), 4.5, PI, TAU, 10, Color(0.86, 0.89, 0.96), 2.0, true)
+		draw_rect(Rect2(badge_c + Vector2(-5, -2), Vector2(10, 8)), Color(0.86, 0.89, 0.96))
+	elif is_chest:
+		_draw_chest(badge_c)
+	else:
+		var lbl := str(level_id)
+		var fs := 20
+		var ts := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+		draw_string_outline(font, badge_c - ts * 0.5 + Vector2(0, ts.y * 0.34), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.8))
+		draw_string(font, badge_c - ts * 0.5 + Vector2(0, ts.y * 0.34), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.WHITE)
+
+func _rounded(r: Rect2, radius: float, col: Color) -> void:
+	var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 5)
+	var moved := PackedVector2Array()
+	for p in pts:
+		moved.append(p + r.position + r.size * 0.5)
+	draw_colored_polygon(moved, col)
+
+func _rounded_outline(r: Rect2, radius: float, col: Color, w: float) -> void:
+	var pts := ShapeDrawUtils.rounded_rect_points(r.size, minf(radius, r.size.y * 0.5), 6)
+	var moved := PackedVector2Array()
+	for p in pts:
+		moved.append(p + r.position + r.size * 0.5)
+	moved.append(moved[0])
+	draw_polyline(moved, col, w, true)
 
 func _draw_crown(p: Vector2) -> void:
 	var w := 20.0

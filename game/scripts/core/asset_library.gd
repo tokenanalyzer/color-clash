@@ -125,6 +125,31 @@ const _OPTIONAL := {
 	&"char_sad": "res://assets/character/sad.png",
 }
 
+## Campaign island art (user-supplied, 2026-09-03). Three PNGs per island:
+##   *_hero   — full island scene + name banner (gameplay backdrop / intro)
+##   *_stages — 5x2 sheet of the 10 stage dioramas (sliced via AtlasTexture,
+##              the source PNG is never modified — see IslandModel.stage_face)
+##   *_map    — the assembled island map scene used as the map section bg
+## These DO resolve to real files and ARE verified — by test_island_assets.gd,
+## not the 74-asset test — so they live in their own registry.
+const _ISLAND_ART := {
+	&"island1_hero": "res://assets/islands/island1_sunlit_falls_hero.png",
+	&"island1_stages": "res://assets/islands/island1_sunlit_falls_stages.png",
+	&"island1_map": "res://assets/islands/island1_sunlit_falls_map.png",
+	&"island2_hero": "res://assets/islands/island2_frosthaven_hero.png",
+	&"island2_stages": "res://assets/islands/island2_frosthaven_stages.png",
+	&"island2_map": "res://assets/islands/island2_frosthaven_map.png",
+	&"island3_hero": "res://assets/islands/island3_volcania_hero.png",
+	&"island3_stages": "res://assets/islands/island3_volcania_stages.png",
+	&"island3_map": "res://assets/islands/island3_volcania_map.png",
+	&"island4_hero": "res://assets/islands/island4_sandoria_hero.png",
+	&"island4_stages": "res://assets/islands/island4_sandoria_stages.png",
+	&"island4_map": "res://assets/islands/island4_sandoria_map.png",
+	&"island5_hero": "res://assets/islands/island5_aurora_reach_hero.png",
+	&"island5_stages": "res://assets/islands/island5_aurora_reach_stages.png",
+	&"island5_map": "res://assets/islands/island5_aurora_reach_map.png",
+}
+
 ## Ordered full-screen environment scenes cycled through the campaign so each
 ## band of levels reads as its own "world". Index by (level-1) / band size.
 const ENV_WORLD_CYCLE: Array[StringName] = [
@@ -143,7 +168,7 @@ static func tex(id: StringName) -> Texture2D:
 	if _cache.has(id):
 		return _cache[id]
 	var t: Texture2D = null
-	var path: String = _PATHS.get(id, _OPTIONAL.get(id, ""))
+	var path: String = _PATHS.get(id, _ISLAND_ART.get(id, _OPTIONAL.get(id, "")))
 	if path != "" and ResourceLoader.exists(path):
 		var res := load(path)
 		if res is Texture2D:
@@ -153,6 +178,21 @@ static func tex(id: StringName) -> Texture2D:
 
 static func has(id: StringName) -> bool:
 	return tex(id) != null
+
+## Island art registry helpers — kw is one of "hero" | "stages" | "map".
+static func island_art(one_based_island: int, kw: String) -> Texture2D:
+	return tex(StringName("island%d_%s" % [one_based_island, kw]))
+
+## {present:[], missing:[], total:int} over the 15 island-art ids.
+static func island_art_audit() -> Dictionary:
+	var present: Array[StringName] = []
+	var missing: Array[StringName] = []
+	for id in _ISLAND_ART:
+		if has(id):
+			present.append(id)
+		else:
+			missing.append(id)
+	return {"present": present, "missing": missing, "total": _ISLAND_ART.size()}
 
 ## Convenience: gem texture for a colour id (&"red" -> gem_red).
 static func gem(color_id: StringName) -> Texture2D:

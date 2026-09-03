@@ -13,11 +13,20 @@ extends Control
 signal level_selected(level_id: int)
 signal home_pressed()
 
-const _TOP_PAD := 40.0
-const _BOTTOM_PAD := 220.0
-const _HEADER_H := 150.0
-const _NODE_STEP := 168.0
-const _SECTION_GAP := 46.0
+const _TOP_PAD := 30.0
+const _BOTTOM_PAD := 200.0
+const _HEADER_H := 118.0
+const _SECTION_GAP := 30.0
+## The island-map art is 3:2 landscape; stretch it a little vertically so the
+## 10 stage nodes get comfortable ( >110px ) spacing on a portrait screen.
+const _MAP_ASPECT := 0.667      # 1024 / 1536
+const _VSTRETCH := 1.06
+
+static func _content_h_for(width: float) -> float:
+	return width * _MAP_ASPECT * _VSTRETCH
+
+static func _section_h_for(width: float) -> float:
+	return _HEADER_H + _content_h_for(width)
 
 var _top_bar: PanelContainer
 var _top_bar_margin: MarginContainer
@@ -69,8 +78,8 @@ func _layout_sections(width: float) -> void:
 	if width <= 0.0:
 		width = 1080.0
 	var y := _top_h + _TOP_PAD
+	var h := _section_h_for(width)
 	for section in _sections:
-		var h: float = section.section_height()
 		section.position = Vector2(0, y)
 		section.custom_minimum_size = Vector2(width, h)
 		section.size = Vector2(width, h)
@@ -203,60 +212,65 @@ class IslandSection extends Control:
 	var island_idx := 0
 	var level_ids: Array[int] = []
 	var _nodes: Dictionary = {}          # level_id -> LevelNodeButton
-	var _path: LevelPathCanvas
-	var _band: TextureRect
+	var _bg_fill: ColorRect              # dark ground behind the (letterboxed) art
+	var _bg: TextureRect                 # the assembled island-map art
+	var _art_rect := Rect2()             # where the art actually sits (nodes clamp to this)
 	var _header: PanelContainer
 	var _name_label: Label
+	var _sub_label: Label
 	var _progress_label: Label
 	var _lock_badge: LockBadge
-	var _positions: Dictionary = {}
+	var _positions: Dictionary = {}      # level_id -> Vector2 (section space)
+	var _content_rect := Rect2()
 	var _t := 0.0
 
 	func setup(idx: int) -> void:
 		island_idx = idx
 		level_ids = IslandModel.level_ids_for_island(idx)
 		mouse_filter = Control.MOUSE_FILTER_PASS
+		clip_contents = true
 
-		_band = TextureRect.new()
-		_band.texture = AssetLibrary.tex(IslandModel.island_theme(idx))
-		_band.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_band.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_band.clip_contents = true
-		_band.visible = _band.texture != null
-		add_child(_band)
+		_bg_fill = ColorRect.new()
+		_bg_fill.color = Color(0.05, 0.06, 0.13, 1.0)
+		_bg_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_bg_fill)
 
-		_path = LevelPathCanvas.new()
-		_path.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(_path)
+		_bg = TextureRect.new()
+		_bg.texture = IslandModel.island_map_art(idx)
+		_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bg.clip_contents = true
+		add_child(_bg)
 
 		_header = PanelContainer.new()
-		_header.add_theme_stylebox_override("panel", UiKit.glass(22, true))
+		_header.add_theme_stylebox_override("panel", UiKit.glass(20, true))
 		add_child(_header)
 		var hrow := HBoxContainer.new()
-		hrow.add_theme_constant_override("separation", 14)
+		hrow.add_theme_constant_override("separation", 12)
 		_header.add_child(hrow)
 		_lock_badge = LockBadge.new()
-		_lock_badge.custom_minimum_size = Vector2(40, 40)
+		_lock_badge.custom_minimum_size = Vector2(38, 38)
 		hrow.add_child(_lock_badge)
 		var vb := VBoxContainer.new()
-		vb.add_theme_constant_override("separation", 2)
+		vb.add_theme_constant_override("separation", 0)
 		hrow.add_child(vb)
 		_name_label = VisualTheme.label(IslandModel.island_name(idx).to_upper(), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD)
 		vb.add_child(_name_label)
-		_progress_label = VisualTheme.label("0 / %d" % level_ids.size(), VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 3)
-		vb.add_child(_progress_label)
+		var subrow := HBoxContainer.new()
+		subrow.add_theme_constant_override("separation", 10)
+		_sub_label = VisualTheme.label(IslandModel.island_subtitle(idx).to_upper(), VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 2)
+		subrow.add_child(_sub_label)
+		_progress_label = VisualTheme.label("0 / %d" % level_ids.size(), VisualTheme.FS_CAPTION, VisualTheme.STAR, 3)
+		subrow.add_child(_progress_label)
+		vb.add_child(subrow)
 		set_process(true)
 
 	func add_node(level_id: int, btn: LevelNodeButton) -> void:
 		_nodes[level_id] = btn
 		add_child(btn)
 
-	func section_height() -> float:
-		return LevelMap._HEADER_H + LevelMap._NODE_STEP * float(max(level_ids.size(), 1)) + 40.0
-
 	func focus_offset() -> float:
-		# y within the section of the current-or-first-incomplete node
 		var target := level_ids[0] if not level_ids.is_empty() else 0
 		for lid in level_ids:
 			if Progress.is_unlocked(lid) and not Progress.is_completed(lid):
@@ -265,45 +279,49 @@ class IslandSection extends Control:
 		return _positions.get(target, Vector2(0, LevelMap._HEADER_H)).y
 
 	func layout(width: float) -> void:
-		_band.position = Vector2(0, 0)
-		_band.size = Vector2(width, section_height())
-		_header.position = Vector2(width * 0.5 - 190.0, 18.0)
-		_header.size = Vector2(380.0, 84.0)
+		var content_h := LevelMap._content_h_for(width)
+		_content_rect = Rect2(0, LevelMap._HEADER_H, width, content_h)
+		_bg_fill.position = _content_rect.position
+		_bg_fill.size = _content_rect.size
+		_bg.position = _content_rect.position
+		_bg.size = _content_rect.size
+
+		# the art keeps its 3:2 aspect and is centred (no crop) — nodes clamp
+		# to where it actually sits so they always land on the island scene.
+		var art_h: float = width * LevelMap._MAP_ASPECT
+		_art_rect = Rect2(0, LevelMap._HEADER_H + (content_h - art_h) * 0.5, width, art_h)
+
+		var header_w: float = minf(width - 40.0, 460.0)
+		_header.position = Vector2((width - header_w) * 0.5, 14.0)
+		_header.size = Vector2(header_w, LevelMap._HEADER_H - 28.0)
 		_header.custom_minimum_size = _header.size
 
-		var amp: float = min(width * 0.24, 210.0)
-		var cx := width * 0.5
+		# stage 1 near the bottom, stage 10 near the top — every supplied map
+		# reference flows this way. Positions map onto the art rect, inset a
+		# little so nodes never clip the section edge.
+		var count := level_ids.size()
+		var inset := Vector2(art_h * 0.02, art_h * 0.04)
 		var i := 0
 		for lid in level_ids:
-			var p := Vector2(cx + amp * sin(float(i) * 0.95 + float(island_idx)),
-				LevelMap._HEADER_H + LevelMap._NODE_STEP * float(i))
-			_positions[lid] = p
-			var btn: LevelNodeButton = _nodes[lid]
-			btn.position = p - btn.custom_minimum_size * 0.5
+			var n := IslandModel.node_position_norm(island_idx, i, count)
+			_positions[lid] = _art_rect.position + inset + Vector2(
+				n.x * (width - inset.x * 2.0), n.y * (art_h - inset.y * 2.0))
 			i += 1
-		_path.position = Vector2.ZERO
-		_path.size = Vector2(width, section_height())
-		_rebuild_path()
+		_position_nodes()
 
-	func _rebuild_path() -> void:
-		var segs: Array = []
-		for i in range(1, level_ids.size()):
-			var a: int = level_ids[i - 1]
-			var b: int = level_ids[i]
-			if not _positions.has(a) or not _positions.has(b):
-				continue
-			segs.append({"from": _positions[a], "to": _positions[b], "lit": Progress.is_unlocked(b)})
-		_path.set_segments(segs)
+	func _position_nodes() -> void:
+		for lid in level_ids:
+			if _positions.has(lid):
+				_nodes[lid].position = _positions[lid] - _nodes[lid].custom_minimum_size * 0.5
 
 	func refresh() -> void:
 		var st := IslandModel.island_state(island_idx)
 		var done := IslandModel.island_completed_count(island_idx)
-		var total := level_ids.size()
-		_progress_label.text = "%d / %d" % [done, total]
+		_progress_label.text = "%d / %d" % [done, level_ids.size()]
 		_lock_badge.state = st
 		_lock_badge.queue_redraw()
 		var locked := st == &"locked"
-		_band.modulate = Color(1, 1, 1, 0.14) if locked else Color(1, 1, 1, 0.30)
+		_bg.modulate = Color(0.5, 0.55, 0.66, 0.9) if locked else Color(1, 1, 1, 1)
 		_name_label.add_theme_color_override("font_color",
 			VisualTheme.TEXT_DIM if locked else VisualTheme.TEXT_GOLD)
 
@@ -320,25 +338,51 @@ class IslandSection extends Control:
 			else:
 				node_state = &"unlocked"
 			var is_chest := (idx + 1) % 5 == 0
-			_nodes[lid].configure(lid, node_state, Progress.get_stars(lid), is_chest)
-			if _positions.has(lid):
-				_nodes[lid].position = _positions[lid] - _nodes[lid].custom_minimum_size * 0.5
+			var btn: LevelNodeButton = _nodes[lid]
+			btn.face_texture = IslandModel.stage_face(island_idx, idx)
+			btn.configure(lid, node_state, Progress.get_stars(lid), is_chest)
 			idx += 1
-		_rebuild_path()
+		_position_nodes()
+		queue_redraw()
 
 	func _process(delta: float) -> void:
 		_t += delta
+		if IslandModel.island_state(island_idx) == &"current":
+			queue_redraw()
 
 	func _draw() -> void:
-		# top veil behind the header + a soft divider so islands read as
-		# distinct chapters without a hard opaque strip
 		var w := size.x
-		draw_rect(Rect2(0, 0, w, LevelMap._HEADER_H), Color(0.05, 0.06, 0.13, 0.28))
-		VisualTheme.draw_v_gradient(self, Rect2(0, 0, w, 90),
-			Color(0.04, 0.05, 0.11, 0.5), Color(0.04, 0.05, 0.11, 0.0), 14)
-		if IslandModel.island_state(island_idx) == &"current":
+		# subtle "traveled" trail: a soft dotted line through the cleared /
+		# reachable nodes (the island art already carries the scenic path).
+		var chain: Array = []
+		for lid in level_ids:
+			if _positions.has(lid) and Progress.is_unlocked(lid):
+				chain.append(_positions[lid])
+		for i in range(1, chain.size()):
+			var a: Vector2 = chain[i - 1]
+			var b: Vector2 = chain[i]
+			draw_line(a, b, Color(0, 0, 0, 0.28), 12.0, true)
+			draw_line(a, b, Color(1.0, 0.86, 0.45, 0.5), 5.0, true)
+			var dir := (b - a)
+			var L := dir.length()
+			if L > 1.0:
+				dir /= L
+				var d := fposmod(_t * 40.0, 30.0)
+				while d < L:
+					draw_circle(a + dir * d, 3.0, Color(1, 1, 1, 0.8))
+					d += 30.0
+		# top divider veil so islands read as distinct chapters
+		VisualTheme.draw_v_gradient(self, Rect2(0, 0, w, LevelMap._HEADER_H + 30.0),
+			Color(0.04, 0.05, 0.11, 0.72), Color(0.04, 0.05, 0.11, 0.0), 16)
+		if IslandModel.island_state(island_idx) == &"locked":
+			draw_rect(Rect2(_content_rect.position, _content_rect.size), Color(0.04, 0.05, 0.12, 0.42))
+			var lc := _content_rect.position + _content_rect.size * 0.5
+			var lr := 46.0
+			draw_arc(lc + Vector2(0, -lr * 0.35), lr * 0.55, PI, TAU, 20, Color(0.75, 0.78, 0.88, 0.6), 8.0, true)
+			draw_rect(Rect2(lc + Vector2(-lr * 0.6, -lr * 0.35), Vector2(lr * 1.2, lr)), Color(0.75, 0.78, 0.88, 0.6))
+		elif IslandModel.island_state(island_idx) == &"current":
 			var pulse := 0.5 + 0.5 * sin(_t * 2.4)
-			draw_rect(Rect2(0, 0, 4, size.y), Color(1.0, 0.82, 0.36, 0.35 + 0.35 * pulse))
+			draw_rect(Rect2(0, 0, 4, size.y), Color(1.0, 0.82, 0.36, 0.3 + 0.3 * pulse))
 
 
 	## The small round lock / check / play badge on an island header.

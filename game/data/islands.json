@@ -1,10 +1,57 @@
 {
-  "_comment": "Campaign islands for the scrollable island map (game/scripts/levels/island_model.gd). Each island is exactly 10 consecutive campaign levels; add an entry per 10 levels. `theme` is the AssetLibrary env id used as that island's backdrop. Unlock rules are NOT set here — they come from the existing sequential ProgressService rule (an island opens when the previous island's last level is cleared).",
+  "_comment": "Campaign islands for the scrollable island map. Each island is exactly 10 consecutive campaign levels (game/scripts/levels/island_model.gd). `hero`/`stages`/`map` are AssetLibrary ids for the user-supplied art (game/assets/islands/): hero = full scene + name banner, stages = 5x2 sheet of the 10 stage dioramas (sliced with AtlasTexture, source PNG never modified), map = the assembled island map used as the section background. `theme` is the env id used as the in-level backdrop for that island's levels. `stage_regions` (optional, normalized x,y,w,h of the stages sheet) overrides the default uniform 5x2 grid slice — only island 2 needs it (its sheet has the logo in the top-left and an uneven 4+6 layout). `node_positions` (optional, normalized to the section) overrides the procedural serpentine trail. Unlock rules are NOT set here — they come from the existing sequential ProgressService rule (an island opens when the previous island's last level is cleared).",
   "islands": [
-    { "name": "Sunlit Falls",   "theme": "env_floating_islands" },
-    { "name": "Crystal Caves",   "theme": "env_crystal_formations" },
-    { "name": "Lava Peaks",      "theme": "env_large_structures" },
-    { "name": "Cloud Spires",    "theme": "env_clouds_mists" },
-    { "name": "Aurora Reach",    "theme": "env_aurora_energy_bands" }
+    {
+      "name": "Sunlit Falls",
+      "subtitle": "Forest Kingdom",
+      "hero": "island1_hero",
+      "stages": "island1_stages",
+      "map": "island1_map",
+      "theme": "env_floating_islands"
+    },
+    {
+      "name": "Frosthaven",
+      "subtitle": "Ice Kingdom",
+      "hero": "island2_hero",
+      "stages": "island2_stages",
+      "map": "island2_map",
+      "theme": "env_crystal_formations",
+      "stage_regions": [
+        [0.302, 0.03, 0.172, 0.40],
+        [0.477, 0.03, 0.172, 0.40],
+        [0.651, 0.03, 0.172, 0.40],
+        [0.824, 0.03, 0.172, 0.40],
+        [0.004, 0.54, 0.162, 0.40],
+        [0.170, 0.54, 0.162, 0.40],
+        [0.336, 0.54, 0.162, 0.40],
+        [0.502, 0.54, 0.162, 0.40],
+        [0.668, 0.54, 0.162, 0.40],
+        [0.834, 0.54, 0.162, 0.40]
+      ]
+    },
+    {
+      "name": "Volcania",
+      "subtitle": "Fire Kingdom",
+      "hero": "island3_hero",
+      "stages": "island3_stages",
+      "map": "island3_map",
+      "theme": "env_large_structures"
+    },
+    {
+      "name": "Sandoria",
+      "subtitle": "Desert Kingdom",
+      "hero": "island4_hero",
+      "stages": "island4_stages",
+      "map": "island4_map",
+      "theme": "env_clouds_mists"
+    },
+    {
+      "name": "Aurora Reach",
+      "subtitle": "Crystal Kingdom",
+      "hero": "island5_hero",
+      "stages": "island5_stages",
+      "map": "island5_map",
+      "theme": "env_aurora_energy_bands"
+    }
   ]
 }

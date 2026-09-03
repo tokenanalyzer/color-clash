@@ -23,6 +23,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_assets.gd",
 	"res://tests/test_event_stream.gd",
 	"res://tests/test_island_model.gd",
+	"res://tests/test_island_assets.gd",
 ]
 
 func _initialize() -> void:
