@@ -14,22 +14,33 @@ const _DURATION := 1.35
 var _t := 0.0
 var _running := true
 var _fx: Control
+var _img: TextureRect
+var _ground: ColorRect
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
+	# This Control is parented to a CanvasLayer, which does NOT drive its rect
+	# from anchors — so we size it (and every full-rect child) to the viewport
+	# ourselves, exactly like HUD/MainMenu. Without this the poster TextureRect
+	# has a zero-size rect and renders nothing (the "blank splash" bug).
+	_ground = ColorRect.new()
+	_ground.color = Color(0.02, 0.03, 0.07, 1.0)   # matches boot_splash/bg_color
+	_ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_ground)
+
 	# WAR OF LOVE poster splash when the composed PNG is present
 	# (assets/branding/splash.png); otherwise the code-drawn wordmark.
 	var poster := AssetLibrary.tex(&"brand_splash")
 	if poster != null:
-		var img := TextureRect.new()
-		img.texture = poster
-		img.set_anchors_preset(Control.PRESET_FULL_RECT)
-		img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		add_child(img)
+		_img = TextureRect.new()
+		_img.texture = poster
+		_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED  # 9:16 cover, no stretch
+		_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_img.clip_contents = true
+		add_child(_img)
 	else:
 		var bg := Backdrop.new()
 		bg.accent = VisualTheme.ACCENT
@@ -37,10 +48,25 @@ func _ready() -> void:
 		add_child(bg)
 
 	_fx = SplashFX.new()
-	_fx.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fx.poster_mode = poster != null
 	add_child(_fx)
+
+	_track_size()
+	get_viewport().size_changed.connect(_track_size)
+
+func _track_size() -> void:
+	var vp := get_viewport_rect().size
+	if vp.x < 1.0:
+		vp = Vector2(get_viewport().size)
+	size = vp
+	custom_minimum_size = vp
+	position = Vector2.ZERO
+	for c in [_ground, _img, _fx]:
+		if c != null:
+			c.position = Vector2.ZERO
+			c.size = vp
+			c.custom_minimum_size = vp
 
 func _process(delta: float) -> void:
 	if not _running:
