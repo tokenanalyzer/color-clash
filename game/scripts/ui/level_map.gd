@@ -353,10 +353,18 @@ class IslandSection extends Control:
 		_position_nodes()
 		queue_redraw()
 
+	var _redraw_accum := 0.0
 	func _process(delta: float) -> void:
 		_t += delta
+		# Only the current island animates (trail pips + edge pulse), and only
+		# a few times a second — the section's draw is heavy (full-width
+		# gradients + 9 multi-pass trail segments) so a per-frame redraw here
+		# was the map's biggest cost.
 		if IslandModel.island_state(island_idx) == &"current":
-			queue_redraw()
+			_redraw_accum += delta
+			if _redraw_accum >= 0.1:
+				_redraw_accum = 0.0
+				queue_redraw()
 
 	func _draw() -> void:
 		var w := size.x
@@ -516,9 +524,15 @@ class MapEnvironment extends Control:
 				"hue": rng.randi_range(0, 5),
 			})
 
+	var _rd := 0.0
 	func _process(delta: float) -> void:
 		_t += delta
-		queue_redraw()
+		# full-screen parallax redraw — throttle to ~15 Hz (the motes drift
+		# slowly, the difference is imperceptible but the FPS gain is not)
+		_rd += delta
+		if _rd >= 0.066:
+			_rd = 0.0
+			queue_redraw()
 
 	func _draw() -> void:
 		var s := size
