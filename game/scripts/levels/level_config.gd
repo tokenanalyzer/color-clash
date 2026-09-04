@@ -9,7 +9,14 @@ var level_name: String
 var width: int
 var height: int
 var colors: Array[StringName] = []
+## Move budget for the level. `starting_moves` is the canonical data key
+## (data/levels.json); `move_limit` is kept as an identical alias so every
+## existing consumer and any older saved data keeps working unchanged.
 var move_limit: int
+var starting_moves: int
+## Monotonic 1..10 difficulty index across the campaign — surfaced for
+## enemy-strength / reward scaling. Data-driven per level, never a global.
+var difficulty_rank: int = 1
 var objectives: Array[Dictionary] = []
 var obstacles: Array[Dictionary] = []
 var reward_coins: int
@@ -29,7 +36,9 @@ static func from_dict(d: Dictionary) -> LevelConfig:
 	lc.height = int(d["height"])
 	for c in d.get("colors", []):
 		lc.colors.append(StringName(String(c)))
-	lc.move_limit = int(d.get("move_limit", 20))
+	lc.move_limit = int(d.get("starting_moves", d.get("move_limit", 20)))
+	lc.starting_moves = lc.move_limit
+	lc.difficulty_rank = int(d.get("difficulty_rank", 1))
 	for o in d.get("objectives", []):
 		lc.objectives.append(o)
 	for ob in d.get("obstacles", []):

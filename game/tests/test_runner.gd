@@ -9,6 +9,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_chain_resolver.gd",
 	"res://tests/test_score_calculator.gd",
 	"res://tests/test_objective.gd",
+	"res://tests/test_level_design.gd",
 	"res://tests/test_fever_system.gd",
 	"res://tests/test_economy.gd",
 	"res://tests/test_synth.gd",
