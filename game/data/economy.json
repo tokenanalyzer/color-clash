@@ -1,0 +1,7 @@
+{
+  "_comment": "Economy tuning for War of Love — data-driven so prices can be rebalanced without code changes (loaded by GameData -> ContinueOffers). `extra_moves` tiers are the in-level 'Need More Moves?' continue options: `moves` is added straight to the running level, `cost` is spent through the existing coin Economy/SaveService. NO second currency, NO second save. Booster prices themselves live in data/boosters.json.",
+  "extra_moves": [
+    { "id": "extra_moves_5",  "moves": 5,  "cost": 140, "label": "+5 Moves" },
+    { "id": "extra_moves_10", "moves": 10, "cost": 240, "label": "+10 Moves" }
+  ]
+}

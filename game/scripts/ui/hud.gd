@@ -12,6 +12,17 @@ signal retry_pressed()
 signal map_pressed()
 signal pause_pressed()
 signal resume_pressed()
+## In-level booster shop opened from the HUD (app.gd freezes the board).
+signal shop_pressed()
+## Player pressed USE in the in-level shop — app.gd routes it through the
+## existing booster pipeline (arm / instant fire -> CombatDirector).
+signal shop_use_booster(booster_id: StringName)
+## The in-level shop was dismissed (with or without a USE) — app.gd unfreezes
+## the board.
+signal shop_closed()
+## "Need More Moves?" outcome — app.gd adds the moves to the live level.
+signal continue_bought(moves_added: int)
+signal continue_declined()
 
 var _level_label: LevelBadge
 var _score_label: Label
@@ -40,6 +51,12 @@ var _end_button: Button
 var _end_map_button: Button
 var _end_confetti: CPUParticles2D
 var _settings_dialog: SettingsPanel
+## Instantiated via load() (not the BoosterShop / ExtraMovesPrompt class_name)
+## so hud.gd carries no compile-time dependency on them — those overlays pull
+## in UiKit which pulls in HUD, and a typed reference here would close that
+## into a class-resolution cycle.
+var _booster_shop            # BoosterShop
+var _moves_prompt            # ExtraMovesPrompt
 var _pause_center: CenterContainer
 var _pause_panel: PanelContainer
 var _scrim: ColorRect
@@ -113,6 +130,17 @@ func _ready() -> void:
 	_build_end_panel()
 	_settings_dialog = SettingsPanel.new()
 	add_child(_settings_dialog)
+	# In-level booster shop + "Need More Moves?" — self-contained overlays
+	# (own scrim), like SettingsPanel. app.gd drives open/close and freezes
+	# the board while either is up.
+	_booster_shop = load("res://scripts/ui/booster_shop.gd").new()
+	add_child(_booster_shop)
+	_booster_shop.use_requested.connect(func(id): shop_use_booster.emit(id))
+	_booster_shop.closed.connect(func(): shop_closed.emit())
+	_moves_prompt = load("res://scripts/ui/extra_moves_prompt.gd").new()
+	add_child(_moves_prompt)
+	_moves_prompt.bought.connect(func(m): continue_bought.emit(m))
+	_moves_prompt.gave_up.connect(func(): continue_declined.emit())
 	_build_pause_panel()
 	_fx = SpriteFX.new()
 	_fx.z_index = 300
@@ -197,6 +225,13 @@ func _build_top_bar() -> void:
 	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_box.add_child(_score_label)
 	row1.add_child(title_box)
+
+	var shop_btn := UiKit.icon_button(&"bag", 68)
+	shop_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		shop_pressed.emit()
+	)
+	row1.add_child(shop_btn)
 
 	var gear := _icon_button(&"gear", 68)
 	gear.pressed.connect(func():
@@ -580,6 +615,26 @@ func show_pause_panel(v: bool) -> void:
 	_refresh_scrim()
 	if v:
 		_pop_in(_pause_panel)
+
+# ----------------------------------------------- in-level shop / continue --
+
+func open_shop() -> void:
+	_booster_shop.open()
+
+func close_shop() -> void:
+	if _booster_shop.is_open():
+		_booster_shop.close()
+
+func open_moves_prompt() -> void:
+	_moves_prompt.open()
+
+## True while any blocking overlay is up (end panel, pause, settings, shop,
+## or the continue prompt) — app.gd uses this to gate the shop button.
+func any_modal_open() -> bool:
+	return _end_center.visible or _pause_center.visible \
+		or (_settings_dialog != null and _settings_dialog.visible) \
+		or (_booster_shop != null and _booster_shop.is_open()) \
+		or (_moves_prompt != null and _moves_prompt.is_open())
 
 # ----------------------------------------------------------- updates --
 

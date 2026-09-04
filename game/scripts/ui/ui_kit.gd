@@ -319,6 +319,15 @@ class _Glyph extends Control:
 			&"close":
 				draw_line(c + Vector2(-r, -r), c + Vector2(r, r), Color(1, 1, 1), 5.0, true)
 				draw_line(c + Vector2(-r, r), c + Vector2(r, -r), Color(1, 1, 1), 5.0, true)
+			&"bag":
+				# a small shopping bag: rounded-top body + handle arc
+				var bw := r * 1.7
+				var bh := r * 1.9
+				var body := Rect2(c + Vector2(-bw * 0.5, -bh * 0.28), Vector2(bw, bh))
+				draw_rect(body, VisualTheme.TEXT_GOLD)
+				draw_rect(body.grow(-3.0), Color(0.13, 0.16, 0.26))
+				draw_arc(c + Vector2(0, -bh * 0.28), bw * 0.34, PI, TAU, 16, VisualTheme.TEXT_GOLD, 4.0, true)
+				draw_rect(Rect2(c + Vector2(-bw * 0.5, -bh * 0.28), Vector2(bw, 4.0)), VisualTheme.TEXT_GOLD)
 			&"chevron":
 				draw_line(c + Vector2(-r * 0.4, -r), c + Vector2(r * 0.5, 0), Color(1, 1, 1), 5.0, true)
 				draw_line(c + Vector2(r * 0.5, 0), c + Vector2(-r * 0.4, r), Color(1, 1, 1), 5.0, true)

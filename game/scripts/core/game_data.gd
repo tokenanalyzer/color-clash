@@ -11,6 +11,9 @@ var boosters: Dictionary = {} # StringName -> Dictionary
 var levels: LevelDatabase
 var sfx: SfxConfig
 var music: MusicConfig
+## In-level "Need More Moves?" continue tiers (data/economy.json). Boosters
+## keep their prices in data/boosters.json; this is only the extra-moves offer.
+var continue_offers: ContinueOffers
 
 func _ready() -> void:
 	colors = PieceColorPalette.from_dict(JsonLoader.load_json("res://data/colors.json"))
@@ -24,3 +27,4 @@ func _ready() -> void:
 	levels = LevelDatabase.from_dict(JsonLoader.load_json("res://data/levels.json"))
 	sfx = SfxConfig.from_dict(JsonLoader.load_json("res://data/sfx.json"))
 	music = MusicConfig.from_dict(JsonLoader.load_json("res://data/music.json"))
+	continue_offers = ContinueOffers.from_dict(JsonLoader.load_json("res://data/economy.json"))

@@ -72,6 +72,11 @@ func _ready() -> void:
 	_hud.map_pressed.connect(_on_map_pressed)
 	_hud.pause_pressed.connect(_on_pause_pressed)
 	_hud.resume_pressed.connect(_on_resume_pressed)
+	_hud.shop_pressed.connect(_on_shop_pressed)
+	_hud.shop_closed.connect(_on_shop_closed)
+	_hud.shop_use_booster.connect(_on_shop_use_booster)
+	_hud.continue_bought.connect(_on_continue_bought)
+	_hud.continue_declined.connect(_on_continue_declined)
 
 	_board_layer = Node2D.new()
 	_board_layer.position = Vector2(0, _hud.playfield_top())
@@ -435,7 +440,7 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	if _objectives.is_complete():
 		_on_level_won()
 	elif _moves_left <= 0:
-		_on_level_lost()
+		_offer_more_moves_or_lose()
 
 ## `chain_depth` (1 = plain match, 2 = one power created+detonated, 3+ = a
 ## real multi-stage cascade — see chain_resolver.gd) drives base/active/high;
@@ -575,6 +580,72 @@ func _present_milestone_chest() -> void:
 	Boosters.add(bid, 1)
 	_hud.set_coins(Economy.coins)
 	_refresh_booster_counts()
+
+## Out of moves with the objective unfinished — offer the "Need More Moves?"
+## continue before failing. The board is frozen; NOTHING about the level
+## state (board, objectives, enemy/boss HP, Jamie meters) changes while the
+## prompt is up, and buying resumes the SAME level — `_start_level` is never
+## re-run.
+func _offer_more_moves_or_lose() -> void:
+	if _level_ended:
+		return
+	if _board != null:
+		_board.disarm_booster()
+		_board.set_input_locked(true)
+	_armed_booster = &""
+	_hud.set_booster_armed(&"")
+	Music.set_state(&"tension")
+	_hud.open_moves_prompt()
+
+func _on_continue_bought(moves_added: int) -> void:
+	if _level_ended:
+		return
+	_moves_left += moves_added
+	_hud.set_moves(_moves_left)
+	_hud.set_coins(Economy.coins)
+	if _board != null:
+		_board.set_input_locked(false)
+	Music.set_state(_compute_music_state(0))
+	_was_near_fail = false
+	_publish_session_state()
+
+func _on_continue_declined() -> void:
+	if _level_ended:
+		return
+	_on_level_lost()
+
+# ------------------------------------------------ in-level booster shop --
+
+## Booster shop opened from the HUD. Freeze the board (existing pause path)
+## so no move is consumed and no board / objective / enemy / boss / power
+## state changes while the shop is open.
+func _on_shop_pressed() -> void:
+	if _current_level == null or _level_ended or _board == null:
+		return
+	if _hud.any_modal_open():
+		return
+	_board.disarm_booster()
+	_board.set_input_locked(true)
+	_armed_booster = &""
+	_hud.set_booster_armed(&"")
+	Music.set_state(&"tension")
+	_hud.open_shop()
+
+func _on_shop_closed() -> void:
+	if _board != null and not _level_ended:
+		_board.set_input_locked(false)
+	if not _level_ended and _current_level != null:
+		Music.set_state(_compute_music_state(0))
+
+## USE pressed in the shop — route straight into the existing booster
+## pipeline so the real board -> CombatDirector -> Jamie/boss chain runs
+## (targeted boosters arm for a board tap, instant ones fire now).
+func _on_shop_use_booster(booster_id: StringName) -> void:
+	if _board == null or _level_ended:
+		return
+	_board.set_input_locked(false)
+	_refresh_booster_counts()
+	_on_booster_pressed(booster_id)
 
 func _on_level_lost() -> void:
 	if _level_ended:

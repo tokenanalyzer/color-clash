@@ -1,7 +1,115 @@
-# Resume point — 2026-09-03 (END OF DAY)  ·  WAR OF LOVE
+# Resume point — 2026-09-04  ·  WAR OF LOVE  ·  GAMEPLAY OVERHAUL
 
 **Latest commit: `c08b8ec`**  ·  branch `backup_asset_integration_2026-09-02`
-·  working tree **clean**  ·  **NOT pushed** (do not push without an explicit ask).
+·  **NOT pushed** (do not push without an explicit ask).
+
+## Gameplay difficulty/combat/booster/inventory overhaul — phased
+
+Big brief: make the campaign a polished, *challenging* match-3 rescue
+adventure (live character combat, in-level booster shop + extra moves,
+Jamie attack animations, enemy/boss behaviour, Jasmine/Jinn presence,
+equipment that affects gameplay, economy balance). Implemented in phases
+A–J; **do not jump ahead — each phase must be test-stable first.**
+
+### PHASE A — difficulty + objective data + move system  ✅ DONE (2026-09-04)
+- `tools/level_gen/generate_levels.py` rewritten. New model: **moves are
+  generous and only taper gently** (island 1 flat 30; islands 2–5 in a
+  29→24 band; bosses 28–32; hard floor **23**, never below). Difficulty is
+  carried by **objectives + blockers**, not move-starvation.
+- New level-data keys: **`starting_moves`** (canonical; `move_limit` kept as
+  an identical alias) and **`difficulty_rank`** (monotonic 1..10). Parsed in
+  `LevelConfig.from_dict`.
+- Objectives now ramp **single (island 1) → double (islands 2–3) → triple
+  (islands 4–5)**, varied across all 4 supported types
+  (`clear_color` / `reach_score` / `create_powers` / `break_obstacles` with
+  per-obstacle/-power filters). Obstacle fields get denser + mixed each
+  island (ice → +lock → +stone → +timebomb, 0→11 obstacles).
+- Generator has `_validate()` enforcing fairness invariants (every
+  `break_obstacles` target ≤ obstacles actually placed; every `reach_score`
+  target ≤ the level's 1-star threshold; move floor; monotonic rank;
+  obstacles inside a safe band). New `game/tests/test_level_design.gd`
+  (registered in `test_runner.gd`) re-checks all of that against the live
+  `data/levels.json`.
+- **Tests: 1191/1191 unit pass** (was 894; +297 data checks). `smoke_all_levels`
+  0 failures (every board still has valid moves), `smoke_main_e2e` /
+  `smoke_level_map` / `smoke_audio_chain` all pass. No APK rebuilt — Phase A
+  is data + one generator + tests only, no scene/asset change.
+- **Only these files changed:** `tools/level_gen/generate_levels.py`,
+  `game/data/levels.json`, `game/scripts/levels/level_config.gd`,
+  `game/tests/test_level_design.gd`, `game/tests/test_runner.gd`, this doc.
+
+### PHASE B — in-level booster shop + "Need More Moves?"  ✅ DONE (2026-09-04)
+- **Single source of truth kept:** the shop reads/writes the existing
+  `Boosters` autoload (the same one the Inventory screen's BOOSTERS tab
+  uses) and coins via `Economy` / `SaveService`. No second currency, no
+  second inventory, no sync layer.
+- **HUD:** new "bag" icon button in the top-bar right cluster
+  (`shop_pressed`). Two self-contained overlays owned by the HUD
+  (`_booster_shop`, `_moves_prompt`) — instantiated via `load()` + kept
+  untyped so `hud.gd` carries **no compile-time dependency** on them
+  (they pull in `UiKit`→`HUD`, a typed ref would close a class cycle and
+  the whole project stops resolving — this bit me once, hence the note).
+- **`scripts/ui/booster_shop.gd`** (`class_name BoosterShop`) — frosted
+  glass / gold modal: per-booster icon / name / OWNED x / price / BUY
+  (→ in-panel confirm showing name, qty, price, coins, coins-after, or a
+  "NOT ENOUGH COINS" state) / USE (owned only → routes into the existing
+  `app._on_booster_pressed` pipeline: targeted boosters arm, instant fire).
+  Signals `use_requested(id)`, `closed()` (both fire synchronously; only
+  the fade is deferred).
+- **`scripts/ui/extra_moves_prompt.gd`** (`class_name ExtraMovesPrompt`) —
+  "NEED MORE MOVES?" with data-driven tiers, coins + coins-after per tier,
+  GIVE UP. Signals `bought(moves)`, `gave_up()`.
+- **`scripts/economy/continue_offers.gd`** (`class_name ContinueOffers`) —
+  pure logic over new **`data/economy.json`** (`extra_moves_5` +5 / 140¢,
+  `extra_moves_10` +10 / 240¢). `GameData.continue_offers`. Prices
+  data-driven — no hard-coded costs in UI.
+- **`data/boosters.json`** re-tuned so price scales with board impact
+  (bomb 90 < lightning 120 < freeze 150 < rainbow 200; shuffle 60).
+- **`app.gd`:** `_on_shop_pressed` freezes the board (existing
+  `set_input_locked` pause path — no move consumed, no board/objective/
+  enemy/boss/meter change), `_on_shop_closed` unfreezes, `_on_shop_use_booster`
+  re-enters the booster pipeline (→ `CombatDirector` → Jamie/boss).
+  `_offer_more_moves_or_lose()` runs at `moves_left <= 0` **before**
+  `_on_level_lost()`; `_on_continue_bought` adds moves to the RUNNING
+  level (never re-runs `_start_level`), `_on_continue_declined` →
+  the unchanged `_on_level_lost()`. Works on boss stages (Jinn included) —
+  boss music state is restored, boss HP untouched.
+- **Tests: 1241/1241 unit pass** (+50 over Phase A; new
+  `tests/test_shop_continue.gd`, registered). `tests/smoke_shop_flow.gd`
+  (new, not in CI) drives the full loop on a **boss stage** + a normal
+  stage and asserts board / score / objectives / boss HP all preserved
+  across every modal and the level is never reset — **PASSES**.
+  `smoke_main_e2e` / `smoke_level_map` / `smoke_all_levels` (0 failures) /
+  `smoke_audio_chain` all pass. Only script error anywhere is the
+  pre-existing `StoryScene._track_size` nil (item #7 below).
+- **Test-run gotcha:** `.godot/` is gitignored, so `class_name` scripts
+  added this phase aren't in the class cache on a fresh checkout. Run
+  `godot4 --headless --editor --quit --path game` once before
+  `test_runner.gd` after adding any new `class_name` (Phase A's test had
+  none, so this is new).
+- **Files changed:** `data/economy.json`*, `data/boosters.json`,
+  `scripts/economy/continue_offers.gd`*, `scripts/ui/booster_shop.gd`*,
+  `scripts/ui/extra_moves_prompt.gd`*, `scripts/ui/hud.gd`,
+  `scripts/ui/ui_kit.gd` (bag glyph), `scripts/core/game_data.gd`,
+  `scripts/app.gd`, `tests/test_shop_continue.gd`*,
+  `tests/smoke_shop_flow.gd`*, `tests/test_runner.gd`, this doc.  (* = new)
+- **No APK rebuilt** — offered to the user; the on-device checklist in the
+  brief needs a physical device.
+
+### PHASE C (next) — Jamie combat animation event pipeline
+Slice `story_jamie_actions` / `story_jinn_actions` into pose AtlasTextures;
+extend `Cast.pose()` for Jamie/Jinn; drive Jamie reactions off
+`CombatDirector.jamie_attack` / `power_fired` and the booster USE hooks
+already wired in Phase B. Then D: booster→Jamie physical actions ·
+E: enemy attack/hit/defeat · F: boss presentation (+ multi-phase Jinn) ·
+G: Jasmine/Jinn gameplay presence · H: equipment gameplay effects ·
+I: economy balancing · J: full campaign difficulty pass.
+
+---
+
+## (earlier) End-of-day checkpoint — 2026-09-03
+
+**Was at commit `c08b8ec`**, working tree clean, not pushed.
 
 Commit chain today:
 `ac324ca` map perf → `0381efe` story/Cast/EnemyModel foundation →

@@ -30,6 +30,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_story_data.gd",
 	"res://tests/test_combat_system.gd",
 	"res://tests/test_inventory.gd",
+	"res://tests/test_shop_continue.gd",
 ]
 
 func _initialize() -> void:
