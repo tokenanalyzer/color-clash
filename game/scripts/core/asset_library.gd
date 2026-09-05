@@ -159,12 +159,42 @@ const _STORY_ART := {
 	&"story_jasmine_portrait": "res://assets/story/jasmine_portrait.png",
 	&"story_jinn_portrait": "res://assets/story/jinn_portrait.png",
 	&"story_jasmine_poses": "res://assets/story/jasmine_poses_8.png",
+	# Checkerboard-keyed copy of the same 4x2 pose grid (jasmine_poses_8.png
+	# is RGB with the same baked-grey-checker bug as enemies_and_bosses.png —
+	# see tools/keyed_sprites/key_jasmine_poses.py). Original untouched.
+	&"story_jasmine_poses_keyed": "res://assets/story/jasmine_poses_8_keyed.png",
 	&"story_cast_atlas": "res://assets/story/cast_atlas_transparent.png",
 	&"story_scenes": "res://assets/story/story_scenes_transparent.png",
 	&"story_enemies": "res://assets/story/enemies_and_bosses.png",
+	# Checkerboard-keyed copy of the enemy row (tools/keyed_sprites/key_enemies.py):
+	# the shipped enemies_and_bosses.png is RGB with a baked light-grey checker,
+	# so the in-arena enemy actor slices this alpha version instead. Same art,
+	# original PNG untouched.
+	&"story_enemies_keyed": "res://assets/story/enemies_keyed.png",
 	&"story_jamie_actions": "res://assets/story/jamie_actions_ref.png",
 	&"story_jinn_actions": "res://assets/story/jinn_actions_ref.png",
 	&"story_jasmine_expr": "res://assets/story/jasmine_expressions_ref.png",
+	# Dedicated single-character art for 5 enemies (2026-09-05 polish pass),
+	# replacing their shared-sheet slice — see enemy_model.gd::enemy_face()
+	# and data/enemies.json's `art` field. Jinn keeps his own established
+	# portrait above, untouched.
+	&"story_villain_stone_golem": "res://assets/story/villains/stone_golem.png",
+	&"story_villain_ice_wraith": "res://assets/story/villains/ice_wraith.png",
+	&"story_villain_dark_knight": "res://assets/story/villains/dark_knight.png",
+	&"story_villain_poison_beast": "res://assets/story/villains/poison_beast.png",
+	&"story_villain_chaos_sorcerer": "res://assets/story/villains/chaos_sorcerer.png",
+}
+
+## Real recorded music tracks (2026-09-05 polish pass) — the first sampled
+## audio in the project; everything else is still synthesized at runtime
+## (see music_director.gd). `music_gameplay_theme` (the louder, more
+## rhythmically consistent of the 2 supplied tracks) is the continuous
+## in-level background music, replacing the old sparse synth loop;
+## `music_menu_theme` (the more dynamic/atmospheric one) plays on the main
+## menu. `audio()` below loads these; `tex()`/_PATHS above stay texture-only.
+const _AUDIO_TRACKS := {
+	&"music_gameplay_theme": "res://assets/audio/gameplay_theme.mp3",
+	&"music_menu_theme": "res://assets/audio/menu_theme.mp3",
 }
 
 ## Ordered full-screen environment scenes cycled through the campaign so each
@@ -195,6 +225,22 @@ static func tex(id: StringName) -> Texture2D:
 
 static func has(id: StringName) -> bool:
 	return tex(id) != null
+
+static var _audio_cache: Dictionary = {}
+
+## AudioStream for a real recorded track id (_AUDIO_TRACKS), or null if
+## absent — same graceful-degradation contract as tex().
+static func audio(id: StringName) -> AudioStream:
+	if _audio_cache.has(id):
+		return _audio_cache[id]
+	var s: AudioStream = null
+	var path: String = _AUDIO_TRACKS.get(id, "")
+	if path != "" and ResourceLoader.exists(path):
+		var res := load(path)
+		if res is AudioStream:
+			s = res
+	_audio_cache[id] = s
+	return s
 
 ## Island art registry helpers — kw is one of "hero" | "stages" | "map".
 static func island_art(one_based_island: int, kw: String) -> Texture2D:

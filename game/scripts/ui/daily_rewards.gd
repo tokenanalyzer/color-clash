@@ -55,28 +55,33 @@ func _ready() -> void:
 	col.add_theme_constant_override("separation", 18)
 	_frame.content().add_child(col)
 
-	# --- banner title + close X on its own row --------------------
+	# --- ribbon banner title, hung over the frame's top edge (reference
+	# match, 2026-09-05) — a proper pointed-tail ribbon instead of a plain
+	# pill, poking above the panel like a ceremonial plaque + close X ------
 	var title_row := Control.new()
-	title_row.custom_minimum_size = Vector2(0, 66)
+	title_row.custom_minimum_size = Vector2(0, 40)
 	col.add_child(title_row)
 
-	var banner_center := CenterContainer.new()
-	banner_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	banner_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_row.add_child(banner_center)
-	var banner := PanelContainer.new()
-	var bsb := UiKit.button_face(UiKit.PURPLE_FACE, UiKit.PURPLE_DEEP, 16)
-	bsb.border_width_bottom = 4
-	bsb.content_margin_left = 34; bsb.content_margin_right = 34
-	bsb.content_margin_top = 8; bsb.content_margin_bottom = 10
-	banner.add_theme_stylebox_override("panel", bsb)
-	banner_center.add_child(banner)
+	var banner := RibbonBanner.new()
+	banner.anchor_left = 0.5
+	banner.anchor_right = 0.5
+	banner.anchor_top = 0.0
+	banner.anchor_bottom = 0.0
+	banner.offset_left = -170
+	banner.offset_right = 170
+	banner.offset_top = -34
+	banner.offset_bottom = 30
+	title_row.add_child(banner)
 	var title := VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, Color(1, 1, 1))
+	title.set_anchors_preset(Control.PRESET_FULL_RECT)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner.add_child(title)
 
 	var x_btn := UiKit.icon_button(&"close", 52)
 	x_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	x_btn.position = Vector2(4, -6)
+	x_btn.position = Vector2(4, -30)
 	x_btn.z_index = 5
 	var xsb := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 26)
 	xsb.content_margin_left = 0; xsb.content_margin_right = 0
@@ -146,7 +151,7 @@ func refresh() -> void:
 		_claim_btn.disabled = false
 		_claim_btn.modulate.a = 1.0
 	else:
-		_status.text = "Come back tomorrow for Day %d." % clampi(claimed_through + 1, 1, 7)
+		_status.text = "Come back tomorrow for Day %d!" % clampi(claimed_through + 1, 1, 7)
 		_claim_btn.disabled = true
 		_claim_btn.modulate.a = 0.5
 
@@ -213,8 +218,11 @@ class DayTile extends Control:
 		var border := UiKit.GLASS_BORDER
 		match state:
 			&"claimed":
-				body = Color(0.09, 0.17, 0.11, 0.9)
-				border = Color(0.4, 0.85, 0.5, 0.55)
+				# Same neutral charcoal as every other tile (reference match,
+				# 2026-09-05) — the big check overlay alone signals "claimed",
+				# no separate green-tinted background needed.
+				body = Color(0.07, 0.08, 0.15, 0.7)
+				border = Color(0.4, 0.7, 0.5, 0.35)
 			&"current":
 				var p := 0.5 + 0.5 * sin(_t * 6.0)
 				body = Color(0.17, 0.15, 0.08, 0.95)
@@ -227,15 +235,20 @@ class DayTile extends Control:
 				body = Color(0.07, 0.08, 0.15, 0.7)
 				border = Color(1, 1, 1, 0.10)
 		_round_rect(r, 16.0, body)
+		# Day 7 "hero" treatment (2026-09-05 UI pass) — the streak payoff gets
+		# a gold outline of its own regardless of claim state, not just a
+		# bigger coin icon, so it visually reads as the grand prize.
+		if big and state != &"current":
+			border = border.lerp(UiKit.GOLD, 0.6)
 		var rp := ShapeDrawUtils.rounded_rect_points(r.size, 16.0, 5)
 		var moved := PackedVector2Array()
 		for pt in rp:
 			moved.append(pt + r.size * 0.5)
 		moved.append(moved[0])
-		draw_polyline(moved, border, 2.5 if state == &"current" else 2.0, true)
+		draw_polyline(moved, border, 3.0 if (state == &"current" or big) else 2.0, true)
 
 		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(11, 25), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, 15,
+		draw_string(font, Vector2(11, 25), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, VisualTheme.FS_MICRO,
 			VisualTheme.STAR if (big or state == &"current") else VisualTheme.TEXT_DIM)
 
 		var c := Vector2(r.size.x * 0.5, r.size.y * 0.55)
@@ -264,22 +277,21 @@ class DayTile extends Control:
 
 		var amt := int(reward.get("coins", 0))
 		var lbl := ("%d" % amt) if amt > 0 else "BOOST"
-		var lfs := 17
+		var lfs := VisualTheme.FS_CAPTION
 		var ls := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs)
 		draw_string_outline(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, 4, Color(0, 0, 0, 0.7))
 		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, VisualTheme.TEXT if not dim else VisualTheme.TEXT_DIM)
 
 		if state == &"claimed":
-			# green check badge, top-right
-			var bc := Vector2(r.size.x - 20.0, 20.0)
-			draw_circle(bc, 13.0, Color(0.2, 0.6, 0.28))
-			draw_circle(bc, 13.0, Color(0.4, 0.85, 0.5)); draw_circle(bc, 10.0, Color(0.14, 0.4, 0.18))
-			draw_line(bc + Vector2(-5, 0), bc + Vector2(-1, 4), Color.WHITE, 3.0, true)
-			draw_line(bc + Vector2(-1, 4), bc + Vector2(6, -5), Color.WHITE, 3.0, true)
-		elif state == &"future":
-			var lc := Vector2(r.size.x - 20.0, 20.0)
-			draw_arc(lc + Vector2(0, -3), 6.0, PI, TAU, 10, Color(0.7, 0.73, 0.82), 3.0, true)
-			draw_rect(Rect2(lc + Vector2(-6, -3), Vector2(12, 10)), Color(0.7, 0.73, 0.82))
+			# Bigger green check overlapping the reward icon (reference match,
+			# 2026-09-05) — reads as "claimed" at a glance instead of a small
+			# corner badge that's easy to miss.
+			var bc := Vector2(r.size.x - 22.0, r.size.y * 0.55 - 18.0)
+			draw_circle(bc, 17.0, Color(0.14, 0.4, 0.18))
+			draw_circle(bc, 17.0, Color(0.4, 0.85, 0.5, 0.92))
+			draw_circle(bc, 13.0, Color(0.16, 0.46, 0.22))
+			draw_line(bc + Vector2(-6, 0), bc + Vector2(-1, 5), Color.WHITE, 3.5, true)
+			draw_line(bc + Vector2(-1, 5), bc + Vector2(7, -6), Color.WHITE, 3.5, true)
 
 		if _burst > 0.0:
 			var rad := (1.0 - _burst) * r.size.x * 0.9
@@ -292,3 +304,27 @@ class DayTile extends Control:
 		for p in pts:
 			moved.append(p + rect.position + rect.size * 0.5)
 		draw_colored_polygon(moved, color)
+
+
+## A pointed-tail ribbon banner (reference match, 2026-09-05) — a purple
+## body with a V-notch cut into each end and small folded "tail" triangles,
+## gold-bordered, standing in for the plain pill title used previously.
+class RibbonBanner extends Control:
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var body := PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, h), Vector2(0, h)])
+		# flared tails beyond each edge, reading as a hanging ribbon's ends
+		var tail_l := PackedVector2Array([Vector2(0, 0), Vector2(0, h), Vector2(-16, h * 0.5)])
+		var tail_r := PackedVector2Array([Vector2(w, 0), Vector2(w, h), Vector2(w + 16, h * 0.5)])
+		draw_colored_polygon(tail_l, UiKit.PURPLE_DEEP)
+		draw_colored_polygon(tail_r, UiKit.PURPLE_DEEP)
+		draw_colored_polygon(body, UiKit.PURPLE_FACE)
+		var closed := body.duplicate()
+		closed.append(closed[0])
+		draw_polyline(closed, UiKit.GOLD, 3.0, true)
+		draw_polyline(PackedVector2Array([tail_l[0], tail_l[2], tail_l[1]]), UiKit.GOLD_DEEP, 2.5, true)
+		draw_polyline(PackedVector2Array([tail_r[0], tail_r[2], tail_r[1]]), UiKit.GOLD_DEEP, 2.5, true)

@@ -75,7 +75,7 @@ func set_obstacle(pos: Vector2i, obstacle_id: StringName, hp: int) -> void:
 		return
 	cell.obstacle_id = obstacle_id
 	cell.obstacle_hp = hp
-	if obstacle_id == &"lock":
+	if CellData.family_of(obstacle_id) == &"lock":
 		cell.locked_empty = true
 
 ## Fills every fillable empty cell with a random color from available_colors.
@@ -160,14 +160,22 @@ func damage_ice(pos: Vector2i) -> bool:
 		return true
 	return false
 
-## Stone can only be removed by a power's area effect, never a plain clear.
+## Stone-family can only be removed by a power's area effect, never a plain
+## clear. Most of the family (stone/cursed_stone) has no hp (defaults to 0)
+## and always breaks in one hit; Shadow Barrier is placed with hp 2 and
+## needs two separate power blasts (returns false, still blocking, after the
+## first). Returns true only once it's actually gone.
 func damage_stone(pos: Vector2i) -> bool:
 	var cell := get_cell(pos)
 	if cell == null or not cell.is_stone():
 		return false
-	cell.obstacle_id = CellData.OBSTACLE_NONE
-	cell.color_id = CellData.COLOR_EMPTY
-	return true
+	cell.obstacle_hp -= 1
+	if cell.obstacle_hp <= 0:
+		cell.obstacle_id = CellData.OBSTACLE_NONE
+		cell.obstacle_hp = 0
+		cell.color_id = CellData.COLOR_EMPTY
+		return true
+	return false
 
 ## Encases a plain colored piece in ice (Freeze power's ring effect). No-op
 ## on empty / stone / powered / already-obstructed / locked cells. Returns

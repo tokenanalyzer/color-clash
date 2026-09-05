@@ -55,12 +55,17 @@ static func boss_for_stage(level_id: int) -> StringName:
 	var island_idx := (level_id - 1) / BOSS_EVERY
 	return StringName(String(_island_entry(island_idx).get("boss", "")))
 
-## Which enemy "guards" a normal stage — deterministic pick from the
-## island's roster so a stage always shows the same foe.
+## The persistent minor villain for a normal stage — ONE enemy per island,
+## present across all 10 of its stages (2026-09-05 correction), not a
+## rotating pick. Falls back to the old roster-cycling only if an island is
+## missing `minor_villain` (shouldn't happen for the 5 defined islands).
 static func enemy_for_stage(level_id: int) -> StringName:
 	if is_boss_stage(level_id):
 		return boss_for_stage(level_id)
 	var island_idx := (level_id - 1) / BOSS_EVERY
+	var mv := String(_island_entry(island_idx).get("minor_villain", ""))
+	if mv != "":
+		return StringName(mv)
 	var roster := roster_for_island(island_idx)
 	if roster.is_empty():
 		return &""
@@ -83,7 +88,9 @@ static func boss_hp(level_id: int) -> int:
 	return base_hp(tier) + island_idx * 3
 
 ## AtlasTexture for a labelled enemy on the 10-wide top row of the enemy
-## sheet. null for &"jinn" (use Cast.portrait) or a missing sheet.
+## sheet. Uses the checkerboard-KEYED copy (story_enemies_keyed) so the
+## in-arena enemy actor renders with clean transparency. null for &"jinn"
+## (use Cast.portrait) or a missing sheet.
 static func enemy_face(id: StringName) -> Texture2D:
 	if id == &"jinn":
 		return Cast.portrait(Cast.WHO_JINN)
@@ -91,21 +98,39 @@ static func enemy_face(id: StringName) -> Texture2D:
 	var def := enemy_def(id)
 	if def.is_empty():
 		return null
+	# A dedicated single-character art (2026-09-05 polish pass) takes
+	# priority over the shared sheet — see data/enemies.json's `art` field.
+	var art := String(def.get("art", ""))
+	if art != "":
+		var dedicated := AssetLibrary.tex(StringName("story_villain_%s" % art))
+		if dedicated != null:
+			return dedicated
 	var cell := int(def.get("cell", 0))
 	var key := "en_%d" % cell
 	if _atlas_cache.has(key):
 		return _atlas_cache[key]
-	var sheet := AssetLibrary.tex(&"story_enemies")
+	var sheet := AssetLibrary.tex(&"story_enemies_keyed")
+	if sheet == null:
+		sheet = AssetLibrary.tex(&"story_enemies")
 	var result: Texture2D = null
 	if sheet != null:
 		var w := float(sheet.get_width())
 		var h := float(sheet.get_height())
 		var cw := w / 10.0
+		var cx := (float(cell) + 0.5) * cw
+		# generous per-enemy window (keyed margins are transparent, so a
+		# little neighbour aura at the edges is harmless), clamped to the
+		# sheet and stopping above the label bar at ~0.31.
+		var x0 := clampf(cx - cw * 0.60, 0.0, w)
+		var x1 := clampf(cx + cw * 0.60, 0.0, w)
 		var at := AtlasTexture.new()
 		at.atlas = sheet
-		# the labelled row sits just under the title; its art band is roughly
-		# y 6%..26% of the sheet.
-		at.region = Rect2(cell * cw + cw * 0.06, h * 0.055, cw * 0.88, h * 0.205)
+		# The sheet has a "10 MINI BOSSES (JIN'S SERVANTS)" title banner at
+		# y~0.010-0.055 and the "N. NAME" label bar at y~0.27+ — start
+		# inside the clean gap between them (measured) so neither ever gets
+		# picked up (a mirrored fragment of the title showed as garbled
+		# "10 MIN..." text above the enemy on a real device before this).
+		at.region = Rect2(x0, h * 0.065, x1 - x0, h * 0.202)
 		at.filter_clip = true
 		result = at
 	_atlas_cache[key] = result

@@ -7,74 +7,405 @@
       "scene": "cinematic",
       "background": "env_floating_islands",
       "lines": [
-        { "who": "narrator", "text": "The Kingdom of Five Crowns had known only peace." },
-        { "who": "jasmine", "pose": "peaceful", "text": "Another bright morning over Sunlit Falls. Nothing ever changes here... and I love it." },
-        { "who": "jinn", "pose": "determined", "text": "Peace is only a cage that hasn't been rattled, Princess. I have come to rattle it." },
-        { "who": "jasmine", "pose": "scared", "text": "Dark fire — guards! Someone — JAMIE!" },
-        { "who": "jinn", "pose": "determined", "text": "Scream if it comforts you. Your hero is a village away and a world too late." },
-        { "who": "narrator", "text": "Jinn folded into smoke, and Jasmine with him — away through the five kingdoms." },
-        { "who": "jamie", "pose": "worried", "text": "The courtyard's still burning... she's gone. The trail runs into the falls." },
-        { "who": "jamie", "pose": "determined", "text": "Five kingdoms or fifty. I'm bringing her home." }
+        {
+          "who": "narrator",
+          "text": "The Kingdom of Five Crowns had known only peace."
+        },
+        {
+          "who": "jamie",
+          "pose": "happy",
+          "text": "Another perfect morning, Jasmine. I could get used to a thousand more like it."
+        },
+        {
+          "who": "jasmine",
+          "pose": "hopeful",
+          "text": "Then let's make it a thousand, Jamie. Sunlit Falls has never felt so alive."
+        },
+        {
+          "who": "narrator",
+          "flash": "dark_magic",
+          "shake": 10,
+          "particles": "vfx_energy_burst",
+          "text": "The sky split — and something ancient answered."
+        },
+        {
+          "who": "jinn",
+          "pose": "determined",
+          "flash": "red",
+          "text": "Peace is only a cage that hasn't been rattled, Princess. I have come to rattle it."
+        },
+        {
+          "who": "jasmine",
+          "pose": "scared",
+          "text": "Dark fire — guards! Someone — JAMIE!"
+        },
+        {
+          "who": "jasmine",
+          "pose": "captured",
+          "flash": "dark_magic",
+          "shake": 6,
+          "particles": "vfx_lightning_arc",
+          "text": "Jamie — help me!"
+        },
+        {
+          "who": "jinn",
+          "pose": "determined",
+          "text": "Scream if it comforts you, Princess. Come, hero — cross my kingdoms if you dare."
+        },
+        {
+          "who": "narrator",
+          "flash": "dark_magic",
+          "particles": "vfx_energy_burst",
+          "text": "Jinn folded into smoke — and Jasmine with him — away through the five kingdoms."
+        },
+        {
+          "who": "jamie",
+          "pose": "worried",
+          "text": "The courtyard's still burning... she's gone. The trail runs into the falls."
+        },
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "flash": "gold",
+          "text": "Jasmine... I will find you. I'll cross them all — and I'll bring her home."
+        }
       ]
     },
-    { "id": "ch1_start", "trigger": "island_start:0", "scene": "chapter", "background": "env_floating_islands",
-      "lines": [ { "who": "narrator", "text": "CHAPTER ONE  ·  SUNLIT FALLS  ·  The Forest Kingdom" },
-        { "who": "jamie", "pose": "determined", "text": "The woodland's turned against itself. Jinn's magic is in the roots. Cut a path." } ] },
-    { "id": "boss1", "trigger": "stage_start:10", "scene": "boss_intro", "background": "env_floating_islands",
-      "lines": [ { "who": "narrator", "text": "A shape of thorn and green light blocks the pass out of the forest." },
-        { "who": "jamie", "pose": "attacking", "text": "One of his beasts. Move it, or be moved." } ] },
-    { "id": "boss1_done", "trigger": "stage_complete:10", "scene": "story", "background": "env_crystal_formations",
-      "lines": [ { "who": "narrator", "text": "The beast bursts into falling leaves. In the leaves: a shard of Jasmine's tiara, still warm with a spell." },
-        { "who": "jasmine", "pose": "calling", "text": "(a whisper in the light)  Jamie... he's taking me north. Into the ice. Hurry." },
-        { "who": "jamie", "pose": "determined", "text": "Frosthaven. Hold on, Jas." } ] },
-    { "id": "ch2_start", "trigger": "island_start:1", "scene": "chapter", "background": "env_crystal_formations",
-      "lines": [ { "who": "narrator", "text": "CHAPTER TWO  ·  FROSTHAVEN  ·  The Ice Kingdom" } ] },
-    { "id": "boss2", "trigger": "stage_start:20", "scene": "boss_intro", "background": "env_crystal_formations",
-      "lines": [ { "who": "narrator", "text": "An armoured frost-spectre rises from the frozen river." },
-        { "who": "jamie", "pose": "lightning_attack", "text": "Ice against lightning. Bad matchup — for you." } ] },
-    { "id": "boss2_done", "trigger": "stage_complete:20", "scene": "story", "background": "env_large_structures",
-      "lines": [ { "who": "jasmine", "pose": "determined", "text": "(the signal, stronger)  He's slowing down. The heat ahead is Volcania. Be careful of the smoke that thinks." },
-        { "who": "jamie", "pose": "determined", "text": "Volcania. Every kingdom's worse than the last." } ] },
-    { "id": "ch3_start", "trigger": "island_start:2", "scene": "chapter", "background": "env_large_structures",
-      "lines": [ { "who": "narrator", "text": "CHAPTER THREE  ·  VOLCANIA  ·  The Fire Kingdom" } ] },
-    { "id": "jinn_cameo", "trigger": "stage_start:30", "scene": "boss_intro", "background": "env_large_structures",
-      "lines": [ { "who": "jinn", "pose": "enraged", "text": "You are... persistent. Tiresome. Here — a taste of what waits at the end of your little walk." },
-        { "who": "narrator", "text": "The mountain answered him. Jamie barely kept his feet." },
-        { "who": "jamie", "pose": "damaged", "text": "That was a fraction of it. Just a fraction." },
-        { "who": "jinn", "pose": "villain_exit", "text": "Come to Aurora Reach when you're ready to lose properly." } ] },
-    { "id": "boss3_done", "trigger": "stage_complete:30", "scene": "story", "background": "env_clouds_mists",
-      "lines": [ { "who": "jamie", "pose": "determined", "text": "Still standing. Sand next. Keep moving." } ] },
-    { "id": "ch4_start", "trigger": "island_start:3", "scene": "chapter", "background": "env_clouds_mists",
-      "lines": [ { "who": "narrator", "text": "CHAPTER FOUR  ·  SANDORIA  ·  The Desert Kingdom" } ] },
-    { "id": "boss4", "trigger": "stage_start:40", "scene": "boss_intro", "background": "env_clouds_mists",
-      "lines": [ { "who": "narrator", "text": "A sorcerer of chaos and red glass bars the last dune." } ] },
-    { "id": "boss4_done", "trigger": "stage_complete:40", "scene": "story", "background": "env_aurora_energy_bands",
-      "lines": [ { "who": "jasmine", "pose": "determined", "text": "(fighting the spell now)  I bought us a moment. Aurora Reach — his stronghold. The crystal at its heart is where he's keeping me." },
-        { "who": "jamie", "pose": "powered_up", "text": "Last kingdom. Sword, lightning, boots — all of it." } ] },
-    { "id": "ch5_start", "trigger": "island_start:4", "scene": "chapter", "background": "env_aurora_energy_bands",
-      "lines": [ { "who": "narrator", "text": "CHAPTER FIVE  ·  AURORA REACH  ·  The Crystal Kingdom" } ] },
-    { "id": "final_intro", "trigger": "stage_start:50", "scene": "final_boss_intro", "background": "env_aurora_energy_bands",
-      "lines": [ { "who": "narrator", "text": "Jasmine hangs in a prison of singing crystal. Jinn stands between." },
-        { "who": "jinn", "pose": "enraged", "text": "The whole journey, and for what? To die at the door." },
-        { "who": "jasmine", "pose": "calling", "text": "Jamie — don't listen to him. Finish this." },
-        { "who": "jamie", "pose": "ultimate_attack", "text": "I didn't cross five kingdoms to talk. Let her go, Jinn." } ] },
-    { "id": "ch1_mid", "trigger": "stage_complete:5", "scene": "story",
-      "lines": [ { "who": "jamie", "pose": "determined", "text": "Halfway through the forest. The creatures are getting bolder — and they're all pointed the same way. North." } ] },
-    { "id": "ch2_mid", "trigger": "stage_complete:15", "scene": "story",
-      "lines": [ { "who": "jinn", "pose": "villain_taunt", "text": "You move well on ice, little hero. Enjoy it. The next kingdom will melt that confidence off you." },
-        { "who": "jamie", "pose": "attacking", "text": "Keep talking. Every word tells me you're still close." } ] },
-    { "id": "ch3_mid", "trigger": "stage_complete:25", "scene": "story",
-      "lines": [ { "who": "jasmine", "pose": "worried", "text": "(faint through the heat)  The fire kingdom's guardians answer to him directly now. Don't trust the ground." } ] },
-    { "id": "ch4_mid", "trigger": "stage_complete:35", "scene": "story",
-      "lines": [ { "who": "jinn", "pose": "enraged", "text": "Forty kingdoms of servants and you walk through them like a market. No matter. The desert keeps its own." } ] },
-    { "id": "ch5_mid", "trigger": "stage_complete:45", "scene": "story",
-      "lines": [ { "who": "jasmine", "pose": "hopeful", "text": "I can see the crystal spire from here, Jamie. I can see YOU. Almost." },
-        { "who": "jamie", "pose": "powered_up", "text": "Almost is over. I'm coming up." } ] },
-    { "id": "ending", "trigger": "stage_complete:50", "scene": "finale", "background": "env_aurora_energy_bands",
-      "lines": [ { "who": "narrator", "text": "The crystal shattered. The dark went out of the five kingdoms all at once, like a held breath let go." },
-        { "who": "jasmine", "pose": "rescued", "text": "You took your time." },
-        { "who": "jamie", "pose": "victory", "text": "Traffic. Five kingdoms of it." },
-        { "who": "narrator", "text": "They walked home the long way, through kingdoms learning to be bright again." },
-        { "who": "narrator", "text": "— WE WIN —" } ] }
+    {
+      "id": "ch1_start",
+      "trigger": "island_start:0",
+      "scene": "chapter",
+      "background": "env_floating_islands",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "CHAPTER ONE  ·  SUNLIT FALLS  ·  The Forest Kingdom"
+        },
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "text": "The woodland's turned against itself. Jinn's magic is in the roots. Cut a path."
+        }
+      ]
+    },
+    {
+      "id": "boss1",
+      "trigger": "stage_start:10",
+      "scene": "boss_intro",
+      "background": "env_floating_islands",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "A shape of thorn and green light blocks the pass out of the forest."
+        },
+        {
+          "who": "jamie",
+          "pose": "attacking",
+          "text": "One of his beasts. Move it, or be moved."
+        }
+      ]
+    },
+    {
+      "id": "boss1_done",
+      "trigger": "stage_complete:10",
+      "scene": "story",
+      "background": "env_crystal_formations",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "The beast bursts into falling leaves. In the leaves: a shard of Jasmine's tiara, still warm with a spell."
+        },
+        {
+          "who": "jasmine",
+          "pose": "calling",
+          "text": "(a whisper in the light)  Jamie... he's taking me north. Into the ice. Hurry."
+        },
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "text": "Frosthaven. Hold on, Jas."
+        }
+      ]
+    },
+    {
+      "id": "ch2_start",
+      "trigger": "island_start:1",
+      "scene": "chapter",
+      "background": "env_crystal_formations",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "CHAPTER TWO  ·  FROSTHAVEN  ·  The Ice Kingdom"
+        }
+      ]
+    },
+    {
+      "id": "boss2",
+      "trigger": "stage_start:20",
+      "scene": "boss_intro",
+      "background": "env_crystal_formations",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "An armoured frost-spectre rises from the frozen river."
+        },
+        {
+          "who": "jamie",
+          "pose": "lightning_attack",
+          "text": "Ice against lightning. Bad matchup — for you."
+        }
+      ]
+    },
+    {
+      "id": "boss2_done",
+      "trigger": "stage_complete:20",
+      "scene": "story",
+      "background": "env_large_structures",
+      "lines": [
+        {
+          "who": "jasmine",
+          "pose": "determined",
+          "text": "(the signal, stronger)  He's slowing down. The heat ahead is Volcania. Be careful of the smoke that thinks."
+        },
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "text": "Volcania. Every kingdom's worse than the last."
+        }
+      ]
+    },
+    {
+      "id": "ch3_start",
+      "trigger": "island_start:2",
+      "scene": "chapter",
+      "background": "env_large_structures",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "CHAPTER THREE  ·  VOLCANIA  ·  The Fire Kingdom"
+        }
+      ]
+    },
+    {
+      "id": "jinn_cameo",
+      "trigger": "stage_start:30",
+      "scene": "boss_intro",
+      "background": "env_large_structures",
+      "lines": [
+        {
+          "who": "jinn",
+          "pose": "enraged",
+          "text": "You are... persistent. Tiresome. Here — a taste of what waits at the end of your little walk."
+        },
+        {
+          "who": "narrator",
+          "text": "The mountain answered him. Jamie barely kept his feet."
+        },
+        {
+          "who": "jamie",
+          "pose": "damaged",
+          "text": "That was a fraction of it. Just a fraction."
+        },
+        {
+          "who": "jinn",
+          "pose": "villain_exit",
+          "text": "Come to Aurora Reach when you're ready to lose properly."
+        }
+      ]
+    },
+    {
+      "id": "boss3_done",
+      "trigger": "stage_complete:30",
+      "scene": "story",
+      "background": "env_clouds_mists",
+      "lines": [
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "text": "Still standing. Sand next. Keep moving."
+        }
+      ]
+    },
+    {
+      "id": "ch4_start",
+      "trigger": "island_start:3",
+      "scene": "chapter",
+      "background": "env_clouds_mists",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "CHAPTER FOUR  ·  SANDORIA  ·  The Desert Kingdom"
+        }
+      ]
+    },
+    {
+      "id": "boss4",
+      "trigger": "stage_start:40",
+      "scene": "boss_intro",
+      "background": "env_clouds_mists",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "A sorcerer of chaos and red glass bars the last dune."
+        }
+      ]
+    },
+    {
+      "id": "boss4_done",
+      "trigger": "stage_complete:40",
+      "scene": "story",
+      "background": "env_aurora_energy_bands",
+      "lines": [
+        {
+          "who": "jasmine",
+          "pose": "determined",
+          "text": "(fighting the spell now)  I bought us a moment. Aurora Reach — his stronghold. The crystal at its heart is where he's keeping me."
+        },
+        {
+          "who": "jamie",
+          "pose": "powered_up",
+          "text": "Last kingdom. Sword, lightning, boots — all of it."
+        }
+      ]
+    },
+    {
+      "id": "ch5_start",
+      "trigger": "island_start:4",
+      "scene": "chapter",
+      "background": "env_aurora_energy_bands",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "CHAPTER FIVE  ·  AURORA REACH  ·  The Crystal Kingdom"
+        }
+      ]
+    },
+    {
+      "id": "final_intro",
+      "trigger": "stage_start:50",
+      "scene": "final_boss_intro",
+      "background": "env_aurora_energy_bands",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "Jasmine hangs in a prison of singing crystal. Jinn stands between."
+        },
+        {
+          "who": "jinn",
+          "pose": "enraged",
+          "text": "The whole journey, and for what? To die at the door."
+        },
+        {
+          "who": "jasmine",
+          "pose": "calling",
+          "text": "Jamie — don't listen to him. Finish this."
+        },
+        {
+          "who": "jamie",
+          "pose": "ultimate_attack",
+          "text": "I didn't cross five kingdoms to talk. Let her go, Jinn."
+        }
+      ]
+    },
+    {
+      "id": "ch1_mid",
+      "trigger": "stage_complete:5",
+      "scene": "story",
+      "lines": [
+        {
+          "who": "jamie",
+          "pose": "determined",
+          "text": "Halfway through the forest. The creatures are getting bolder — and they're all pointed the same way. North."
+        }
+      ]
+    },
+    {
+      "id": "ch2_mid",
+      "trigger": "stage_complete:15",
+      "scene": "story",
+      "lines": [
+        {
+          "who": "jinn",
+          "pose": "villain_taunt",
+          "text": "You move well on ice, little hero. Enjoy it. The next kingdom will melt that confidence off you."
+        },
+        {
+          "who": "jamie",
+          "pose": "attacking",
+          "text": "Keep talking. Every word tells me you're still close."
+        }
+      ]
+    },
+    {
+      "id": "ch3_mid",
+      "trigger": "stage_complete:25",
+      "scene": "story",
+      "lines": [
+        {
+          "who": "jasmine",
+          "pose": "worried",
+          "text": "(faint through the heat)  The fire kingdom's guardians answer to him directly now. Don't trust the ground."
+        }
+      ]
+    },
+    {
+      "id": "ch4_mid",
+      "trigger": "stage_complete:35",
+      "scene": "story",
+      "lines": [
+        {
+          "who": "jinn",
+          "pose": "enraged",
+          "text": "Forty kingdoms of servants and you walk through them like a market. No matter. The desert keeps its own."
+        }
+      ]
+    },
+    {
+      "id": "ch5_mid",
+      "trigger": "stage_complete:45",
+      "scene": "story",
+      "lines": [
+        {
+          "who": "jasmine",
+          "pose": "hopeful",
+          "text": "I can see the crystal spire from here, Jamie. I can see YOU. Almost."
+        },
+        {
+          "who": "jamie",
+          "pose": "powered_up",
+          "text": "Almost is over. I'm coming up."
+        }
+      ]
+    },
+    {
+      "id": "ending",
+      "trigger": "stage_complete:50",
+      "scene": "finale",
+      "background": "env_aurora_energy_bands",
+      "lines": [
+        {
+          "who": "narrator",
+          "text": "The crystal shattered. The dark went out of the five kingdoms all at once, like a held breath let go."
+        },
+        {
+          "who": "jasmine",
+          "pose": "rescued",
+          "text": "You took your time."
+        },
+        {
+          "who": "jamie",
+          "pose": "victory",
+          "text": "Traffic. Five kingdoms of it."
+        },
+        {
+          "who": "narrator",
+          "text": "They walked home the long way, through kingdoms learning to be bright again."
+        },
+        {
+          "who": "narrator",
+          "text": "— WE WIN —"
+        }
+      ]
+    }
   ]
 }

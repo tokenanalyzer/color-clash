@@ -787,6 +787,36 @@ func _play_power_tap(pos: Vector2i) -> void:
 	if not board.has_any_valid_move():
 		await _reshuffle()
 
+## The two distinct power ids that detonated this move (order-stable — first
+## two distinct ids seen in `powers_activated`). Falls back to duplicating
+## the one power found if, unusually, every activation this move was the
+## same id detonating more than twice (still a valid same-power combo, e.g.
+## three Bombs — reads as "bomb+bomb").
+static func _combo_pair(powers_activated: Array) -> Array[StringName]:
+	var pair: Array[StringName] = []
+	for p in powers_activated:
+		var pid: StringName = p["power_id"]
+		if not pair.has(pid):
+			pair.append(pid)
+		if pair.size() >= 2:
+			break
+	if pair.is_empty():
+		pair.append(&"bomb")
+	if pair.size() < 2:
+		pair.append(pair[0])
+	return pair
+
+func _combo_tint(a: StringName, b: StringName) -> Color:
+	var ca: Color = _POW_FX_TINT.get(a, VisualTheme.ACCENT_HOT)
+	var cb: Color = _POW_FX_TINT.get(b, VisualTheme.ACCENT_HOT)
+	return ca.lerp(cb, 0.5)
+
+func _combo_label(a: StringName, b: StringName) -> String:
+	var pair := [String(a), String(b)]
+	pair.sort()
+	var key := "%s+%s" % [pair[0], pair[1]]
+	return String(GameData.power_combo_labels.get(key, "POWER COMBO!"))
+
 static func _power_sfx_id(power_id: StringName) -> StringName:
 	match power_id:
 		&"bomb":
@@ -821,15 +851,24 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 	var is_combo := combo_powers >= 2
 	if is_combo:
 		var cc := _board_rect_center()
-		sfx.play(&"power_combo_core", to_global(cc), _cell_size * 4.2, Color(1, 1, 1), 0.5, true, 1.6)
-		sfx.play_hold(&"vfx_shockwave_ring", to_global(cc), _cell_size * 9.0, VisualTheme.ACCENT_HOT, 0.55)
+		# 2026-09-05: a combo is no longer just "everything amplified" — its
+		# identity (name, color, and the actual two power sounds layered) is
+		# derived from WHICH powers detonated together, so bomb+bomb reads
+		# differently from lightning+lightning or bomb+lightning instead of
+		# all three just being a bigger generic blast.
+		var pair := _combo_pair(result.powers_activated)
+		var combo_tint := _combo_tint(pair[0], pair[1])
+		var combo_label := _combo_label(pair[0], pair[1])
+		sfx.play(_power_sfx_id(pair[0]), to_global(cc), _cell_size * 4.2, combo_tint, 0.5, true, 1.6)
+		sfx.play(_power_sfx_id(pair[1]), to_global(cc), _cell_size * 3.6, combo_tint, 0.42, true, 1.3)
+		sfx.play_hold(&"vfx_shockwave_ring", to_global(cc), _cell_size * 9.0, combo_tint, 0.55)
 		particles.flash(to_global(cc), Color(1, 1, 1), _cell_size * 7.0)
-		particles.flash(to_global(cc), VisualTheme.ACCENT_HOT, _cell_size * 9.5)
+		particles.flash(to_global(cc), combo_tint, _cell_size * 9.5)
 		ScreenShake.apply(self, 10.0 + float(combo_powers) * 2.0, 0.34)
 		Haptics.strong(90)
 		Audio.play(&"combo_ding", 0.0, 2)
-		ComboPopup.spawn(self, cc - Vector2(0, _cell_size * 1.4), "POWER COMBO!",
-			VisualTheme.ACCENT_HOT, 52, "x%d BLAST" % combo_powers)
+		ComboPopup.spawn(self, cc - Vector2(0, _cell_size * 1.4), combo_label,
+			combo_tint, 52, "x%d BLAST" % combo_powers)
 
 	for wave_index in result.wave_cells.size():
 		var cells: Array = result.wave_cells[wave_index]
@@ -1111,6 +1150,41 @@ func request_shuffle() -> void:
 	if _locked_input or board == null:
 		return
 	await _reshuffle()
+
+## Boss stage "counter-attack" pressure mechanic (driven by app.gd, not the
+## board itself): obstructs one live, unobstructed, powerless cell with an
+## obstacle — reusing the exact same obstacle plumbing a level-authored
+## obstacle uses (an `ice`-family id here: any clear/blast damages it), just
+## placed mid-fight. Never strands the player: if a candidate cell would
+## leave zero valid moves anywhere on the board, that placement is reverted
+## and another cell is tried. Returns false (no-op) if no safe cell exists.
+func boss_obstruct_random_cell(obstacle_id: StringName, hp: int) -> bool:
+	if board == null:
+		return false
+	var candidates: Array[Vector2i] = []
+	for x in board.width:
+		for y in board.height:
+			var pos := Vector2i(x, y)
+			var cell := board.get_cell(pos)
+			if cell != null and cell.is_selectable() and not cell.has_obstacle() and not cell.has_power():
+				candidates.append(pos)
+	while not candidates.is_empty():
+		var idx := rng.randi_range(0, candidates.size() - 1)
+		var pos: Vector2i = candidates[idx]
+		candidates.remove_at(idx)
+		var cell := board.get_cell(pos)
+		var prev_id := cell.obstacle_id
+		var prev_hp := cell.obstacle_hp
+		board.set_obstacle(pos, obstacle_id, hp)
+		if board.has_any_valid_move():
+			var node := _node_at(pos)
+			if node != null:
+				node.configure(cell.color_id, cell.power_id, cell.obstacle_id, cell.obstacle_hp, _cell_size, palette)
+			particles.flash(to_global(_slot_center(pos)), Color(0.6, 0.15, 0.75), _cell_size * 1.6)
+			return true
+		cell.obstacle_id = prev_id
+		cell.obstacle_hp = prev_hp
+	return false
 
 func _spawn_ghost(cell: CellData, pos: Vector2) -> PieceView:
 	var ghost := PieceView.new()

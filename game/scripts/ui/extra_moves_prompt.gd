@@ -17,7 +17,7 @@ signal bought(moves_added: int)
 signal gave_up()
 
 var _scrim: ColorRect
-var _panel: PanelContainer
+var _panel: UiKit.GoldFramePanel
 var _tier_box: VBoxContainer
 var _coins_label: Label
 var _is_open := false
@@ -41,21 +41,16 @@ func _ready() -> void:
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(center)
 
-	_panel = PanelContainer.new()
+	# Gold-framed chrome (2026-09-05 UI pass) — same dialog family as every
+	# other modal, replacing a hand-rolled stylebox that was the odd one out.
+	_panel = UiKit.GoldFramePanel.new(22)
 	_panel.custom_minimum_size = Vector2(520, 560)
-	var sb := UiKit.glass(28, true)
-	sb.bg_color = Color(0.08, 0.09, 0.18, 0.96)
-	sb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.45)
-	sb.set_border_width_all(2)
-	sb.content_margin_left = 26; sb.content_margin_right = 26
-	sb.content_margin_top = 24; sb.content_margin_bottom = 24
-	_panel.add_theme_stylebox_override("panel", sb)
 	center.add_child(_panel)
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 14)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
-	_panel.add_child(v)
+	_panel.content().add_child(v)
 
 	var title := VisualTheme.label("NEED MORE MOVES?", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -109,17 +104,43 @@ func _rebuild() -> void:
 	for t in GameData.continue_offers.tiers():
 		_tier_box.add_child(_tier_button(t))
 
+## Label and price get their own columns (2026-09-05 UI pass) — previously
+## one run-on string with no visual hierarchy between what you're buying
+## and what it costs.
 func _tier_button(t: Dictionary) -> Button:
 	var id: StringName = t["id"]
 	var cost := int(t["cost"])
 	var afford := Economy.can_afford(cost)
 	var after := maxi(Economy.coins - cost, 0)
-	var b := UiKit.button("%s      %d  (→ %d)" % [String(t["label"]).to_upper(), cost, after],
-		&"primary" if afford else &"tertiary", VisualTheme.FS_MICRO)
-	b.custom_minimum_size = Vector2(420, 74)
+	var b := UiKit.button("", &"primary" if afford else &"tertiary", VisualTheme.FS_BODY)
+	b.custom_minimum_size = Vector2(420, 78)
 	b.disabled = not afford
 	b.modulate.a = 1.0 if afford else 0.45
 	b.pressed.connect(func(): _buy(id))
+
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.offset_left = 22; row.offset_right = -22
+	row.offset_top = 6; row.offset_bottom = -6
+	row.add_theme_constant_override("separation", 10)
+	b.add_child(row)
+
+	var label := VisualTheme.label(String(t["label"]).to_upper(), VisualTheme.FS_BODY, Color(1, 1, 1))
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	row.add_child(label)
+
+	var price_col := VBoxContainer.new()
+	price_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(price_col)
+	var price_lbl := VisualTheme.label("%d ¢" % cost, VisualTheme.FS_HEADING, Color(1, 1, 1))
+	price_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	price_col.add_child(price_lbl)
+	var after_lbl := VisualTheme.label("→ %d" % after, VisualTheme.FS_MICRO, Color(1, 1, 1, 0.75), 0)
+	after_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	price_col.add_child(after_lbl)
+
 	return b
 
 ## Spend + report the moves to add. app.gd adds them to the live level and

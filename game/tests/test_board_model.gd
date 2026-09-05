@@ -74,6 +74,47 @@ func test_lock_unlocks_from_neighbor_clear() -> void:
 	check("neighbor_clear_unlocks_lock", unlocked.has(Vector2i(1, 0)))
 	check("lock_cell_now_fillable", not board.get_cell(Vector2i(1, 0)).is_lock())
 
+## 2026-09-05 depth pass: 7 themed blocker ids reuse the 4 proven mechanic
+## families (see cell_data.gd's _FAMILY table) rather than inventing new
+## ones. These tests lock in the family mapping + the one real behavior
+## change (Shadow Barrier needs 2 power hits, not stone's usual 1).
+func test_new_blocker_ids_map_to_the_right_family() -> void:
+	var board := _colored_board(3, 3, &"red")
+	board.set_obstacle(Vector2i(0, 0), &"wooden_crate", 1)
+	board.set_obstacle(Vector2i(1, 0), &"reinforced_crate", 3)
+	board.set_obstacle(Vector2i(2, 0), &"frozen_crystal", 2)
+	board.set_obstacle(Vector2i(0, 1), &"magic_chain", 1)
+	board.set_obstacle(Vector2i(1, 1), &"cursed_stone", 0)
+	board.set_obstacle(Vector2i(2, 1), &"shadow_barrier", 2)
+	board.set_obstacle(Vector2i(0, 2), &"dark_rune", 3)
+	check("wooden_crate is ice-family", board.get_cell(Vector2i(0, 0)).is_ice())
+	check("reinforced_crate is ice-family", board.get_cell(Vector2i(1, 0)).is_ice())
+	check("frozen_crystal is ice-family", board.get_cell(Vector2i(2, 0)).is_ice())
+	check("magic_chain is lock-family", board.get_cell(Vector2i(0, 1)).is_lock())
+	check("magic_chain starts unselectable", not board.get_cell(Vector2i(0, 1)).is_selectable())
+	check("cursed_stone is stone-family", board.get_cell(Vector2i(1, 1)).is_stone())
+	check("shadow_barrier is stone-family", board.get_cell(Vector2i(2, 1)).is_stone())
+	check("dark_rune is timebomb-family", board.get_cell(Vector2i(0, 2)).is_timebomb())
+
+func test_reinforced_crate_needs_three_hits() -> void:
+	var board := _colored_board(3, 3, &"red")
+	board.set_obstacle(Vector2i(0, 0), &"reinforced_crate", 3)
+	check("survives_hit_1", not board.damage_ice(Vector2i(0, 0)))
+	check("survives_hit_2", not board.damage_ice(Vector2i(0, 0)))
+	check("breaks_on_hit_3", board.damage_ice(Vector2i(0, 0)))
+
+func test_cursed_stone_still_breaks_in_one_hit() -> void:
+	var board := BoardModel.new(3, 3, 3)
+	board.set_obstacle(Vector2i(0, 0), &"cursed_stone", 0)
+	check("cursed_stone_one_hit_break", board.damage_stone(Vector2i(0, 0)))
+
+func test_shadow_barrier_needs_two_power_hits() -> void:
+	var board := BoardModel.new(3, 3, 3)
+	board.set_obstacle(Vector2i(0, 0), &"shadow_barrier", 2)
+	check("survives_first_power_hit", not board.damage_stone(Vector2i(0, 0)))
+	check("still_blocks_selection_after_first_hit", not board.get_cell(Vector2i(0, 0)).is_selectable())
+	check("breaks_on_second_power_hit", board.damage_stone(Vector2i(0, 0)))
+
 func test_gravity_compacts_column_and_stops_at_blockers() -> void:
 	var board := BoardModel.new(1, 5, 3)
 	board.set_obstacle(Vector2i(0, 3), &"stone", 0)

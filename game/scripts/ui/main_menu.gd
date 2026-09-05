@@ -11,6 +11,10 @@ signal daily_pressed()
 signal inventory_pressed()
 
 const VERSION_TEXT := "v0.5  •  offline"
+## How far the logo (and, to preserve its tuned gap, the PLAY/action column
+## below it) shift down from their original position (2026-09-05 UI pass —
+## more breathing room under the taller currency chips).
+const LOGO_DROP := 130.0
 
 var _coins_label: Label
 var _gems_label: Label
@@ -22,7 +26,6 @@ var _top_bar_margin: MarginContainer
 var _action_col: VBoxContainer
 var _play_btn: Button
 var _version: Label
-var _toast: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -44,26 +47,29 @@ func _ready() -> void:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title)
 
-	# --- frosted glass currency bar ----------------------------------
+	# --- currency chips, no outer bar -------------------------------
+	# 2026-09-05 UI pass: the chips already carry their own frosted-glass
+	# pill (UiKit.currency_chip's glass(26)) — wrapping them in a SECOND,
+	# bigger glass pill stacked the translucency into a flat, muddy dark
+	# strip. Dropping the outer panel and just laying the two chips out
+	# side by side reads far cleaner.
 	_top_bar = PanelContainer.new()
-	var sb := UiKit.glass(26)
-	sb.shadow_size = 18
-	_top_bar.add_theme_stylebox_override("panel", sb)
+	_top_bar.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(_top_bar)
 	_top_bar_margin = MarginContainer.new()
 	_top_bar_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_top_bar.add_child(_top_bar_margin)
 	var top := HBoxContainer.new()
 	top.alignment = BoxContainer.ALIGNMENT_CENTER
-	top.add_theme_constant_override("separation", 16)
+	top.add_theme_constant_override("separation", 20)
 	_top_bar_margin.add_child(top)
 	var coin := UiKit.currency_chip(&"coin", VisualTheme.TEXT_GOLD, true)
 	_coins_label = coin["value"]
-	(coin["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	(coin["plus"] as Button).pressed.connect(func(): UiKit.show_toast(self, "Shop coming soon"))
 	top.add_child(coin["root"])
 	var gem := UiKit.currency_chip(&"crystal", Color(0.82, 0.72, 1.0), true)
 	_gems_label = gem["value"]
-	(gem["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	(gem["plus"] as Button).pressed.connect(func(): UiKit.show_toast(self, "Shop coming soon"))
 	top.add_child(gem["root"])
 
 	# --- action column: PLAY (large) then DAILY + SETTINGS ----------
@@ -127,13 +133,6 @@ func _ready() -> void:
 	_settings = SettingsPanel.new()
 	add_child(_settings)
 
-	_toast = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT, 5)
-	_toast.set_anchors_preset(Control.PRESET_CENTER)
-	_toast.add_theme_stylebox_override("normal", UiKit.glass(16, true))
-	_toast.modulate.a = 0.0
-	_toast.z_index = 60
-	add_child(_toast)
-
 	_apply_safe_area()
 	refresh()
 
@@ -150,7 +149,7 @@ func _apply_safe_area() -> void:
 	var vp := get_viewport_rect().size
 	var bar_w: float = clampf(vp.x - 48.0, 280.0, 720.0)
 	_top_bar.position = Vector2((vp.x - bar_w) * 0.5, si.position.y + 16.0)
-	_top_bar.size = Vector2(bar_w, 64.0)
+	_top_bar.size = Vector2(bar_w, 76.0)
 	_top_bar.custom_minimum_size = _top_bar.size
 	_top_bar_margin.add_theme_constant_override("margin_left", 14)
 	_top_bar_margin.add_theme_constant_override("margin_right", 14)
@@ -159,8 +158,9 @@ func _apply_safe_area() -> void:
 	_action_col.offset_left = (vp.x - btn_w) * 0.5
 	_action_col.offset_right = -(vp.x - btn_w) * 0.5
 	# PLAY centred around ~46% of the screen height — clearly the focus,
-	# well clear of the bottom stone platform in the backdrop art.
-	_action_col.offset_top = clampf(vp.y * 0.40, si.position.y + 220.0, vp.y - 340.0)
+	# well clear of the bottom stone platform in the backdrop art. Shifted
+	# down by LOGO_DROP to follow the logo and keep their gap unchanged.
+	_action_col.offset_top = clampf(vp.y * 0.40, si.position.y + 220.0, vp.y - 340.0) + LOGO_DROP
 
 	_version.offset_top = -(si.size.y + 32.0)
 	_version.offset_bottom = -(si.size.y + 10.0)
@@ -182,14 +182,6 @@ func refresh() -> void:
 	_gems_label.text = str(SaveService.get_int("gems", 0))
 	if _daily_dot != null:
 		_daily_dot.visible = DailyRewardsScreen.has_claimable()
-
-func _show_toast(text: String) -> void:
-	_toast.text = "  %s  " % text
-	_toast.position = Vector2((size.x - _toast.size.x) * 0.5, size.y * 0.66)
-	var t := _toast.create_tween()
-	t.tween_property(_toast, "modulate:a", 1.0, 0.14)
-	t.tween_interval(1.1)
-	t.tween_property(_toast, "modulate:a", 0.0, 0.35)
 
 func _bounce(node: Control) -> void:
 	if node == null:
@@ -230,7 +222,12 @@ class TitleBlock extends Control:
 			return
 		var si := VisualTheme.safe_insets(self)
 		var cx := s.x * 0.5
-		var cy: float = maxf(s.y * 0.20, si.position.y + 150.0) + sin(_t * 1.4) * 5.0
+		# Pushed down a fixed amount (2026-09-05 UI pass, see
+		# MainMenu.LOGO_DROP) so the crest clears the now-taller currency
+		# chips with real breathing room — _apply_safe_area() shifts the
+		# PLAY/action column down by the same amount so the logo-to-button
+		# gap this was already tuned against doesn't change.
+		var cy: float = maxf(s.y * 0.20, si.position.y + 150.0) + MainMenu.LOGO_DROP + sin(_t * 1.4) * 5.0
 
 		var logo := AssetLibrary.tex(&"brand_wordmark")
 		if logo != null:

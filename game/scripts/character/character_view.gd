@@ -14,6 +14,10 @@ const _ACCENT := Color(0.42, 0.78, 1.0)
 const _BODY := Color(0.16, 0.19, 0.32)
 const _BODY_HI := Color(0.28, 0.34, 0.54)
 
+## Which cast member this view renders (Cast.WHO_*). Jamie is the default so
+## existing callers are unchanged; app.gd repoints one instance to Jasmine so
+## she stays present and reacting on the battlefield (Phase C).
+var who: StringName = Cast.WHO_JAMIE
 var _pose: StringName = &"idle"
 var _line: String = ""
 var _show_bubble := false
@@ -53,13 +57,34 @@ func set_idle() -> void:
 	_show_bubble = false
 	queue_redraw()
 
+## When true, render only the clean supplied portrait for `who`, fitted
+## inside the control rect (keep-aspect, feet on the bottom edge) — no
+## code-drawn fallback, no pose-sheet slicing. Used for the combat-arena
+## Jasmine so she reads as a real character, not a corner sticker.
+var portrait_only := false
+
 func _draw() -> void:
+	if portrait_only:
+		var pt := Cast.portrait(who)
+		if pt != null:
+			var m2: float = maxf(float(pt.get_width()), float(pt.get_height()))
+			var fit: float = minf(size.x / (pt.get_width() / m2), size.y / (pt.get_height() / m2))
+			var pw := fit * pt.get_width() / m2
+			var ph := fit * pt.get_height() / m2
+			draw_texture_rect(pt, Rect2(Vector2(size.x * 0.5 - pw * 0.5, size.y - ph), Vector2(pw, ph)), false)
+		_draw_bubble()
+		return
+
 	# Real art path (none registered yet) — blit and stop.
 	# real hero art (Jamie) — pose-specific char_* override first, then the
 	# supplied Jamie portrait, then the code-drawn placeholder below.
-	var tex := AssetLibrary.tex(StringName("char_" + String(_pose)))
+	var tex: Texture2D = null
+	if who == Cast.WHO_JAMIE:
+		tex = AssetLibrary.tex(StringName("char_" + String(_pose)))
 	if tex == null:
-		tex = Cast.portrait(Cast.WHO_JAMIE)
+		tex = Cast.pose(who, _pose)
+	if tex == null:
+		tex = Cast.portrait(who)
 	if tex != null:
 		var s := minf(size.x, size.y) * 1.9
 		var m: float = maxf(float(tex.get_width()), float(tex.get_height()))

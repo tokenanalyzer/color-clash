@@ -28,6 +28,26 @@ func test_normal_stage_enemy_is_deterministic_from_the_island_roster() -> void:
 	check("stage-3 enemy is from island 0's roster", roster.has(a))
 	check("island 2 roster has fire_imp", EnemyModel.roster_for_island(2).has(&"fire_imp"))
 
+func test_one_persistent_minor_villain_per_chapter() -> void:
+	# 2026-09-05 hard requirement: the SAME minor villain (normal stages) AND
+	# boss (the chapter's 10th stage) appear across an entire 10-stage
+	# island — never rotating per stage.
+	var chapters := [
+		{"stages": [1, 2, 5, 9, 10], "id": "poison_beast"},
+		{"stages": [11, 12, 15, 19, 20], "id": "ice_wraith"},
+		{"stages": [21, 22, 25, 29, 30], "id": "dark_knight"},
+		{"stages": [31, 32, 35, 39, 40], "id": "chaos_sorcerer"},
+	]
+	for chapter in chapters:
+		for stage in chapter["stages"]:
+			check_eq("stage %d shows %s" % [stage, chapter["id"]],
+				String(EnemyModel.enemy_for_stage(stage)), String(chapter["id"]))
+	# Island 5 (41-49 normal, 50 = Jinn) is the one exception: its persistent
+	# minor villain (stone_golem) is NOT the same id as the stage-50 boss.
+	for stage in [41, 42, 45, 49]:
+		check_eq("stage %d shows stone_golem" % stage, String(EnemyModel.enemy_for_stage(stage)), "stone_golem")
+	check_eq("stage 50 is Jinn (final boss, not stone_golem)", String(EnemyModel.enemy_for_stage(50)), "jinn")
+
 func test_hp_scales_by_tier_and_chapter() -> void:
 	check_eq("normal base hp", EnemyModel.base_hp(&"normal"), 3)
 	check_eq("final boss base hp", EnemyModel.base_hp(&"final_boss"), 30)

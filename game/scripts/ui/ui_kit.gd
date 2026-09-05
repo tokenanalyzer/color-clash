@@ -69,6 +69,9 @@ static func button_face(face: Color, deep: Color, radius: int = 20) -> StyleBoxF
 	sb.anti_aliasing = true
 	return sb
 
+const _TAB_INACTIVE_FACE := Color(0.16, 0.19, 0.30)
+const _TAB_INACTIVE_DEEP := Color(0.07, 0.09, 0.17)
+
 ## Colour pair for a button "kind".
 static func _kind_colors(kind: StringName) -> Array:
 	match kind:
@@ -76,37 +79,57 @@ static func _kind_colors(kind: StringName) -> Array:
 		&"secondary": return [PURPLE_FACE, PURPLE_DEEP]
 		&"tertiary": return [BLUE_FACE, BLUE_DEEP]
 		&"danger": return [RED_FACE, RED_DEEP]
+		# A real selected/unselected pair for segmented tab rows (2026-09-05
+		# UI pass) — the active tab is gold-filled (matches the app's gold
+		# "premium" accent), the inactive ones sit on the same quiet glass
+		# tone as everything else, replacing the old alpha-dim hack.
+		&"tab_active": return [GOLD, GOLD_DEEP]
+		&"tab_inactive": return [_TAB_INACTIVE_FACE, _TAB_INACTIVE_DEEP]
 		_: return [GREEN_FACE, GREEN_DEEP]
 
 # --------------------------------------------------------------- widgets --
 
 ## The premium campaign button. `kind`: primary | secondary | tertiary | danger.
-static func button(text: String, kind: StringName = &"primary", font_size: int = -1) -> Button:
-	var cols := _kind_colors(kind)
-	var face: Color = cols[0]
-	var deep: Color = cols[1]
+## `radius` lets a caller ask for a fuller pill shape (e.g. Settings' link
+## rows, which read as stadium-shaped in the reference) without touching the
+## default chunky-bevel look everywhere else.
+static func button(text: String, kind: StringName = &"primary", font_size: int = -1, radius: int = 20) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.focus_mode = Control.FOCUS_NONE
 	b.clip_contents = false
 	b.add_theme_font_size_override("font_size", font_size if font_size > 0 else VisualTheme.FS_BUTTON)
-	b.add_theme_color_override("font_color", Color(1, 1, 1))
-	b.add_theme_color_override("font_hover_color", Color(1, 1, 1))
-	b.add_theme_color_override("font_pressed_color", Color(0.94, 0.98, 1.0))
-	b.add_theme_constant_override("outline_size", 6)
-	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.65))
-	b.add_theme_stylebox_override("normal", button_face(face, deep))
-	b.add_theme_stylebox_override("hover", button_face(face.lightened(0.08), deep))
-	var pressed_sb := button_face(face.darkened(0.14), deep)
+	set_button_kind(b, kind, radius)
+	attach_press_feedback(b)
+	return b
+
+## Re-applies a button's face/font colors for `kind` in place — lets a tab
+## row (or any button whose "selected" state changes at runtime) swap looks
+## without rebuilding the Button node, so press-feedback/signal connections
+## survive the switch.
+static func set_button_kind(b: Button, kind: StringName, radius: int = 20) -> void:
+	var cols := _kind_colors(kind)
+	var face: Color = cols[0]
+	var deep: Color = cols[1]
+	# The gold-faced tab kind is bright enough that white text reads poorly —
+	# everything else keeps the existing white-on-saturated-color look.
+	var light_face := kind == &"tab_active"
+	var font_col := Color(0.22, 0.14, 0.02) if light_face else Color(1, 1, 1)
+	b.add_theme_color_override("font_color", font_col)
+	b.add_theme_color_override("font_hover_color", font_col)
+	b.add_theme_color_override("font_pressed_color", font_col)
+	b.add_theme_constant_override("outline_size", 6 if not light_face else 2)
+	b.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.65) if not light_face else Color(1, 1, 0.85, 0.4))
+	b.add_theme_stylebox_override("normal", button_face(face, deep, radius))
+	b.add_theme_stylebox_override("hover", button_face(face.lightened(0.08), deep, radius))
+	var pressed_sb := button_face(face.darkened(0.14), deep, radius)
 	pressed_sb.border_width_bottom = 3
 	pressed_sb.content_margin_top = 17
 	pressed_sb.content_margin_bottom = 13
 	b.add_theme_stylebox_override("pressed", pressed_sb)
-	var dis := button_face(face.darkened(0.4), deep.darkened(0.2))
+	var dis := button_face(face.darkened(0.4), deep.darkened(0.2), radius)
 	dis.bg_color.a = 0.7
 	b.add_theme_stylebox_override("disabled", dis)
-	attach_press_feedback(b)
-	return b
 
 ## Small round icon button (gear / close / plus) drawn as a glass disc.
 static func icon_button(glyph: StringName, diameter: int = 64) -> Button:
@@ -135,32 +158,34 @@ static func icon_button(glyph: StringName, diameter: int = 64) -> Button:
 ##   {root: PanelContainer, value: Label, plus: Button|null}
 static func currency_chip(icon_kind: StringName, text_color: Color, with_plus: bool = true) -> Dictionary:
 	var root := PanelContainer.new()
-	root.add_theme_stylebox_override("panel", glass(22))
+	root.add_theme_stylebox_override("panel", glass(26))
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 10)
 	root.add_child(row)
 
+	# Sized up (2026-09-05 UI pass) — the coin/gem icons read as too small
+	# for a "premium fantasy" top bar at their old 30px.
 	var icon := HUD.GemIcon.new()
 	icon.kind = icon_kind
 	icon.tint = VisualTheme.GEM
-	icon.custom_minimum_size = Vector2(30, 30)
+	icon.custom_minimum_size = Vector2(42, 42)
 	row.add_child(icon)
 
-	var value := VisualTheme.label("0", VisualTheme.FS_LABEL, text_color)
+	var value := VisualTheme.label("0", VisualTheme.FS_HEADING, text_color)
 	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	row.add_child(value)
 
 	var plus: Button = null
 	if with_plus:
 		plus = Button.new()
-		plus.custom_minimum_size = Vector2(30, 30)
+		plus.custom_minimum_size = Vector2(38, 38)
 		plus.focus_mode = Control.FOCUS_NONE
 		plus.text = "+"
-		plus.add_theme_font_size_override("font_size", 22)
+		plus.add_theme_font_size_override("font_size", 26)
 		plus.add_theme_color_override("font_color", Color(1, 1, 1))
 		plus.add_theme_constant_override("outline_size", 4)
 		plus.add_theme_color_override("font_outline_color", Color(0, 0.25, 0.05, 0.8))
-		var psb := button_face(GREEN_FACE, GREEN_DEEP, 15)
+		var psb := button_face(GREEN_FACE, GREEN_DEEP, 19)
 		psb.content_margin_left = 0
 		psb.content_margin_right = 0
 		psb.content_margin_top = 0
@@ -168,11 +193,171 @@ static func currency_chip(icon_kind: StringName, text_color: Color, with_plus: b
 		psb.border_width_bottom = 4
 		plus.add_theme_stylebox_override("normal", psb)
 		plus.add_theme_stylebox_override("hover", psb)
-		plus.add_theme_stylebox_override("pressed", button_face(GREEN_FACE.darkened(0.15), GREEN_DEEP, 15))
+		plus.add_theme_stylebox_override("pressed", button_face(GREEN_FACE.darkened(0.15), GREEN_DEEP, 19))
 		row.add_child(plus)
 		attach_press_feedback(plus)
 
 	return {"root": root, "value": value, "plus": plus}
+
+## Fantasy toggle switch (2026-09-05 UI pass) — a glass capsule track (dim
+## slate when off, warm gold glow when on) with a sliding gold-rimmed knob.
+## Replaces the stock, unthemed `CheckButton` Settings used previously.
+class ToggleSwitch extends Button:
+	signal toggled_value(v: bool)
+	var _knob_t := 0.0   # 0=off .. 1=on, animated
+
+	func _init() -> void:
+		toggle_mode = true
+		focus_mode = Control.FOCUS_NONE
+		custom_minimum_size = Vector2(96, 44)
+		var empty := StyleBoxEmpty.new()
+		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+			add_theme_stylebox_override(state, empty)
+		toggled.connect(func(v: bool):
+			_animate_knob(v)
+			toggled_value.emit(v))
+
+	## Sets the visual/logical state without an animated slide or emitting
+	## `toggled_value` — for initializing from a saved setting at open time.
+	func set_state(v: bool) -> void:
+		set_pressed_no_signal(v)
+		_knob_t = 1.0 if v else 0.0
+		queue_redraw()
+
+	func _animate_knob(v: bool) -> void:
+		if not is_inside_tree():
+			_knob_t = 1.0 if v else 0.0
+			queue_redraw()
+			return
+		var t := create_tween()
+		t.tween_method(func(x: float): _knob_t = x; queue_redraw(),
+			_knob_t, 1.0 if v else 0.0, 0.16).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		# Reference toggle is a solid green pill when on, dim slate when off —
+		# richer/more saturated than a subtle glow lerp.
+		var track_col: Color = Color(0.16, 0.18, 0.26, 0.95).lerp(UiKit.GREEN_FACE, _knob_t)
+		var pts := ShapeDrawUtils.rounded_rect_points(Vector2(w, h), h * 0.5, 5)
+		var poly := PackedVector2Array()
+		for p in pts:
+			poly.append(p + Vector2(w, h) * 0.5)
+		draw_colored_polygon(poly, track_col)
+		var closed := poly.duplicate()
+		closed.append(closed[0])
+		draw_polyline(closed, UiKit.GREEN_DEEP.lerp(UiKit.GOLD, 1.0 - _knob_t), 2.0, true)
+		var r := h * 0.5 - 4.0
+		var kx: float = lerpf(r + 4.0, w - r - 4.0, _knob_t)
+		var font := ThemeDB.fallback_font
+		var fs := int(h * 0.36)
+		var label := "ON" if _knob_t > 0.5 else "OFF"
+		var text_w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		# Keep the label clear of the knob's left/right edge, whichever side it
+		# sits on, instead of a fixed offset that can clip under the knob.
+		var text_x: float = 10.0 if _knob_t > 0.5 else maxf(w - 10.0 - text_w, kx + r + 6.0)
+		draw_string(font, Vector2(text_x, h * 0.5 + fs * 0.36), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs,
+			Color(1, 1, 1, 0.9) if _knob_t > 0.5 else Color(1, 1, 1, 0.55))
+		var knob_center := Vector2(kx, h * 0.5)
+		draw_circle(knob_center, r + 2.5, Color(0, 0, 0, 0.35))
+		draw_circle(knob_center, r, Color(0.97, 0.96, 0.93))
+		draw_arc(knob_center, r - 1.0, 0, TAU, 20, UiKit.GOLD_DEEP.lerp(UiKit.GOLD, _knob_t), 2.0, true)
+
+static func toggle(value: bool = false) -> ToggleSwitch:
+	var t := ToggleSwitch.new()
+	t.set_state(value)
+	attach_press_feedback(t)
+	return t
+
+## Fantasy volume slider (2026-09-05 UI pass, Settings reference match) — a
+## thin recessed track with a solid green fill and a cream gold-rimmed knob,
+## replacing the unthemed stock `HSlider`. Range 0..1 like the old slider.
+class VolumeSlider extends Range:
+	signal value_changed_by_user(v: float)
+	var _dragging := false
+
+	func _init() -> void:
+		min_value = 0.0
+		max_value = 1.0
+		step = 0.01
+		custom_minimum_size = Vector2(130, 34)
+		focus_mode = Control.FOCUS_NONE
+		mouse_filter = Control.MOUSE_FILTER_STOP
+
+	func _gui_input(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			_dragging = event.pressed
+			if event.pressed:
+				_set_from_x(event.position.x)
+		elif event is InputEventScreenTouch:
+			_dragging = event.pressed
+			if event.pressed:
+				_set_from_x(event.position.x)
+		elif (event is InputEventMouseMotion or event is InputEventScreenDrag) and _dragging:
+			_set_from_x(event.position.x)
+
+	func _set_from_x(x: float) -> void:
+		var r := size.y * 0.5
+		var t := clampf((x - r) / maxf(size.x - r * 2.0, 1.0), 0.0, 1.0)
+		value = lerpf(min_value, max_value, t)
+		value_changed_by_user.emit(value)
+		queue_redraw()
+
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var r := h * 0.5
+		var track := Rect2(Vector2(0, h * 0.5 - 4.0), Vector2(w, 8.0))
+		_rrect(track, 4.0, Color(0.12, 0.13, 0.20, 0.9))
+		var t: float = (value - min_value) / maxf(max_value - min_value, 0.0001)
+		var fill_w: float = maxf(lerpf(0.0, w, t), 8.0)
+		_rrect(Rect2(Vector2(0, h * 0.5 - 4.0), Vector2(fill_w, 8.0)), 4.0, UiKit.GREEN_FACE)
+		var kx: float = lerpf(r, w - r, t)
+		var kc := Vector2(kx, h * 0.5)
+		draw_circle(kc, r, Color(0, 0, 0, 0.30))
+		draw_circle(kc, r - 2.0, Color(0.97, 0.96, 0.93))
+		draw_arc(kc, r - 3.0, 0, TAU, 16, UiKit.GOLD_DEEP, 2.0, true)
+
+	func _rrect(r: Rect2, radius: float, col: Color) -> void:
+		var pts := ShapeDrawUtils.rounded_rect_points(r.size, radius, 4)
+		var poly := PackedVector2Array()
+		for p in pts:
+			poly.append(p + r.position + r.size * 0.5)
+		draw_colored_polygon(poly, col)
+
+static func volume_slider(value: float = 1.0) -> VolumeSlider:
+	var s := VolumeSlider.new()
+	s.value = value
+	return s
+
+# --------------------------------------------------------------- toasts --
+
+## Consolidated toast/notification (2026-09-05 UI pass) — replaces 3
+## near-identical copies that used to live in settings_panel.gd /
+## main_menu.gd / level_map.gd, and is the base for the "OBJECTIVE
+## COMPLETE" / "CHAPTER COMPLETE" / "NEW BOOSTER" / "NEW EQUIPMENT" moments
+## (see app.gd / booster_shop.gd). Spawns its own throwaway Label so
+## concurrent toasts stack instead of one call resetting another's
+## animation. `parent` must be a Control already sized (it centers within
+## it); `accent` tints the glass border so different moments can read as
+## distinct without new art.
+static func show_toast(parent: Control, text: String, accent: Color = GOLD) -> void:
+	var toast := VisualTheme.label("  %s  " % text, VisualTheme.FS_BODY, VisualTheme.TEXT, 5)
+	var sb := glass(16, true)
+	sb.border_color = Color(accent.r, accent.g, accent.b, 0.55)
+	sb.border_width_top = 2
+	toast.add_theme_stylebox_override("normal", sb)
+	toast.modulate.a = 0.0
+	toast.z_index = 200
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(toast)
+	await parent.get_tree().process_frame
+	toast.position = Vector2((parent.size.x - toast.size.x) * 0.5, parent.size.y * 0.72)
+	var t := toast.create_tween()
+	t.tween_property(toast, "modulate:a", 1.0, 0.14)
+	t.tween_interval(1.2)
+	t.tween_property(toast, "modulate:a", 0.0, 0.3)
+	t.tween_callback(toast.queue_free)
 
 # ------------------------------------------------------------ animations --
 
@@ -260,6 +445,14 @@ class GoldFramePanel extends PanelContainer:
 	func set_accent(c: Color) -> void:
 		_accent = c
 		queue_redraw()
+
+	## Overrides the panel fill color in place — lets a specific dialog (e.g.
+	## Settings' reference-matched deep violet) diverge from the default navy
+	## fill without a whole new panel class.
+	func set_bg_color(c: Color) -> void:
+		var sb := (get_theme_stylebox("panel") as StyleBoxFlat).duplicate()
+		sb.bg_color = c
+		add_theme_stylebox_override("panel", sb)
 
 	func _process(delta: float) -> void:
 		_t += delta

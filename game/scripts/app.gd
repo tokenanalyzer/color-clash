@@ -38,8 +38,12 @@ var _music_token: int = 0
 
 var _backdrop: Backdrop
 var _daily: DailyRewardsScreen
-var _character: CharacterView
+var _jasmine: JasmineActor              # Jasmine's dynamic battlefield presence
+var _jamie_rig: JamieRig               # Jamie's combat presence (Phase C)
+var _enemy_actor: EnemyActor           # active villain in the combat arena
+var _power_fired_this_move := false
 var _story_scene: StoryScene
+var _intro_video: IntroVideoScreen
 var _combat: CombatDirector
 var _level_ended := false
 var _inventory: InventoryScreen
@@ -82,13 +86,33 @@ func _ready() -> void:
 	_board_layer.position = Vector2(0, _hud.playfield_top())
 	add_child(_board_layer)
 
-	# Mascot (placeholder art) — a pure event-stream consumer via
-	# CharacterDirector. Docked bottom-left, just above the booster tray;
-	# shown only during a level, faded with the rest of the game chrome.
-	_character = CharacterView.new()
-	_character.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	game_canvas.add_child(_character)
-	_relayout_character()
+	# --- Character combat arena (Phase C): a dedicated band between the board
+	# and the booster tray holding three real characters, drawn back-to-front
+	# Jasmine -> enemy -> Jamie so Jamie reads on top during a dash. ---
+
+	# Jasmine — battlefield support. Her pose/expression tracks the real
+	# story/gameplay state (captured, scared, worried, hopeful, cheering,
+	# victory, rescued, ...) via Cast.jasmine_state() — never one
+	# permanently-happy portrait. See _set_jasmine_state().
+	_jasmine = JasmineActor.new()
+	game_canvas.add_child(_jasmine)
+
+	# The active villain — chapter minor villain on normal stages, the boss
+	# on every 10th. Flinches / knocks back when Jamie's rig lands a hit.
+	_enemy_actor = EnemyActor.new()
+	game_canvas.add_child(_enemy_actor)
+
+	# Jamie — the combat lead. Renders the clean supplied portrait at
+	# gameplay scale and animates it through real windup -> lunge ->
+	# projectile -> impact -> recover phases. Presentation only;
+	# CombatDirector still owns every number.
+	_jamie_rig = JamieRig.new()
+	game_canvas.add_child(_jamie_rig)
+	_jamie_rig.enemy_reaction.connect(_on_jamie_enemy_reaction)
+	_jamie_rig.shake_requested.connect(func(mag: float):
+		if _board != null:
+			ScreenShake.apply(_board, mag, 0.3))
+	_relayout_arena()
 
 	var map_canvas := CanvasLayer.new()
 	map_canvas.layer = 10
@@ -127,6 +151,9 @@ func _ready() -> void:
 	add_child(story_canvas)
 	_story_scene = StoryScene.new()
 	story_canvas.add_child(_story_scene)
+	_intro_video = IntroVideoScreen.new()
+	_intro_video.visible = false
+	story_canvas.add_child(_intro_video)
 
 	var splash_canvas := CanvasLayer.new()
 	splash_canvas.layer = 100
@@ -137,7 +164,9 @@ func _ready() -> void:
 
 	_hud.visible = false
 	_board_layer.visible = false
-	_character.visible = false
+	_jasmine.visible = false
+	_jamie_rig.visible = false
+	_enemy_actor.visible = false
 	_map.visible = false
 	_menu.visible = true
 	_menu.modulate.a = 1.0
@@ -171,21 +200,42 @@ func _relayout_board() -> void:
 	_board_layer.position = Vector2(0, _hud.playfield_top())
 	if _board != null and _current_level != null:
 		_board.refit(_board_rect())
-	_relayout_character()
+	_relayout_arena()
 
-## Pin the mascot just above the booster tray on the left edge (placeholder
-## placement — final anchor comes with the real art).
-func _relayout_character() -> void:
-	if _character == null:
+## Lay the three characters out in the HUD's combat-arena band: Jamie on the
+## left, the villain on the right (facing each other), Jasmine set back
+## between them. All stand on `arena_floor_y()`; nothing overlaps the board.
+func _relayout_arena() -> void:
+	if _hud == null:
 		return
 	var vp := get_viewport().get_visible_rect().size
-	_character.position = Vector2(6.0, vp.y - _hud.playfield_bottom() - _character.custom_minimum_size.y - 4.0)
+	var floor_y := _hud.arena_floor_y()
+	var band := _hud.ARENA_HEIGHT
+	var jamie_h := band * 0.88
+	var enemy_h := band * 0.86
+	var jas_h := band * 0.66
+
+	var enemy_torso := Vector2(vp.x * 0.80, floor_y - enemy_h * 0.55)
+	if _enemy_actor != null:
+		enemy_torso = _enemy_actor.configure(_current_level.id if _current_level != null else 1,
+			vp.x - 12.0, floor_y, enemy_h)
+
+	if _jamie_rig != null:
+		# Jamie's portrait has his flaming sword right at the frame's left
+		# edge, so keep a small left margin.
+		_jamie_rig.configure(vp.x * 0.02 + 8.0, floor_y, jamie_h, enemy_torso)
+
+	if _jasmine != null:
+		# set back + between the two fighters, feet a touch higher than the
+		# floor so she reads as further upstage; her exact x drifts with her
+		# current state (see JasmineActor._BIAS).
+		_jasmine.configure(vp.x * 0.44, floor_y - band * 0.06, jas_h, vp.x * 0.5)
 
 # --------------------------------------------------------- screen flow --
 
 func _on_splash_finished() -> void:
 	# SplashScreen frees itself; the menu is already the visible screen.
-	pass
+	Music.play_ambient(&"music_menu_theme")
 
 func _on_menu_play_pressed() -> void:
 	_menu.refresh()
@@ -197,6 +247,7 @@ func _on_home_pressed() -> void:
 	await _fade_out(_map, TRANSITION_DURATION)
 	_menu.refresh()
 	await _fade_in(_menu, TRANSITION_DURATION)
+	Music.play_ambient(&"music_menu_theme")
 
 func _on_daily_pressed() -> void:
 	_daily.refresh()
@@ -214,12 +265,15 @@ func _on_level_selected_from_map(level_id: int) -> void:
 	await _go_to_level(level_id)
 
 func _go_to_map() -> void:
+	Music.stop_ambient()
 	await _fade_out_game(TRANSITION_DURATION)
 	_map.refresh()
 	await _fade_in(_map, TRANSITION_DURATION)
+	Music.play_ambient(&"music_menu_theme")
 
 func _go_to_level(level_id: int) -> void:
 	await _fade_out(_map, TRANSITION_DURATION)
+	Music.stop_ambient()
 	await _play_pre_level_story(level_id)
 	_start_level(level_id)
 	await _fade_in_game(TRANSITION_DURATION)
@@ -232,11 +286,26 @@ func _play_pre_level_story(level_id: int) -> void:
 	var ids: Array = GameData.levels.ordered_ids
 	var first_id: int = ids[0] if not ids.is_empty() else -1
 	if level_id == first_id:
-		await _play_beat(Story.beat_for("campaign_start"))
+		await _play_campaign_intro()
 	if IslandModel.island_index_for_level(level_id) >= 0 \
 			and level_id == IslandModel.level_ids_for_island(IslandModel.island_index_for_level(level_id))[0]:
 		await _play_beat(Story.beat_for(Story.island_start_trigger(IslandModel.island_index_for_level(level_id))))
 	await _play_beat(Story.beat_for(Story.stage_start_trigger(level_id)))
+
+## The real intro video (2026-09-05) replaces the old code-driven "opening"
+## StoryScene beat — same one-time-only contract (Story.mark_seen), same
+## trigger. Falls back to the original StoryScene beat if the transcoded
+## video asset isn't present (e.g. a future export target without it), so
+## there's never a blank/broken screen and never two competing intros.
+func _play_campaign_intro() -> void:
+	if not Story.has_pending("campaign_start"):
+		return
+	if IntroVideoScreen.asset_available():
+		_intro_video.play()
+		await _intro_video.finished
+		Story.mark_seen("opening")
+	else:
+		await _play_beat(Story.beat_for("campaign_start"))
 
 ## Plays a story beat overlay and blocks until it is dismissed. No-op for {}.
 func _play_beat(beat: Dictionary) -> void:
@@ -267,21 +336,29 @@ func _fade_out_game(duration: float) -> void:
 	await tween.finished
 	_hud.visible = false
 	_board_layer.visible = false
-	_character.visible = false
+	_jasmine.visible = false
+	_jamie_rig.visible = false
+	_enemy_actor.visible = false
 
 func _fade_in_game(duration: float) -> void:
 	_hud.modulate.a = 0.0
 	_board_layer.modulate.a = 0.0
 	_hud.visible = true
 	_board_layer.visible = true
-	_character.modulate.a = 0.0
-	_character.visible = true
-	_relayout_character()
+	_jasmine.modulate.a = 0.0
+	_jasmine.visible = true
+	_jamie_rig.modulate.a = 0.0
+	_jamie_rig.visible = true
+	_enemy_actor.modulate.a = 0.0
+	_enemy_actor.visible = true
+	_relayout_arena()
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(_hud, "modulate:a", 1.0, duration)
 	tween.tween_property(_board_layer, "modulate:a", 1.0, duration)
-	tween.tween_property(_character, "modulate:a", 1.0, duration)
+	tween.tween_property(_jasmine, "modulate:a", 1.0, duration)
+	tween.tween_property(_jamie_rig, "modulate:a", 1.0, duration)
+	tween.tween_property(_enemy_actor, "modulate:a", 1.0, duration)
 	await tween.finished
 
 # -------------------------------------------------------- level session --
@@ -327,6 +404,7 @@ func _start_level(level_id: int) -> void:
 
 	# --- character combat: Jamie powers always; a boss on every 10th stage ---
 	_level_ended = false
+	_moves_since_boss_hit = 0
 	_combat = CombatDirector.new(_current_level.id)
 	_combat.meters_changed.connect(_hud.set_power_meters)
 	_combat.power_fired.connect(_on_power_fired)
@@ -340,17 +418,44 @@ func _start_level(level_id: int) -> void:
 	else:
 		_hud.end_boss()
 
-	Music.start()
-	Music.set_state(_compute_music_state(0), true)
+	# Continuous real gameplay track (2026-09-05) replaces the old sparse
+	# synth loop. play_ambient() no-ops if it's already playing (retry /
+	# next-level keep the same music going, never restarting mid-track).
+	Music.play_ambient(&"music_gameplay_theme")
 
-	_relayout_character()
-	if _character != null:
-		_character.set_idle()
+	_relayout_arena()
+	if _jasmine != null:
+		# Danger reads on her face before a single move is made: the final
+		# boss stage IS the moment she's held captive; other boss stages are
+		# just tense; normal stages she's rooting for Jamie.
+		if _combat != null and _combat.is_final_boss():
+			_jasmine.set_state(&"captured", false)
+		elif _combat != null and _combat.is_boss:
+			_jasmine.set_state(&"scared", false)
+		else:
+			_jasmine.set_state(&"determined", false)
+	if _jamie_rig != null:
+		_jamie_rig.reset_to_idle()
 	GameEvents.publish_type(EngineEvent.LEVEL_STARTED, {
 		"level_id": _current_level.id,
 		"name": _current_level.level_name,
 	})
 	_publish_session_state(0, false)
+
+## Villain reaction (2026-09-05): a visible weakened tint that deepens as
+## the stage's objectives progress, so completing them reads as "wearing the
+## villain down" rather than being purely a board-side checklist. Independent
+## of EnemyActor.play_hit()'s transient white flash.
+func _update_villain_weakened_tint() -> void:
+	if _enemy_actor == null or _objectives == null or _objectives.objectives.is_empty():
+		return
+	var total_progress := 0.0
+	var total_target := 0.0
+	for i in _objectives.objectives.size():
+		total_progress += float(_objectives.progress[i])
+		total_target += float(_objectives.target_for(i))
+	if total_target > 0.0:
+		_enemy_actor.set_weakened(total_progress / total_target)
 
 func _refresh_booster_counts() -> void:
 	_hud.set_booster_counts(Boosters.counts)
@@ -389,6 +494,7 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	_combo.record_move(result.chain_depth)
 	var fever_activated := _fever.register_move(result.chain_depth)
 	_objectives.apply_move(result.colors_cleared, _score, result.powers_created, result.obstacles_broken)
+	_update_villain_weakened_tint()
 
 	if counts_as_move:
 		_moves_left = max(_moves_left - 1 - result.move_penalty, 0)
@@ -409,6 +515,11 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 		if fever_now:
 			_hud.flash_fever()
 			_board.play_fever_burst()
+			# Jamie's multi-power ultimate cinematic (short, non-blocking).
+			if _jamie_rig != null:
+				_jamie_rig.play(&"fever_ultimate")
+			if _jasmine != null:
+				_jasmine.set_state(&"cheering")
 
 	if fever_activated:
 		Audio.play(&"fever_activate")
@@ -420,6 +531,8 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	var near_fail := _moves_left <= NEAR_FAIL_MOVES and not _objectives.is_complete()
 	if near_fail and not _was_near_fail:
 		Audio.play(&"tension_pulse")
+		if _jasmine != null:
+			_jasmine.set_state(&"worried")
 	_was_near_fail = near_fail
 
 	# --- typed event stream for this move (additive — the direct
@@ -430,17 +543,73 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 
 	# --- match-3 -> character combat: turn this move into Jamie attack
 	# energy + boss damage. boss_defeated fires _on_boss_defeated -> win. ---
+	_power_fired_this_move = false
 	if _combat != null:
 		_combat.feed_move(result, result.chain_depth, result.cleared_cells.size(), counts_as_move, _moves_left)
+	if _combat != null and _combat.is_boss and counts_as_move:
+		_update_boss_pressure()
+	# A move that broke an obstacle but didn't otherwise trigger Jamie's rig
+	# (no power fired, no big plain hit) still gets a small villain flinch —
+	# obstacle/objective progress should read as "hurting" the villain too,
+	# not just plain matches. is_busy() guards against double-flinching a
+	# move that already triggered a jamie_rig reaction through another path.
+	if _enemy_actor != null and not result.obstacles_broken.is_empty() \
+			and not _power_fired_this_move and (_jamie_rig == null or not _jamie_rig.is_busy()):
+		_enemy_actor.play_hit(&"hit")
 
 	_update_music_state(result.chain_depth, result.cleared_cells.size())
 
 	if _level_ended:
 		return
 	if _objectives.is_complete():
-		_on_level_won()
+		if _combat != null and _combat.is_boss:
+			_check_boss_win_or_flourish()
+		else:
+			_on_level_won()
 	elif _moves_left <= 0:
 		_offer_more_moves_or_lose()
+
+## Boss-stage pressure (2026-09-05): a boss stage isn't just a normal level
+## with a health bar — every BOSS_PRESSURE_MOVES real moves while the boss
+## is still alive, it counter-attacks the board with a temporary obstacle
+## (reuses the ordinary ice-family plumbing; never strands the player — see
+## BoardView.boss_obstruct_random_cell). A flat per-move cadence rather than
+## "moves without damage": CombatDirector's base attack damage is never
+## zero, so a no-damage trigger would in practice never fire.
+const BOSS_PRESSURE_MOVES := 4
+var _moves_since_boss_hit := 0
+
+func _update_boss_pressure() -> void:
+	if _combat.boss_hp <= 0:
+		_moves_since_boss_hit = 0
+		return
+	_moves_since_boss_hit += 1
+	if _moves_since_boss_hit < BOSS_PRESSURE_MOVES:
+		return
+	_moves_since_boss_hit = 0
+	if _board != null and _board.boss_obstruct_random_cell(&"ice", 2):
+		Audio.play(&"tension_pulse")
+		Haptics.strong(60)
+		if _jasmine != null:
+			_jasmine.set_state(&"worried")
+
+## Boss stages require BOTH the boss defeated (hp 0) AND the stage's own
+## objectives complete — previously either one alone ended the level, which
+## meant a boss fight could be skipped entirely by just hitting a score/color
+## goal. Called both right when the boss dies (objectives may already be
+## done) and from the objectives-complete check (boss may already be dead).
+func _check_boss_win_or_flourish() -> void:
+	if _level_ended:
+		return
+	if _combat == null or not _combat.is_boss or _combat.boss_hp > 0:
+		return
+	if _objectives == null or not _objectives.is_complete():
+		return
+	if _jamie_rig != null:
+		_jamie_rig.play(&"victory")
+	if _jasmine != null:
+		_jasmine.set_state(&"rescued" if _combat.is_final_boss() else &"victory")
+	_on_level_won()
 
 ## `chain_depth` (1 = plain match, 2 = one power created+detonated, 3+ = a
 ## real multi-stage cascade — see chain_resolver.gd) drives base/active/high;
@@ -483,6 +652,10 @@ func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
 
 # ----------------------------------------------------- character combat --
 
+## CombatDirector's base attack for a move. Powers/combos are handled by
+## `_on_power_fired` (which sets `_power_fired_this_move`); this drives Jamie's
+## rig only for a plain match with no power, and only when the match was
+## sizeable — so ordinary matching stays snappy and un-busy.
 func _on_jamie_attack(kind: StringName, damage: int, big: bool) -> void:
 	if _board == null:
 		return
@@ -494,28 +667,51 @@ func _on_jamie_attack(kind: StringName, damage: int, big: bool) -> void:
 	elif big:
 		ScreenShake.apply(_board, 12.0, 0.34)
 		Haptics.strong(80)
-		Audio.play(&"sword_attack", 0.7)
 	elif damage >= 4:
 		ScreenShake.apply(_board, 5.0, 0.18)
+	if _jamie_rig != null and not _power_fired_this_move and kind == &"basic" and damage >= 3:
+		_jamie_rig.play(&"attack_sword")
 
 func _on_power_fired(power: StringName, combo: StringName) -> void:
-	_hud.flash_power(combo if combo != &"" else power)
-	match String(combo if combo != &"" else power):
+	_power_fired_this_move = true
+	var id := combo if combo != &"" else power
+	_hud.flash_power(id)
+	match String(id):
 		"fire_sword": Audio.play(&"sword_attack")
 		"lightning_hand", "lightning_dash": Audio.play(&"lightning")
 		"lightning_boots", "dash_slash": Audio.play(&"lightning", 0.4)
 		"lightning_sword": Audio.play(&"sword_attack", 0.9)
 		"ultimate": Audio.play(&"power_up", 1.0)
-	if _character != null:
-		_character.play_reaction(&"hype", JamiePowers.label(combo if combo != &"" else power) + "!")
+	if _jamie_rig != null:
+		_jamie_rig.play(_rig_action_for_power(id))
+	# Reserve the cheer for the genuinely special moment (Ultimate) — routine
+	# power fires leave her current state (e.g. scared in a boss fight) alone.
+	if _jasmine != null and String(id) == "ultimate":
+		_jasmine.set_state(&"cheering")
+
+## Power / combo id -> Jamie rig action (data/jamie_actions.json).
+func _rig_action_for_power(id: StringName) -> StringName:
+	match String(id):
+		"fire_sword": return &"attack_sword"
+		"lightning_hand": return &"attack_lightning"
+		"lightning_boots": return &"attack_dash"
+		"lightning_sword": return &"attack_blast"
+		"dash_slash": return &"attack_dash"
+		"lightning_dash": return &"attack_blast"
+		"ultimate": return &"fever_ultimate"
+	return &"attack_sword"
 
 func _on_boss_attacked() -> void:
 	if _board != null:
 		ScreenShake.apply(_board, 14.0, 0.4)
 	Haptics.strong(90)
 	Audio.play(&"boss_impact")
-	if _character != null:
-		_character.play_reaction(&"worried", "")
+	if _jamie_rig != null:
+		_jamie_rig.play(&"hurt")
+	if _combat != null and _combat.is_final_boss():
+		_hud.boss_taunt()
+	if _jasmine != null:
+		_jasmine.set_state(&"scared")
 
 func _on_boss_defeated() -> void:
 	if _level_ended:
@@ -524,7 +720,26 @@ func _on_boss_defeated() -> void:
 	Audio.play(&"boss_impact", 1.0)
 	if _board != null:
 		ScreenShake.apply(_board, 18.0, 0.5)
-	_on_level_won()
+	if _enemy_actor != null:
+		_enemy_actor.play_defeat()
+	# Only the actual chapter win (Jamie's victory pose, Jasmine
+	# rescued/cheering) plays here if the stage's other objectives are
+	# ALREADY done too — otherwise the board stays live (CombatDirector
+	# no-ops further boss damage once hp is 0) until they are, and
+	# _check_boss_win_or_flourish() fires the same flourish from
+	# _apply_move_result once they complete.
+	_check_boss_win_or_flourish()
+
+## Jamie's rig reports a landed hit — drive the boss reaction (boss stages)
+## from it. Damage numbers were already applied by CombatDirector; this is
+## pure presentation and cannot desync them.
+func _on_jamie_enemy_reaction(kind: StringName, _pos: Vector2) -> void:
+	if kind == &"none":
+		return
+	if _enemy_actor != null:
+		_enemy_actor.play_hit(kind)
+	if _combat != null and _combat.is_boss and _combat.boss_hp > 0:
+		_hud.boss_hit(kind)
 
 func _on_level_won() -> void:
 	if _level_ended:
@@ -541,19 +756,31 @@ func _on_level_won() -> void:
 		"level_id": _current_level.id, "score": _score, "stars": stars,
 	})
 	Music.fade_out_and_stop(0.7)
+	Music.stop_ambient(0.7)
 	Audio.play(&"level_complete")
 	if _combat != null and _combat.is_boss:
 		Audio.play(&"boss_impact", 1.0)
+		if not _combat.is_final_boss():
+			var isl := IslandModel.island_index_for_level(_current_level.id)
+			if isl >= 0:
+				UiKit.show_toast(_hud, "CHAPTER COMPLETE — %s" % IslandModel.island_name(isl).to_upper(), VisualTheme.STAR)
 	Haptics.strong(60)
 	if _board != null:
 		_board.set_fever(false)
 		_board.play_win_flourish()
 	_backdrop.set_accent_target(VisualTheme.ACCENT)
+	# Boss wins already set a more specific state (rescued / victory) in
+	# _on_boss_defeated before calling this — only a plain stage clear needs
+	# it here.
+	if _jasmine != null and (_combat == null or not _combat.is_boss):
+		_jasmine.set_state(&"cheering")
 
 	# Boss stage (every 10th) — grant the boss's equipment drop + a shard,
 	# then let the story beat (stage_complete:N) carry the chapter transition.
 	if first_clear and _combat != null and _combat.is_boss:
-		Inventory.grant_boss_reward(_current_level.id)
+		var new_equip := Inventory.grant_boss_reward(_current_level.id)
+		if new_equip != "":
+			UiKit.show_toast(_hud, "NEW EQUIPMENT — %s" % new_equip.to_upper(), VisualTheme.GEM)
 
 	# Every 5th level is a "chest" node on the map — the first time it's
 	# cleared, open a milestone chest before the normal summary.
@@ -619,7 +846,7 @@ func _on_continue_declined() -> void:
 ## Booster shop opened from the HUD. Freeze the board (existing pause path)
 ## so no move is consumed and no board / objective / enemy / boss / power
 ## state changes while the shop is open.
-func _on_shop_pressed() -> void:
+func _on_shop_pressed(focus_id: StringName = &"") -> void:
 	if _current_level == null or _level_ended or _board == null:
 		return
 	if _hud.any_modal_open():
@@ -629,7 +856,7 @@ func _on_shop_pressed() -> void:
 	_armed_booster = &""
 	_hud.set_booster_armed(&"")
 	Music.set_state(&"tension")
-	_hud.open_shop()
+	_hud.open_shop(focus_id)
 
 func _on_shop_closed() -> void:
 	if _board != null and not _level_ended:
@@ -656,6 +883,8 @@ func _on_level_lost() -> void:
 	GameEvents.publish_type(EngineEvent.LEVEL_FAILED, {
 		"level_id": _current_level.id, "score": _score,
 	})
+	if _jasmine != null:
+		_jasmine.set_state(&"crying")
 
 func _on_next_level_pressed() -> void:
 	var next_id := GameData.levels.next_level_id(_current_level.id)
@@ -693,7 +922,11 @@ func _on_booster_pressed(booster_id: StringName) -> void:
 		_board.disarm_booster()
 		_armed_booster = &""
 		return
+	# Tapping a booster you own zero of used to be a silent dead end — now it
+	# opens the shop straight to that booster's buy-confirm dialog, so
+	# "I want this one" is a single tap instead of tap-tray-then-find-it.
 	if Boosters.get_count(booster_id) <= 0:
+		_on_shop_pressed(booster_id)
 		return
 
 	var def: Dictionary = GameData.boosters.get(booster_id, {})
@@ -724,3 +957,16 @@ func _on_booster_committed(booster_id: StringName) -> void:
 	_hud.set_booster_armed(&"")
 	_hud.flash_booster(booster_id)
 	GameEvents.publish_type(EngineEvent.BOOSTER_USED, {"booster_id": booster_id, "targeted": true})
+	if _jamie_rig != null:
+		_jamie_rig.play(_rig_action_for_booster(booster_id))
+
+## Booster id -> the Jamie attack it reads as (Bomb -> Jamie detonates a
+## bomb, Rainbow -> a mega blast, ...). Its board effect still resolves
+## through ChainResolver / CombatDirector exactly as before.
+func _rig_action_for_booster(booster_id: StringName) -> StringName:
+	match String(booster_id):
+		"bomb": return &"attack_bomb"
+		"lightning": return &"attack_lightning"
+		"freeze": return &"attack_freeze"
+		"rainbow": return &"attack_rainbow"
+	return &"attack_blast"

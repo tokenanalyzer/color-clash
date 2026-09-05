@@ -65,7 +65,7 @@ func configure(p_color_id: StringName, p_power_id: StringName, p_obstacle_id: St
 	queue_redraw()
 
 func _update_processing() -> void:
-	set_process(power_id != CellData.POWER_NONE or obstacle_id == &"timebomb")
+	set_process(power_id != CellData.POWER_NONE or CellData.family_of(obstacle_id) == &"timebomb")
 
 func _process(delta: float) -> void:
 	_phase += delta
@@ -119,10 +119,15 @@ func _draw() -> void:
 	if not has_piece and obstacle_id == CellData.OBSTACLE_NONE:
 		return
 
-	if obstacle_id == &"stone":
+	# Themed obstacle ids (2026-09-05 depth pass — Wooden Crate, Reinforced
+	# Crate, Frozen Crystal, Magic Chain, Cursed Stone, Shadow Barrier, Dark
+	# Rune) reuse their family's existing visual for now; distinct themed art
+	# is a follow-up, not a new render path per id.
+	var family := CellData.family_of(obstacle_id)
+	if family == &"stone":
 		_draw_stone()
 		return
-	if obstacle_id == &"lock" and not has_piece:
+	if family == &"lock" and not has_piece:
 		_draw_lock()
 		return
 
@@ -133,9 +138,9 @@ func _draw() -> void:
 	elif has_piece:
 		_blit_gem(GemTextures.gem(color_id, _palette))
 
-	if obstacle_id == &"ice":
+	if family == &"ice":
 		_draw_ice_overlay()
-	elif obstacle_id == &"timebomb":
+	elif family == &"timebomb":
 		_draw_timebomb_overlay()
 
 	if selected:

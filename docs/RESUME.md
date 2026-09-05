@@ -3,6 +3,67 @@
 **Latest commit: `c08b8ec`**  ·  branch `backup_asset_integration_2026-09-02`
 ·  **NOT pushed** (do not push without an explicit ask).
 
+## END-OF-DAY CHECKPOINT — 2026-09-04 (Phase C, session frozen for review)
+
+**1. Completed today (Phase C, all uncommitted):**
+- New War of Love poster (`WAR_OF_LOVE_SPLASH_SCREEN_9x16.png`) copied
+  byte-identical (MD5-verified) into `game/assets/branding/splash.png`;
+  original source in Downloads left untouched. Stretch mode fixed
+  (`COVERED`→`CENTERED`) so it letterboxes cleanly with no crop/distortion
+  on devices taller than 9:16. Loading indicator confirmed still a
+  separate runtime layer, not baked into the poster.
+- Opening cinematic rebuilt in `StoryScene` (flash/shake/particle-burst/
+  bg-zoom+swap primitives) driving a rewritten 7-scene `opening` beat in
+  `data/story.json`: peace → Jinn's arrival → Jasmine's fear → capture
+  (new `captured` pose) → Jinn's taunt/escape → Jamie's shock → his promise.
+- Jasmine dynamic emotion states/poses, Jinn story integration, minor
+  villain (e.g. Toxic Slime) presentation, combat/booster visuals, and the
+  Need More Moves modal clipping fix — all carried from the prior round and
+  re-verified working on-device today.
+- **Two real, previously-unknown bugs found and fixed** by inspecting live
+  device screenshots (not just logs):
+  1. `StoryScene._track_size()` was called before its children existed →
+     dialogue box/SKIP button pinned top-left on every real device forever
+     (this was the true cause of the old "harmless" boot error). Fixed by
+     moving the call + `size_changed` connect to the end of `_ready()`.
+  2. Minor-enemy portraits showed a garbled "10 MIN…" text fragment — a
+     mirrored sliver of the enemy sheet's title banner bleeding into the
+     crop. Fixed in `enemy_model.gd::enemy_face()` by moving the crop's y0
+     past the measured banner extent (`h*0.065`).
+
+**2. Current APK:**
+`build/war-of-love-debug.apk` — 318,006,500 bytes (~303 MB), built from
+the current uncommitted working tree, installed on device
+`3C15CB00ABS00000` via `adb install -r`, launched successfully.
+
+**3. Current Git HEAD:** `ca9ac2a` (Phase B commit). Phase A = `01bdb4d`.
+Working tree has Phase C changes on top, **uncommitted**.
+
+**4. Phase C status:** **UNCOMMITTED, NOT PUSHED.** ~15 modified files +
+~20 new/untracked files (incl. `.uid`/`.import` sidecars) sitting in the
+working tree exactly as built/tested. `git status --porcelain` confirms
+HEAD has not moved. Frozen as-is per instruction — no further changes
+made after this checkpoint note.
+
+**5. Tests:** unit **1436/1436 pass**, 0 fail. All **6 smoke tests pass**
+(`smoke_combat_anim`, `smoke_shop_flow`, `smoke_main_e2e`,
+`smoke_level_map`, `smoke_all_levels`, `smoke_audio_chain`).
+
+**6. Physical-device verification:** confirmed via multiple real
+screenshots on the reconnected device — poster complete/letterboxed,
+splash→menu transition clean, opening cinematic dialogue correctly
+positioned and readable, gameplay arena clean (no checkerboard, no
+garbled text over Toxic Slime), steady 58–60 FPS, 0 script errors in
+logcat this session.
+
+**7. Remaining for tomorrow:** continue Phase C systematically from this
+checkpoint — the remaining items from the 12-priority list not yet fully
+closed out (combat targeting polish, further booster identity/sound
+passes, dialogue pass beyond the opening beat, any outstanding items from
+the 32-item redesign brief not yet covered by the 12 priorities). Do not
+start Phase D. Do not commit/push until the user gives explicit physical
+approval of this exact frozen build.
+
 ## Gameplay difficulty/combat/booster/inventory overhaul — phased
 
 Big brief: make the campaign a polished, *challenging* match-3 rescue
@@ -96,14 +157,284 @@ A–J; **do not jump ahead — each phase must be test-stable first.**
 - **No APK rebuilt** — offered to the user; the on-device checklist in the
   brief needs a physical device.
 
-### PHASE C (next) — Jamie combat animation event pipeline
-Slice `story_jamie_actions` / `story_jinn_actions` into pose AtlasTextures;
-extend `Cast.pose()` for Jamie/Jinn; drive Jamie reactions off
-`CombatDirector.jamie_attack` / `power_fired` and the booster USE hooks
-already wired in Phase B. Then D: booster→Jamie physical actions ·
-E: enemy attack/hit/defeat · F: boss presentation (+ multi-phase Jinn) ·
-G: Jasmine/Jinn gameplay presence · H: equipment gameplay effects ·
-I: economy balancing · J: full campaign difficulty pass.
+### PHASE C — real Jamie combat animation system  ✅ CODE DONE (2026-09-04) · device test PENDING
+- **Assets:** `assets/story/jamie_actions_ref.png` is a loose mood/reference
+  collage (opaque bg) — NOT sliceable. The real source is
+  `assets/story/cast_atlas_transparent.png` (AssetLibrary `story_cast_atlas`,
+  transparent). It's still a freeform collage, so poses are sliced by
+  **explicit normalized regions** in `data/jamie_actions.json` (`poses` /
+  `jinn_poses`), the same sanctioned pattern as `islands.json`'s
+  `stage_regions`. Source PNGs are never modified (AtlasTexture sub-rects).
+  Region rects are best-effort eyeballed and a Phase-J polish candidate.
+- **`scripts/character/jamie_action_controller.gd`** (`JamieActionController`,
+  pure RefCounted) — deterministic state machine IDLE→WINDUP→STRIKE→RECOVER
+  + a bounded action queue (`QUEUE_MAX`, drops oldest on overflow,
+  `dropped` counts it). `strike` is the authoritative "hit lands" beat
+  (rig reacts to it, never to a tween finishing) so a dropped frame can't
+  skip or duplicate a hit. `tick(dt)` crosses multiple phases in one call
+  on a lag spike. A `sequence` action (Fever ultimate) emits `strike` once
+  per sub-power. It has NO reference to CombatDirector / damage.
+- **`scripts/character/jamie_rig.gd`** (`JamieRig`, Control) — renders the
+  real Jamie pose art and turns controller phases into visuals only:
+  anticipation crouch → lunge/dash toward the enemy anchor → a travelling
+  projectile built from the supplied VFX art → impact burst → recover to
+  the (unchanged) logical position. Emits `enemy_reaction(kind, pos)` and
+  `shake_requested(mag)`. Only `set_process(true)` while an action runs.
+- **`Cast`** — `jamie_pose()` / `jinn_pose()` slice `story_cast_atlas` by the
+  JSON regions; `Cast.pose(WHO_JAMIE|WHO_JINN, …)` now returns real pose art
+  (portrait fallback for unknown names).
+- **Wiring (`app.gd`):** `_character` (CharacterView) is repointed from
+  Jamie to **Jasmine** (bottom-right, still reacting to the event stream —
+  cheer/scared/victory). A new `_jamie_rig` is the combat presence
+  (bottom-left). `_on_power_fired` → `_rig_action_for_power()` →
+  `_jamie_rig.play()` (fire_sword→attack_sword, lightning_hand→
+  attack_lightning, lightning_boots→attack_dash, combos→attack_blast,
+  ultimate→fever_ultimate). Plain matches drive `attack_sword` only when
+  `damage>=3` and no power fired (keeps ordinary matching snappy).
+  `_on_booster_committed` → `_rig_action_for_booster()` (bomb→attack_bomb,
+  rainbow→attack_mega_blast, …). Fever activation → `fever_ultimate`.
+  `_on_boss_attacked`→`hurt` (+ `boss_taunt()` on the final boss),
+  `_on_boss_defeated`→`victory`. `_jamie_rig.enemy_reaction` →
+  `_hud.boss_hit(kind)` (boss stages). `shake_requested` → `ScreenShake`.
+- **`BossBar`** — `play_hit(kind)` (portrait flinch/knock + bar flash,
+  scaled hit/heavy_hit/knockback/stun) and `play_taunt()` (final-boss
+  pulse). HP is still set only via `set_hp()` so a reaction can never
+  desync the numbers. `HUD.boss_hit()/boss_taunt()` passthroughs.
+- **Authoritative-damage invariant:** CombatDirector still owns every
+  number; the rig is presentation and reacts to the `strike` beat, not to
+  animation completion. `smoke_combat_anim` proves a rig-only action deals
+  **zero** damage and that a fired power animates without touching boss HP.
+- **Tests: 1303/1303 unit pass** (+62; new `tests/test_jamie_actions.gd`,
+  registered — controller phases, no-skip/no-dup strike, lag-spike, queue
+  bound, reset, fever 3-strike, Cast slices, rig node). New
+  `tests/smoke_combat_anim.gd` (not CI) — **passes**. `smoke_shop_flow` /
+  `smoke_main_e2e` / `smoke_level_map` / `smoke_all_levels` (0 failures) /
+  `smoke_audio_chain` all re-run and pass.
+- **APK:** `build/war-of-love-debug.apk` (built this session).
+- **NOT DONE — the brief's §19 on-device test.** Needs a human to sideload
+  the APK and eyeball Jamie's sword / lightning / dash / bomb / fever, the
+  boss reactions, 60 FPS and logcat. Headless proves the pipeline is
+  correct and deterministic; it can't judge how the animation *reads*.
+- **Partial within Phase C (deferred to their own phases per §20):** a
+  persistent on-screen minor-villain actor for NON-boss stages (only boss
+  stages have an enemy actor today — the BossBar); Jinn taunt/attack
+  cinematics beyond the portrait pulse; per-pose region polish.
+- **Files:** `data/jamie_actions.json`*, `scripts/character/jamie_action_controller.gd`*,
+  `scripts/character/jamie_rig.gd`*, `scripts/character/character_view.gd`,
+  `scripts/story/cast.gd`, `scripts/ui/boss_bar.gd`, `scripts/ui/hud.gd`,
+  `scripts/app.gd`, `tests/test_jamie_actions.gd`*, `tests/smoke_combat_anim.gd`*,
+  `tests/test_runner.gd`, this doc.  (* = new)
+
+### PHASE C — VISUAL REWORK after physical device rejection  ✅ (2026-09-04)
+The first Phase C build was rejected on-device: Jamie/Jasmine read as tiny
+corner stickers, checkerboard artifacts around the characters, no visible
+normal-stage enemy, wasted lower screen. Root-caused and fixed, still
+uncommitted (waiting on your approval):
+
+- **Root cause of the checkerboard:** `cast_atlas_transparent.png` and
+  `enemies_and_bosses.png` are **RGB with no alpha** — a light-grey
+  checkerboard is baked into the "empty" pixels despite the filenames.
+  Slicing them for poses/enemy always showed that checker on device.
+  `jasmine_poses_8.png` has the same problem (unused now).
+- **Fix — use the clean art that actually has real transparency:**
+  `jamie_portrait.png` / `jasmine_portrait.png` / `jinn_portrait.png` are
+  genuine RGBA cut-outs (verified pixel-by-pixel). `Cast.jamie_pose()` /
+  `jinn_pose()` now return the clean portrait instead of slicing the
+  checkered atlas (`cast_atlas_transparent.png` is no longer read).
+  New `tools/keyed_sprites/key_enemies.py` keys the enemy sheet's baked
+  checkerboard (two near-white greys, verified colour values) to real
+  alpha and writes `assets/story/enemies_keyed.png` — same art, same
+  layout, original PNG untouched. `EnemyModel.enemy_face()` slices that.
+- **A real combat arena, not corner portraits:** `HUD.ARENA_HEIGHT` (360)
+  + `arena_top_y()`/`arena_floor_y()`/`tray_reserve()` carve a dedicated
+  band between the board and the tray; `playfield_bottom()` grew so the
+  board is fitted above it (board stays visually dominant — verified
+  ~57% of screen height on the test device). `app._relayout_arena()`
+  stands Jamie (left, ~88% of the band), the villain (right, ~86%,
+  bigger on boss stages), and Jasmine (centre, set back, ~66%) on the
+  arena floor with real spatial separation, drawn Jasmine → enemy → Jamie
+  so Jamie reads on top during a dash.
+- **New `EnemyActor`** (`scripts/character/enemy_actor.gd`) — the
+  persistent normal-stage villain (`EnemyModel.enemy_for_stage`), replaced
+  by that chapter's boss on every 10th stage
+  (`EnemyModel.boss_for_stage`/`is_boss_stage`) — same node just swaps
+  art, so "the boss takes over the combat presentation" per the brief.
+  `play_hit(kind)` (flinch/knock/flash) and `play_defeat()`; HP still only
+  ever comes from CombatDirector.
+- **`JamieRig` rebuilt** around the one clean portrait: real multi-phase
+  transform animation (windup lean+squash → lunge toward the enemy →
+  weapon-hand ignites — sword=orange/orb=blue, keyed to `hand` in
+  `jamie_actions.json` → projectile → impact → recover), not a portrait
+  sliding around. Added an FX cap (`_fx_saturated()`, max 5 concurrent
+  transient nodes) after an on-device FPS dip during Fever+rapid combos;
+  gameplay-critical signals (`enemy_reaction`, `shake_requested`) still
+  always fire even when decorative FX are skipped.
+- **`CharacterView.portrait_only`** — Jasmine now blits her clean portrait
+  directly (keep-aspect, feet-anchored), no pose-sheet slicing.
+- **Two iterations verified live on the connected device**
+  (`3C15CB00ABS00000`, adb-installed both times): iteration 1 fixed the
+  composition but Jamie's flaming sword clipped the left screen edge and
+  the enemy showed a sliver of its baked name label; iteration 2 (current)
+  fixes both (`left_x` margin bump, enemy region height trimmed above the
+  label bar). Confirmed via `adb screencap` on two different live levels —
+  clean transparency, correct scale/position, board/tray untouched, real
+  touch input advancing moves/objectives correctly. Idle/light-play FPS
+  55–60 (matches pre-Phase-C baseline); a Fever-mode dip to ~35–46 was
+  observed and is **pre-existing Fever board-aura cost**, not new from
+  this rework (confirmed via a non-Fever idle sample on the same build) —
+  noted, not chased further (out of this fix's scope).
+- **Tests: 1314/1314 unit pass** (+11 over the first Phase C pass:
+  `test_jamie_actions.gd` pose/rig-sizing/enemy-actor checks,
+  `test_story_assets.gd` updated for the new `story_enemies_keyed` id and
+  the label-safe enemy region). All 6 smokes re-verified green after both
+  the redesign and the follow-up tuning.
+- **New files:** `data/jamie_actions.json` (rewritten — no more hand-
+  estimated pose regions), `scripts/character/enemy_actor.gd`,
+  `tools/keyed_sprites/key_enemies.py`,
+  `game/assets/story/enemies_keyed.png` (+`.import`).
+- **Edited:** `scripts/character/jamie_rig.gd` (rebuilt), `character_view.gd`,
+  `scripts/story/cast.gd`, `scripts/story/enemy_model.gd`,
+  `scripts/core/asset_library.gd`, `scripts/ui/hud.gd` (arena geometry),
+  `scripts/ui/boss_bar.gd` (unrelated `at`/Variant-inference build fix
+  from the previous pass, caught this round), `scripts/app.gd` (arena
+  wiring), `tests/test_jamie_actions.gd`, `tests/test_story_assets.gd`,
+  `tests/test_runner.gd`, `tests/smoke_combat_anim.gd`.
+- **Still uncommitted** — waiting on your approval before any commit.
+
+### PHASE C — dynamic staging pass (priorities 1-12 of the 2nd device-rejection brief)  ✅ (2026-09-04)
+Deep-inspected `C:\Users\Administrator\Downloads\Game Character and UI UX`
+(10/11 files hash-identical to assets already in the repo; the 1 new file
+was an old, already-largely-implemented UI wireframe doc — no new pose art
+existed beyond what was already catalogued). That inspection found
+`jasmine_expressions_ref.png` genuinely alpha-clean with story-critical
+poses (scared/crying/captured/rescue-hug/victory) never wired up, and that
+`jasmine_poses_8.png` has the SAME baked-checkerboard bug as the enemy
+sheet. Implemented:
+- **Priority 12 (device bug) FIXED:** `BoosterShop`/`ExtraMovesPrompt`/
+  `SettingsPanel` are constructed inside `HUD._ready()` **before** HUD
+  itself has a real size (CanvasLayer-parented Controls start at (0,0)) —
+  their FULL_RECT anchor offsets baked in against that zero size, then
+  double-counted once HUD grew to the real viewport, pushing "NEED MORE
+  MOVES?" off the right edge. `HUD._track_size()` now re-tracks all three
+  overlays after sizing itself. **Verified on-device**: modal now fully
+  centred, no clipping. Regression test added (`test_overlay_children_are_not_double_sized_after_hud_settles`).
+- **Priority 2/3 (checkerboard + Jasmine dynamic states):** generalized the
+  keying tool (`tools/keyed_sprites/key_checkerboard.py`) and ran it on
+  `jasmine_poses_8.png` → `jasmine_poses_8_keyed.png` (measured, not
+  guessed, cell regions). Added 6 individually-cropped, individually
+  dark-background-composited-and-verified emotion crops from
+  `jasmine_expressions_ref.png` (already real alpha, no keying needed):
+  scared, worried, crying, captured, rescued, victory. `Cast.jasmine_state()`
+  is the new single entry point (`JASMINE_STATE_TABLE`); `JasmineActor`
+  (new) renders it and nudges her position toward Jamie on a positive state,
+  back on a fearful one.
+- **Priorities 1/4 (dynamic staging):** `app.gd` now sets Jasmine's state
+  from real signals — level start (captured on the final boss stage,
+  scared on other boss stages, determined otherwise), near-fail (worried),
+  fever (cheering), Ultimate fired (cheering), boss counter-attack
+  (scared), boss defeated (rescued on the final boss, victory otherwise),
+  normal level won (cheering), level lost (crying). **Confirmed live on
+  device**: watched her pose flip determined → cheering (Fever) → worried
+  (near-fail) across one play session, each a genuinely different supplied
+  pose, no checkerboard, no clipping.
+- **Priority 6:** `EnemyActor` gained a cheap looping idle bob (sprite-only
+  tween, killed on defeat) so the villain reads as alive between hits.
+- **Priority 7 (targeting):** re-verified — `EnemyActor.configure()`
+  returns the torso point, `JamieRig.configure()` aims every projectile/
+  impact at it; unchanged, still correct.
+- **Priority 9 (booster identity):** Freeze and Rainbow got their own
+  `jamie_actions.json` entries (were reusing the generic blast) — Freeze:
+  `vfx_ice_burst`, `power_freeze` sfx, `stun` reaction; Rainbow:
+  `vfx_rainbow_burst`, `power_rainbow` sfx. Shuffle already had its own
+  sfx (`board_view.request_shuffle()` plays `shuffle`) — confirmed
+  adequate, left alone.
+- **Priority 5 (Jinn/Jasmine story panels) — evaluated, deferred, disclosed
+  honestly:** cropped candidate compositions (cage, confrontation, "WE WIN")
+  from `story_scenes_transparent.png`; native crop resolution (~250x250px)
+  and post-keying edge quality on fine hair detail were below this pass's
+  bar for a shipped background. Left `StoryScene` untouched rather than
+  ship a soft/blocky panel; the crops are reproducible from the inspection
+  notes in this session if a future pass wants to pursue higher-res source
+  crops.
+- **Tests: 1372/1372 unit pass** (+58: `test_jasmine_actor.gd` new,
+  `test_story_assets.gd` extended for the state table + emotion regions +
+  registry count 12, `test_shop_continue.gd` +1 overlay-sizing regression).
+  All 6 smokes re-verified green.
+- **Files:** new `tools/keyed_sprites/key_checkerboard.py`,
+  `tools/keyed_sprites/key_jasmine_poses.py`,
+  `game/assets/story/jasmine_poses_8_keyed.png`(+`.import`),
+  `game/scripts/character/jasmine_actor.gd`,
+  `game/tests/test_jasmine_actor.gd`; edited `scripts/story/cast.gd`
+  (rewritten state table), `scripts/app.gd` (Jasmine wiring + freeze/
+  rainbow mapping), `scripts/ui/hud.gd` (overlay re-track fix),
+  `scripts/character/enemy_actor.gd` (idle bob), `data/jamie_actions.json`
+  (+attack_freeze, +attack_rainbow), `tests/test_story_assets.gd`,
+  `tests/test_shop_continue.gd`, `tests/test_runner.gd`.
+- **Verified live on the connected device** (`3C15CB00ABS00000`): clean
+  transparency throughout, Jasmine's dynamic poses, booster shop fully
+  visible, "NEED MORE MOVES?" fully visible (the reported bug — confirmed
+  fixed), steady 57-60 FPS through fever + swipes + modals, 0 script
+  errors in logcat.
+- **Still uncommitted** — waiting on your approval.
+
+### PHASE C — new poster + opening cinematic + 2 real device-only bugs found & fixed  ✅ (2026-09-04)
+- **Poster:** copied `C:\Users\Administrator\Downloads\War of Love\WAR_OF_LOVE_SPLASH_SCREEN_9x16.png`
+  (verified MD5-identical after copy; source untouched) into
+  `game/assets/branding/splash.png` — the single path both `SplashScreen`
+  and Godot's native `boot_splash/image` read. Fixed `SplashScreen`'s
+  stretch mode `COVERED`→`CENTERED` so devices taller than 9:16 no longer
+  crop the artwork. **Confirmed on device: complete poster, fully
+  letterboxed, no crop, no distortion.**
+- **Opening cinematic:** extended `StoryScene` with reusable presentation
+  primitives — a colour `flash` (+ matching sfx hook), a `shake`, a one-shot
+  `particles` burst from existing VFX art, an always-on slow `bg` zoom
+  (Ken Burns), and a mid-beat `bg` swap. Rewrote the `opening` beat in
+  `data/story.json` to the full 7-scene kidnapping arc (peace → Jinn
+  arrives → Jasmine's fear → capture, using her new `captured` pose →
+  taunt/escape → Jamie's shock → his promise), ~43s, skippable. Also fixed
+  a pre-existing mojibake (corrupted em-dash) bug in the dialogue text.
+- **Real bug #1 (found via this verification, not previously known):**
+  `StoryScene._track_size()` was called at the very TOP of `_ready()`,
+  before `_box`/`_skip`/`_left`/`_right`/`_bg` existed — it crashed/no-op'd
+  on that first call (null children) and, since nothing but an actual
+  viewport resize event ever re-triggers it (which never fires on a static-
+  orientation device), the dialogue box / SKIP button / character slots
+  stayed pinned at Godot's default top-left rect on every real device,
+  forever. **This is what the long-standing "harmless" boot-log error
+  (`Invalid assignment ... 'size' ... Nil` at story_scene.gd) actually was**
+  — RESUME's earlier "cosmetic, no functional impact" note was wrong. Fixed
+  by moving the initial `_track_size()` call (and the `size_changed`
+  connection) to the end of `_ready()`, after every child exists — same
+  pattern HUD already uses. **Confirmed on device**: dialogue box now
+  correctly bottom-centred and fully readable (screenshotted mid-beat);
+  the boot-log error is gone entirely, not just relocated (checked logcat).
+- **Real bug #2 (found via this verification):** some enemy crops
+  (`EnemyModel.enemy_face()`) picked up a mirrored fragment of the sheet's
+  "10 MINI BOSSES (JIN'S SERVANTS)" title banner (y~0.010-0.055 of
+  `enemies_keyed.png`), rendered backwards by `EnemyActor`'s left-facing
+  horizontal flip — visible on device as garbled "10 MIN" text floating
+  above the minor villain. Measured the actual gap between the title and
+  the art (starts ~y 0.065) and moved the crop's y0 there. **Confirmed on
+  device**: the artifact is gone; verified all 10 enemies crop cleanly via
+  a dark-background composite before shipping.
+- **Tests: 1436/1436 unit pass** (+64 over the previous pass: new
+  `test_story_scene.gd`, opening-beat structure/mojibake checks). All 6
+  smokes pass. 0 script errors in logcat this session (previously 1
+  recurring, now genuinely fixed).
+- **Files:** new `tools/keyed_sprites/key_checkerboard.py` (generalized),
+  `key_jasmine_poses.py`, `game/assets/story/jasmine_poses_8_keyed.png`
+  (+`.import`), `game/scripts/character/jasmine_actor.gd`,
+  `game/tests/{test_jasmine_actor,test_story_scene}.gd`; edited
+  `game/assets/branding/splash.png` (new poster), `scripts/ui/splash_screen.gd`,
+  `scripts/story/{story_scene,cast,enemy_model}.gd`, `data/story.json`,
+  `scripts/app.gd`, `scripts/ui/hud.gd`, `tests/{test_story_assets,test_shop_continue,test_runner}.gd`.
+- **Still uncommitted** — waiting on your approval.
+
+### PHASE D (next) — booster → Jamie physical action polish + non-boss enemy actor
+Then E: enemy attack/hit/defeat depth · F: boss presentation (+ multi-phase
+Jinn) · G: Jasmine/Jinn gameplay presence depth · H: equipment gameplay
+effects · I: economy balancing · J: full campaign difficulty + animation
+polish pass.
 
 ---
 

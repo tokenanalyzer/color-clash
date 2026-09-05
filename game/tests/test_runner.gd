@@ -7,6 +7,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_board_model.gd",
 	"res://tests/test_power_resolver.gd",
 	"res://tests/test_chain_resolver.gd",
+	"res://tests/test_power_combos.gd",
 	"res://tests/test_score_calculator.gd",
 	"res://tests/test_objective.gd",
 	"res://tests/test_level_design.gd",
@@ -31,6 +32,9 @@ const TEST_SCRIPTS := [
 	"res://tests/test_combat_system.gd",
 	"res://tests/test_inventory.gd",
 	"res://tests/test_shop_continue.gd",
+	"res://tests/test_jamie_actions.gd",
+	"res://tests/test_jasmine_actor.gd",
+	"res://tests/test_story_scene.gd",
 ]
 
 func _initialize() -> void:

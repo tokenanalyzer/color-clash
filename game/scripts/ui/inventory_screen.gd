@@ -65,8 +65,8 @@ func _ready() -> void:
 	_tab_row.add_theme_constant_override("separation", 8)
 	col.add_child(_tab_row)
 	for i in _TABS.size():
-		var b := UiKit.button(_TABS[i], &"tertiary", VisualTheme.FS_MICRO)
-		b.custom_minimum_size = Vector2(0, 46)
+		var b := UiKit.button(_TABS[i], &"tab_active" if i == 0 else &"tab_inactive", VisualTheme.FS_BUTTON)
+		b.custom_minimum_size = Vector2(0, 52)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func(idx = i): Audio.play(&"button_tap"); _tab = idx; _rebuild())
 		_tab_row.add_child(b)
@@ -113,7 +113,7 @@ func _rebuild() -> void:
 		return
 	_coins_label.text = "%d  ¢" % Economy.coins
 	for i in _tab_row.get_child_count():
-		(_tab_row.get_child(i) as Button).modulate.a = 1.0 if i == _tab else 0.55
+		UiKit.set_button_kind(_tab_row.get_child(i) as Button, &"tab_active" if i == _tab else &"tab_inactive")
 	_clear()
 	match _tab:
 		0: _build_powers()
@@ -127,10 +127,38 @@ func _row_card() -> PanelContainer:
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return p
 
+## A small tinted glow-circle icon badge (2026-09-05 UI pass) — the shared
+## icon slot Powers/Boosters/Items rows all use now, so the 3 list-style
+## tabs read as one consistent "item card" system instead of icon-less
+## plain text rows. `icon_id` is an IconDraw glyph id, or "" for a plain
+## texture (boosters already have real art via AssetLibrary.power()).
+func _icon_badge(tint: Color, icon_id: StringName, tex: Texture2D = null, size_px: int = 60) -> Control:
+	var wrap := PanelContainer.new()
+	wrap.custom_minimum_size = Vector2(size_px, size_px)
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(tint.r, tint.g, tint.b, 0.22)
+	sb.set_corner_radius_all(size_px / 2)
+	sb.border_color = Color(tint.r, tint.g, tint.b, 0.65)
+	sb.set_border_width_all(2)
+	wrap.add_theme_stylebox_override("panel", sb)
+	if tex != null:
+		var tr := TextureRect.new()
+		tr.texture = tex
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.custom_minimum_size = Vector2(size_px * 0.72, size_px * 0.72)
+		wrap.add_child(tr)
+	else:
+		var g := IconDraw.IconRect.new()
+		g.id = icon_id
+		g.custom_minimum_size = Vector2(size_px * 0.72, size_px * 0.72)
+		wrap.add_child(g)
+	return wrap
+
 const _POWER_META := {
-	&"fire_sword": ["Fire Sword", "Raw match power — bigger clears hit harder."],
-	&"lightning_hand": ["Blue Lightning", "Spell power — fills from power activations."],
-	&"lightning_boots": ["Lightning Boots", "Momentum — fills from deep cascades."],
+	&"fire_sword": ["Fire Sword", "Raw match power — bigger clears hit harder.", "fire_sword", Color(1.0, 0.5, 0.15)],
+	&"lightning_hand": ["Blue Lightning", "Spell power — fills from power activations.", "lightning", Color(0.35, 0.7, 1.0)],
+	&"lightning_boots": ["Lightning Boots", "Momentum — fills from deep cascades.", "lightning", Color(0.62, 0.42, 0.95)],
 }
 
 func _build_powers() -> void:
@@ -139,8 +167,9 @@ func _build_powers() -> void:
 		var lvl: int = Inventory.power_level(id)
 		var card := _row_card()
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 14)
 		card.add_child(row)
+		row.add_child(_icon_badge(meta[3], StringName(String(meta[2]))))
 		var v := VBoxContainer.new()
 		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(v)
@@ -152,8 +181,8 @@ func _build_powers() -> void:
 		v.add_child(VisualTheme.label("LV %d   %s" % [lvl, dots], VisualTheme.FS_CAPTION, VisualTheme.TEXT))
 		var cost: int = Inventory.power_upgrade_cost(id)
 		var btn := UiKit.button("MAX" if cost < 0 else "UPGRADE  %d¢" % cost,
-			&"primary" if (cost > 0 and Economy.can_afford(cost)) else &"tertiary", VisualTheme.FS_MICRO)
-		btn.custom_minimum_size = Vector2(180, 58)
+			&"primary" if (cost > 0 and Economy.can_afford(cost)) else &"tertiary", VisualTheme.FS_CAPTION)
+		btn.custom_minimum_size = Vector2(180, 64)
 		btn.disabled = cost < 0 or not Economy.can_afford(cost)
 		btn.pressed.connect(func():
 			if Inventory.upgrade_power(id):
@@ -166,21 +195,30 @@ func _build_boosters() -> void:
 		var def: Dictionary = GameData.boosters[id]
 		var card := _row_card()
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 14)
 		card.add_child(row)
+		row.add_child(_icon_badge(UiKit.GOLD, id, AssetLibrary.power(id)))
 		var v := VBoxContainer.new()
 		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(v)
-		v.add_child(VisualTheme.label(String(def.get("label", id)).to_upper(), VisualTheme.FS_BODY, VisualTheme.TEXT))
+		var name_row := HBoxContainer.new()
+		v.add_child(name_row)
+		name_row.add_child(VisualTheme.label(String(def.get("label", id)).to_upper(), VisualTheme.FS_BODY, VisualTheme.TEXT))
+		var targeted: bool = bool(def.get("targeted", false))
+		var tag := VisualTheme.label(" TAP BOARD" if targeted else " INSTANT",
+			VisualTheme.FS_MICRO, VisualTheme.ACCENT if targeted else VisualTheme.GOOD, 0)
+		name_row.add_child(tag)
 		v.add_child(VisualTheme.label(String(def.get("help", "")), VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0))
 		row.add_child(VisualTheme.label("x %d" % Boosters.get_count(id), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD))
 		var buy := UiKit.button("BUY  %d¢" % int(def.get("cost", 0)),
-			&"primary" if Economy.can_afford(int(def.get("cost", 0))) else &"tertiary", VisualTheme.FS_MICRO)
-		buy.custom_minimum_size = Vector2(150, 54)
+			&"primary" if Economy.can_afford(int(def.get("cost", 0))) else &"tertiary", VisualTheme.FS_CAPTION)
+		buy.custom_minimum_size = Vector2(150, 64)
 		buy.disabled = not Economy.can_afford(int(def.get("cost", 0)))
 		buy.pressed.connect(func():
 			if Boosters.purchase(id):
-				Audio.play(&"button_tap"); _rebuild())
+				Audio.play(&"button_tap")
+				UiKit.show_toast(self, "NEW %s ACQUIRED" % String(def.get("label", id)).to_upper(), VisualTheme.GOOD)
+				_rebuild())
 		row.add_child(buy)
 		_body.add_child(card)
 
@@ -201,6 +239,7 @@ func _build_equipment() -> void:
 		sb.set_border_width_all(2 if is_eq else 1)
 		card.add_theme_stylebox_override("panel", sb)
 		card.custom_minimum_size = Vector2(170, 150)
+		card.modulate.a = 1.0 if owned else 0.55
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 3)
 		card.add_child(v)
@@ -231,8 +270,9 @@ func _build_items() -> void:
 	for id in items:
 		var card := _row_card()
 		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		row.add_theme_constant_override("separation", 14)
 		card.add_child(row)
+		row.add_child(_icon_badge(VisualTheme.GEM, &""))
 		row.add_child(VisualTheme.label(String(id).replace("_", " ").capitalize(), VisualTheme.FS_BODY, VisualTheme.TEXT))
 		var sp := Control.new()
 		sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL

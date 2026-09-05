@@ -19,7 +19,32 @@ static func draw_icon(ci: CanvasItem, id: StringName, c: Vector2, s: float, t: f
 		&"chain": _chain(ci, c, s, t)
 		&"shuffle": _shuffle(ci, c, s, t)
 		&"extra_moves": _extra_moves(ci, c, s, tint)
+		&"fire_sword": _fire_sword(ci, c, s, t)
 		_: ci.draw_circle(c, s * 0.3, tint)
+
+## Inventory's POWERS tab icon (2026-09-05 UI pass) — a small flaming blade,
+## same visual complexity/style as the other hand-drawn glyphs above.
+static func _fire_sword(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
+	var flick := 0.7 + 0.3 * sin(t * 14.0)
+	var tip := c + Vector2(0, -s * 0.46)
+	var hilt := c + Vector2(0, s * 0.28)
+	# blade
+	var blade := PackedVector2Array([
+		tip, c + Vector2(s * 0.08, -s * 0.05), c + Vector2(s * 0.06, s * 0.14),
+		c + Vector2(-s * 0.06, s * 0.14), c + Vector2(-s * 0.08, -s * 0.05),
+	])
+	ci.draw_colored_polygon(blade, Color(1.0, 0.85, 0.55))
+	var edge := blade.duplicate(); edge.append(blade[0])
+	ci.draw_polyline(edge, Color(1.0, 0.55, 0.15, 0.9), maxf(s * 0.03, 1.5), true)
+	# crossguard + hilt
+	ci.draw_line(c + Vector2(-s * 0.18, s * 0.14), c + Vector2(s * 0.18, s * 0.14), Color(0.6, 0.42, 0.2), maxf(s * 0.05, 2.0), true)
+	ci.draw_line(c + Vector2(0, s * 0.14), hilt, Color(0.36, 0.24, 0.14), maxf(s * 0.06, 3.0), true)
+	# flame licking off the blade
+	for i in 5:
+		var a := t * 9.0 + TAU * float(i) / 5.0
+		var o := tip.lerp(c + Vector2(0, -s * 0.05), float(i) / 5.0) + Vector2(sin(a) * s * 0.1, 0)
+		ci.draw_circle(o, s * (0.09 + 0.04 * flick) * (1.0 - float(i) / 6.0), Color(1.0, 0.5, 0.12, 0.55 * flick))
+	ci.draw_circle(tip, s * 0.07 * flick, Color(1.0, 0.92, 0.6))
 
 static func _bomb(ci: CanvasItem, c: Vector2, s: float, t: float) -> void:
 	# a shaded iron sphere with a lit fuse — a real object, not a flat disc

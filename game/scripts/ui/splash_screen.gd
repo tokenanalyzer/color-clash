@@ -37,9 +37,12 @@ func _ready() -> void:
 		_img = TextureRect.new()
 		_img.texture = poster
 		_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED  # 9:16 cover, no stretch
+		# KEEP_ASPECT_CENTERED (fit, never crop) rather than COVERED: real
+		# devices vary in aspect ratio (many are taller than the poster's
+		# 9:16), and COVERED would crop the top/bottom of the supplied
+		# artwork to fill them. The dark _ground colour letterboxes cleanly.
+		_img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_img.clip_contents = true
 		add_child(_img)
 	else:
 		var bg := Backdrop.new()
@@ -98,16 +101,25 @@ class SplashFX extends Control:
 		var cx := s.x * 0.5
 		var cy: float = s.y * 0.42
 
-		# poster splash carries its own title — only draw the loading sweep
+		# poster splash carries its own title — only draw the loading sweep,
+		# styled to match the new crest's gold/crimson palette rather than a
+		# generic white progress bar.
 		if poster_mode:
 			var font := ThemeDB.fallback_font
 			var bar_w := s.x * 0.5
 			var bx := cx - bar_w * 0.5
 			var by: float = s.y - si.size.y - 64.0
-			draw_line(Vector2(bx, by), Vector2(bx + bar_w, by), Color(1, 1, 1, 0.14), 6.0, true)
 			var pr: float = clampf(t / _splash_duration(), 0.0, 1.0)
-			draw_line(Vector2(bx, by), Vector2(bx + bar_w * pr, by), VisualTheme.STAR, 6.0, true)
-			draw_circle(Vector2(bx + bar_w * pr, by), 7.0, Color(1, 1, 1, 0.95))
+			var lead := Vector2(bx + bar_w * pr, by)
+			# soft crimson-gold glow breathing behind the leading edge
+			var pulse: float = 0.7 + 0.3 * sin(t * 5.0)
+			VisualTheme.draw_glow(self, lead, 15.0 * pulse, Color(VisualTheme.ACCENT_HOT.r, VisualTheme.ACCENT_HOT.g, VisualTheme.ACCENT_HOT.b, 0.5), 4)
+			draw_line(Vector2(bx, by), Vector2(bx + bar_w, by), Color(1, 1, 1, 0.14), 6.0, true)
+			draw_line(Vector2(bx, by), lead, VisualTheme.STAR, 6.0, true)
+			# a small gold-rimmed crimson gem instead of a flat dot
+			draw_circle(lead, 8.0, VisualTheme.ACCENT_HOT)
+			draw_circle(lead, 8.0, Color(VisualTheme.TEXT_GOLD.r, VisualTheme.TEXT_GOLD.g, VisualTheme.TEXT_GOLD.b, 0.9), false, 1.6)
+			draw_circle(lead + Vector2(-2.4, -2.4), 2.2, Color(1, 1, 1, 0.85))
 			return
 
 		var appear: float = clampf(t / 0.55, 0.0, 1.0)

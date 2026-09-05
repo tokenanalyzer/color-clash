@@ -107,7 +107,11 @@ func _track_size() -> void:
 func is_open() -> bool:
 	return _is_open
 
-func open() -> void:
+## `focus_id`: when set (e.g. the player tapped a booster in the gameplay
+## tray that they own zero of), jumps straight to that booster's buy-confirm
+## dialog instead of just showing the list — "I want THIS one" should be a
+## single tap, not tap-the-tray-then-scroll-then-tap-BUY.
+func open(focus_id: StringName = &"") -> void:
 	_is_open = true
 	visible = true
 	_hide_confirm()
@@ -115,6 +119,8 @@ func open() -> void:
 	_scrim.modulate.a = 0.0
 	_scrim.create_tween().tween_property(_scrim, "modulate:a", 1.0, 0.16)
 	UiKit.pop_in(_frame)
+	if focus_id != &"" and GameData.boosters.has(focus_id):
+		request_buy(focus_id)
 
 func close() -> void:
 	if not _is_open:
@@ -165,7 +171,13 @@ func _row(id: StringName) -> PanelContainer:
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 2)
 	row.add_child(v)
-	v.add_child(VisualTheme.label(String(def.get("label", id)).to_upper(), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD))
+	var name_row := HBoxContainer.new()
+	name_row.add_theme_constant_override("separation", 8)
+	v.add_child(name_row)
+	name_row.add_child(VisualTheme.label(String(def.get("label", id)).to_upper(), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD))
+	var targeted: bool = bool(def.get("targeted", false))
+	name_row.add_child(VisualTheme.label("TAP BOARD" if targeted else "INSTANT",
+		VisualTheme.FS_MICRO, VisualTheme.ACCENT if targeted else VisualTheme.GOOD, 0))
 	var help := VisualTheme.label(String(def.get("help", "")), VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0)
 	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	help.custom_minimum_size = Vector2(240, 0)
@@ -237,6 +249,8 @@ func confirm_buy() -> bool:
 	var ok := Boosters.purchase(id)   # Economy.spend + Boosters.add(1) + persist
 	if ok:
 		Audio.play(&"button_tap")
+		var label := String(GameData.boosters.get(id, {}).get("label", id)).to_upper()
+		UiKit.show_toast(self, "NEW %s ACQUIRED" % label, VisualTheme.GOOD)
 	_hide_confirm()
 	_refresh()
 	return ok
@@ -257,20 +271,15 @@ func _build_confirm_layer() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_confirm_layer.add_child(center)
 
-	var panel := PanelContainer.new()
+	# Gold-framed chrome (2026-09-05 UI pass) — same dialog family as every
+	# other modal, replacing a hand-rolled stylebox that was the odd one out.
+	var panel := UiKit.GoldFramePanel.new(20)
 	panel.custom_minimum_size = Vector2(480, 420)
-	var sb := UiKit.glass(24, true)
-	sb.bg_color = Color(0.08, 0.09, 0.18, 0.97)
-	sb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.45)
-	sb.set_border_width_all(2)
-	sb.content_margin_left = 24; sb.content_margin_right = 24
-	sb.content_margin_top = 22; sb.content_margin_bottom = 22
-	panel.add_theme_stylebox_override("panel", sb)
 	center.add_child(panel)
 
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 10)
-	panel.add_child(v)
+	panel.content().add_child(v)
 
 	_c_title = VisualTheme.label("", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
 	_c_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

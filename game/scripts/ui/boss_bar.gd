@@ -61,6 +61,38 @@ func play_defeat() -> void:
 	t.tween_property(self, "modulate:a", 0.0, 0.5)
 	t.tween_callback(func(): visible = false)
 
+## Boss reacts to a Jamie hit. `kind`: hit | heavy_hit | knockback | stun.
+## Pure presentation — a portrait flinch/knock + a bar flash. HP is set
+## separately via set_hp() so this can never desync the numbers.
+func play_hit(kind: StringName) -> void:
+	if _defeated or _portrait == null:
+		return
+	_flash = 1.0
+	queue_redraw()
+	var knock: float = {&"hit": 6.0, &"heavy_hit": 20.0, &"knockback": 26.0, &"stun": 12.0}.get(kind, 6.0)
+	var base := Vector2(8, 7)
+	_portrait.position = base
+	var t := _portrait.create_tween()
+	t.tween_property(_portrait, "position", base + Vector2(knock, 0), 0.05).set_trans(Tween.TRANS_SINE)
+	t.tween_property(_portrait, "position", base, 0.22).set_trans(Tween.TRANS_ELASTIC)
+	if kind == &"stun":
+		var s := _portrait.create_tween()
+		s.tween_property(_portrait, "rotation", 0.12, 0.06)
+		s.tween_property(_portrait, "rotation", -0.12, 0.12)
+		s.tween_property(_portrait, "rotation", 0.0, 0.1)
+
+## The final boss watches / taunts (stage 50 flavour) — a quick portrait
+## pulse + dark glow flash. No effect on HP or victory logic.
+func play_taunt() -> void:
+	if _defeated or _portrait == null:
+		return
+	var pc := _portrait.pivot_offset
+	_portrait.pivot_offset = _portrait.size * 0.5
+	var t := _portrait.create_tween()
+	t.tween_property(_portrait, "scale", Vector2(1.14, 1.14), 0.12).set_trans(Tween.TRANS_BACK)
+	t.tween_property(_portrait, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_ELASTIC)
+	t.tween_callback(func(): _portrait.pivot_offset = pc)
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_relayout()
@@ -99,20 +131,27 @@ func _draw() -> void:
 	draw_circle(pc, ps * 0.5 + 3.0, Color(gold.r, gold.g, gold.b, 0.9))
 	draw_circle(pc, ps * 0.5 + 1.0, Color(0.04, 0.04, 0.09, 1.0))
 
-	# HP track + fill (under the name)
+	# HP track + fill (under the name) — thicker, gold-framed, with a soft
+	# glow and a small gem riding the fill's leading edge (2026-09-05 UI
+	# pass: the boss fight is the campaign's climax, this bar should read
+	# as premium as the Fever meter elsewhere in the same HUD).
 	var bx := ps + 22.0
-	var by := h - 30.0
+	var by := h - 34.0
 	var bw := w - bx - 18.0
-	var bh := 16.0
-	_round(Rect2(bx, by, bw, bh), 8.0, Color(0.02, 0.02, 0.05, 0.95))
+	var bh := 20.0
+	_round(Rect2(bx, by, bw, bh), 10.0, Color(0.02, 0.02, 0.05, 0.95))
 	if _hp_shown > 0.001:
 		var fill := Rect2(bx, by, bw * _hp_shown, bh)
 		var fc := Color(0.95, 0.22, 0.26) if not _final else Color(0.85, 0.2, 0.55)
 		if _flash > 0.0:
 			fc = fc.lerp(Color(1, 1, 1), _flash)
-		_round(fill, 8.0, fc)
-		_round(Rect2(fill.position + Vector2(0, 2), Vector2(fill.size.x, bh * 0.4)), 8.0, Color(1, 1, 1, 0.28))
-	_round_outline(Rect2(bx, by, bw, bh), 8.0, Color(gold.r, gold.g, gold.b, 0.7), 1.5)
+		_round(fill, 10.0, fc)
+		_round(Rect2(fill.position + Vector2(0, 2), Vector2(fill.size.x, bh * 0.4)), 10.0, Color(1, 1, 1, 0.28))
+		var lead := Vector2(fill.position.x + fill.size.x, fill.position.y + bh * 0.5)
+		VisualTheme.draw_glow(self, lead, bh * 1.1, Color(fc.r, fc.g, fc.b, 0.35 + 0.15 * sin(_t * 5.0)), 3)
+		draw_circle(lead, bh * 0.34, Color(gold.r, gold.g, gold.b, 0.95))
+		draw_arc(lead, bh * 0.34, 0, TAU, 12, Color(1, 1, 1, 0.8), 1.4, true)
+	_round_outline(Rect2(bx, by, bw, bh), 10.0, Color(gold.r, gold.g, gold.b, 0.7), 2.0)
 	if _flash > 0.0:
 		_round(panel, 16.0, Color(1, 0.4, 0.4, 0.12 * _flash))
 

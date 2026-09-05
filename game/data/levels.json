@@ -116,7 +116,26 @@
           "target": 5500
         }
       ],
-      "obstacles": [],
+      "obstacles": [
+        {
+          "type": "wooden_crate",
+          "x": 1,
+          "y": 5,
+          "hp": 1
+        },
+        {
+          "type": "wooden_crate",
+          "x": 4,
+          "y": 4,
+          "hp": 1
+        },
+        {
+          "type": "wooden_crate",
+          "x": 4,
+          "y": 1,
+          "hp": 1
+        }
+      ],
       "star_scores": [
         7000,
         11500,
@@ -147,7 +166,26 @@
           "target": 22
         }
       ],
-      "obstacles": [],
+      "obstacles": [
+        {
+          "type": "wooden_crate",
+          "x": 2,
+          "y": 5,
+          "hp": 1
+        },
+        {
+          "type": "wooden_crate",
+          "x": 4,
+          "y": 1,
+          "hp": 1
+        },
+        {
+          "type": "wooden_crate",
+          "x": 5,
+          "y": 1,
+          "hp": 1
+        }
+      ],
       "star_scores": [
         7000,
         11500,
@@ -175,28 +213,34 @@
       "objectives": [
         {
           "type": "break_obstacles",
-          "obstacle": "ice",
-          "target": 3
+          "obstacle": "wooden_crate",
+          "target": 4
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 1,
           "y": 5,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 3,
           "y": 3,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 4,
           "y": 1,
-          "hp": 2
+          "hp": 1
+        },
+        {
+          "type": "wooden_crate",
+          "x": 2,
+          "y": 4,
+          "hp": 1
         }
       ],
       "star_scores": [
@@ -207,7 +251,7 @@
       "reward": {
         "coins": 166
       },
-      "hint": "Ice takes two hits. Blast it with a power."
+      "hint": "Wooden Crates break in one hit \u2014 clear a jewel on top of one."
     },
     {
       "id": 7,
@@ -237,28 +281,28 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 2,
           "y": 4,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 1,
           "y": 1,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 3,
           "y": 2,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 1,
           "y": 2,
-          "hp": 2
+          "hp": 1
         }
       ],
       "star_scores": [
@@ -294,26 +338,32 @@
         {
           "type": "break_obstacles",
           "obstacle": "any",
-          "target": 3
+          "target": 4
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 3,
           "y": 4,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "ice",
+          "type": "wooden_crate",
           "x": 3,
           "y": 6,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 3,
+          "hp": 1
+        },
+        {
+          "type": "magic_chain",
+          "x": 1,
+          "y": 4,
           "hp": 1
         }
       ],
@@ -344,8 +394,8 @@
       "objectives": [
         {
           "type": "break_obstacles",
-          "obstacle": "lock",
-          "target": 3
+          "obstacle": "magic_chain",
+          "target": 2
         },
         {
           "type": "clear_color",
@@ -355,21 +405,27 @@
       ],
       "obstacles": [
         {
-          "type": "lock",
+          "type": "wooden_crate",
           "x": 2,
           "y": 6,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "wooden_crate",
           "x": 3,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 3,
           "y": 4,
+          "hp": 1
+        },
+        {
+          "type": "magic_chain",
+          "x": 3,
+          "y": 6,
           "hp": 1
         }
       ],
@@ -381,7 +437,7 @@
       "reward": {
         "coins": 214
       },
-      "hint": "Locks open when you clear jewels right next to them."
+      "hint": "Magic Chains open when you clear jewels right next to them."
     },
     {
       "id": 10,
@@ -411,16 +467,22 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 6,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 6,
           "hp": 2
+        },
+        {
+          "type": "magic_chain",
+          "x": 2,
+          "y": 5,
+          "hp": 1
         }
       ],
       "star_scores": [
@@ -461,31 +523,31 @@
       ],
       "obstacles": [
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 5,
           "y": 3,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 6,
           "y": 2,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 5,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 1,
           "hp": 2
@@ -523,37 +585,37 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "lock",
+          "obstacle": "magic_chain",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 5,
           "hp": 1
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 4,
           "hp": 2
@@ -596,31 +658,31 @@
       ],
       "obstacles": [
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 3,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 5,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 4,
           "y": 2,
           "hp": 1
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 6,
           "hp": 2
@@ -664,31 +726,31 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 3,
           "hp": 1
@@ -726,37 +788,37 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "lock",
+          "obstacle": "magic_chain",
           "target": 2
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 1,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 6,
           "y": 3,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 5,
           "y": 5,
           "hp": 1
@@ -801,31 +863,31 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 2,
           "hp": 1
@@ -839,7 +901,7 @@
       "reward": {
         "coins": 326
       },
-      "hint": "Stone only breaks inside a power blast."
+      "hint": "Cursed Stone only breaks inside a power blast."
     },
     {
       "id": 17,
@@ -869,43 +931,43 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "lock",
-          "target": 2
+          "obstacle": "magic_chain",
+          "target": 1
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 6,
-          "hp": 1
+          "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 4,
           "y": 5,
           "hp": 1
@@ -949,43 +1011,43 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "lock",
-          "target": 2
+          "obstacle": "magic_chain",
+          "target": 1
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 3,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 3,
-          "hp": 1
+          "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 5,
           "y": 1,
           "hp": 1
@@ -1035,37 +1097,37 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 4,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 4,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 6,
-          "hp": 1
+          "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 4,
           "y": 1,
           "hp": 1
@@ -1109,34 +1171,34 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 1,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 2,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 7,
-          "hp": 2
+          "hp": 3
         }
       ],
       "star_scores": [
@@ -1177,28 +1239,28 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 1
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 3,
           "hp": 2
@@ -1238,34 +1300,34 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 3
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 4,
           "hp": 2
@@ -1309,28 +1371,28 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 5
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 7,
           "hp": 2
@@ -1375,37 +1437,31 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 7
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 2,
           "y": 4,
-          "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 2,
-          "y": 7,
-          "hp": 2
+          "hp": 3
         }
       ],
       "star_scores": [
@@ -1441,43 +1497,37 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 5,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 4,
-          "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 3,
-          "y": 7,
-          "hp": 2
+          "hp": 3
         }
       ],
       "star_scores": [
@@ -1524,37 +1574,31 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 5
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 4,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 2,
           "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 2,
-          "y": 3,
-          "hp": 2
+          "hp": 3
         }
       ],
       "star_scores": [
@@ -1594,52 +1638,52 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 6
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 1,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 7,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 7,
           "hp": 1
@@ -1683,52 +1727,52 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 1
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 6,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 7,
           "y": 6,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 6,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 2,
           "hp": 1
@@ -1778,46 +1822,46 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 3
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 6,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 1,
           "y": 2,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 3,
           "y": 7,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 6,
           "y": 5,
           "hp": 1
@@ -1861,31 +1905,31 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 5
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 6,
-          "hp": 2
+          "hp": 3
         }
       ],
       "star_scores": [
@@ -1926,43 +1970,37 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 2
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "cursed_stone",
           "x": 6,
-          "y": 6,
-          "hp": 2
+          "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "dark_rune",
           "x": 3,
-          "y": 5
-        },
-        {
-          "type": "timebomb",
-          "x": 3,
-          "y": 2,
+          "y": 5,
           "hp": 7
         }
       ],
@@ -1974,7 +2012,7 @@
       "reward": {
         "coins": 566
       },
-      "hint": "Time bombs count down every move \u2014 clear or blast them first!"
+      "hint": "Dark Runes count down every move \u2014 clear or blast them first!"
     },
     {
       "id": 32,
@@ -2001,7 +2039,7 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 2
         },
         {
@@ -2012,37 +2050,31 @@
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 5,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "cursed_stone",
           "x": 5,
-          "y": 1,
-          "hp": 2
+          "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "dark_rune",
           "x": 4,
-          "y": 5
-        },
-        {
-          "type": "timebomb",
-          "x": 4,
-          "y": 4,
+          "y": 5,
           "hp": 7
         }
       ],
@@ -2084,43 +2116,37 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 2
         }
       ],
       "obstacles": [
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 3,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "cursed_stone",
           "x": 5,
-          "y": 3,
-          "hp": 2
+          "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "dark_rune",
           "x": 5,
-          "y": 4
-        },
-        {
-          "type": "timebomb",
-          "x": 6,
-          "y": 2,
+          "y": 4,
           "hp": 7
         }
       ],
@@ -2163,46 +2189,46 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 5
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 5,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 1,
           "y": 4,
           "hp": 7
@@ -2242,7 +2268,7 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
+          "obstacle": "cursed_stone",
           "target": 3
         },
         {
@@ -2253,40 +2279,40 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 6
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 7,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 8,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 6,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 3,
           "y": 8,
           "hp": 7
@@ -2337,40 +2363,40 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 4
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 6,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 3,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 2,
           "y": 6,
           "hp": 7
@@ -2414,53 +2440,48 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "cursed_stone",
+          "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 2,
-          "y": 6
+          "y": 6,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "dark_rune",
           "x": 1,
           "y": 4,
-          "hp": 2
-        },
-        {
-          "type": "timebomb",
-          "x": 7,
-          "y": 5,
           "hp": 7
         }
       ],
@@ -2503,53 +2524,48 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "cursed_stone",
+          "target": 3
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 1,
-          "y": 5
+          "y": 5,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 7,
           "y": 3,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 8,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "dark_rune",
           "x": 6,
           "y": 1,
-          "hp": 2
-        },
-        {
-          "type": "timebomb",
-          "x": 4,
-          "y": 6,
           "hp": 7
         }
       ],
@@ -2598,47 +2614,42 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 8
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 1,
-          "y": 4
-        },
-        {
-          "type": "ice",
-          "x": 4,
-          "y": 2,
-          "hp": 2
-        },
-        {
-          "type": "ice",
-          "x": 5,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
-          "x": 6,
-          "y": 7,
-          "hp": 2
+          "type": "reinforced_crate",
+          "x": 4,
+          "y": 2,
+          "hp": 3
         },
         {
-          "type": "timebomb",
+          "type": "reinforced_crate",
+          "x": 5,
+          "y": 4,
+          "hp": 3
+        },
+        {
+          "type": "dark_rune",
           "x": 6,
-          "y": 6,
+          "y": 7,
           "hp": 7
         }
       ],
@@ -2686,42 +2697,37 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 7,
-          "y": 6
+          "y": 6,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 7,
           "y": 4,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "dark_rune",
           "x": 4,
           "y": 4,
-          "hp": 2
-        },
-        {
-          "type": "timebomb",
-          "x": 7,
-          "y": 5,
           "hp": 7
         }
       ],
@@ -2763,52 +2769,53 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 3
+          "obstacle": "shadow_barrier",
+          "target": 1
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 7,
-          "y": 4
+          "y": 4,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 2,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 1,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 3,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 1,
           "y": 7,
           "hp": 6
@@ -2849,8 +2856,8 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 3
+          "obstacle": "shadow_barrier",
+          "target": 1
         },
         {
           "type": "create_powers",
@@ -2860,46 +2867,47 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 7,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 8
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 7,
-          "y": 2
+          "y": 2,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 8,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 6,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 3,
           "y": 1,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 5,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 3,
           "y": 7,
           "hp": 6
@@ -2943,52 +2951,53 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 3
+          "obstacle": "shadow_barrier",
+          "target": 1
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 7,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 1,
-          "y": 1
+          "y": 1,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 4,
           "y": 8,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "frozen_crystal",
           "x": 5,
           "y": 5,
           "hp": 2
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 2,
           "y": 7,
           "hp": 1
         },
         {
-          "type": "timebomb",
+          "type": "dark_rune",
           "x": 6,
           "y": 7,
           "hp": 6
@@ -3033,65 +3042,60 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "shadow_barrier",
+          "target": 1
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 7,
           "y": 2
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 8
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 6,
-          "y": 1
+          "y": 1,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 2,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 3,
           "y": 5,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 3,
           "y": 8,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 3,
           "y": 3,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 3,
-          "y": 6,
           "hp": 6
         }
       ],
@@ -3129,8 +3133,8 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "shadow_barrier",
+          "target": 1
         },
         {
           "type": "create_powers",
@@ -3140,59 +3144,54 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 8
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 5,
           "y": 4
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 6,
-          "y": 8
+          "y": 8,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 1,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 4,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 1,
           "y": 3,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 8,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 4,
           "y": 5,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 6,
-          "y": 2,
           "hp": 6
         }
       ],
@@ -3241,59 +3240,54 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 7,
           "y": 8
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 5,
-          "y": 7
+          "y": 7,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 4,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 6,
           "y": 8,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 3,
           "y": 8,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 2,
           "y": 7,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 1,
-          "y": 3,
           "hp": 6
         }
       ],
@@ -3335,71 +3329,66 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "shadow_barrier",
+          "target": 2
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 1,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 5,
-          "y": 6
+          "y": 6,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "shadow_barrier",
           "x": 3,
           "y": 2,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 3,
           "y": 7,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 1,
           "y": 1,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 1,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 7,
           "y": 7,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 3,
-          "y": 6,
           "hp": 6
         }
       ],
@@ -3442,71 +3431,66 @@
         },
         {
           "type": "break_obstacles",
-          "obstacle": "stone",
-          "target": 4
+          "obstacle": "shadow_barrier",
+          "target": 2
         }
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 2,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 5,
-          "y": 5
+          "y": 5,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "shadow_barrier",
           "x": 7,
           "y": 4,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 5,
           "y": 3,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 6,
           "y": 4,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 4,
           "y": 1,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 1,
           "y": 4,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 2,
           "y": 4,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 4,
-          "y": 5,
           "hp": 6
         }
       ],
@@ -3555,65 +3539,60 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 6
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 7
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 3,
           "y": 5
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 3,
-          "y": 4
+          "y": 4,
+          "hp": 2
         },
         {
-          "type": "ice",
+          "type": "shadow_barrier",
           "x": 5,
           "y": 7,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 1,
           "y": 8,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
           "x": 4,
           "y": 2,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "magic_chain",
           "x": 7,
           "y": 1,
-          "hp": 2
+          "hp": 1
         },
         {
-          "type": "lock",
+          "type": "magic_chain",
           "x": 7,
           "y": 5,
           "hp": 1
         },
         {
-          "type": "lock",
+          "type": "dark_rune",
           "x": 3,
           "y": 8,
-          "hp": 1
-        },
-        {
-          "type": "timebomb",
-          "x": 3,
-          "y": 3,
           "hp": 6
         }
       ],
@@ -3661,41 +3640,36 @@
       ],
       "obstacles": [
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 4,
           "y": 1
         },
         {
-          "type": "stone",
+          "type": "cursed_stone",
           "x": 6,
           "y": 3
         },
         {
-          "type": "stone",
+          "type": "shadow_barrier",
           "x": 5,
-          "y": 3
-        },
-        {
-          "type": "ice",
-          "x": 4,
           "y": 3,
           "hp": 2
         },
         {
-          "type": "ice",
+          "type": "reinforced_crate",
+          "x": 4,
+          "y": 3,
+          "hp": 3
+        },
+        {
+          "type": "reinforced_crate",
           "x": 1,
           "y": 6,
-          "hp": 2
+          "hp": 3
         },
         {
-          "type": "ice",
+          "type": "dark_rune",
           "x": 3,
-          "y": 8,
-          "hp": 2
-        },
-        {
-          "type": "timebomb",
-          "x": 5,
           "y": 8,
           "hp": 6
         }

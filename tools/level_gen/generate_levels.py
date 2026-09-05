@@ -120,66 +120,82 @@ def difficulty(lid):
 
 def _obstacle_specs(lid):
     """(type, count, hp) tuples for a stage. hp 0 => omit the field.
-    Densities climb each island; bosses carry a thematic-but-fair field."""
+    Densities climb each island; bosses carry a thematic-but-fair field.
+
+    Themed ids (2026-09-05 gameplay-depth pass) are original War of Love
+    blockers, but each reuses one of the 4 proven mechanic families instead
+    of inventing new ones (see game/scripts/board/cell_data.gd's _FAMILY
+    table):
+      ice family      (any clear/blast damages; hp tiers the challenge)
+        -> wooden_crate (hp1, gentle), frozen_crystal (hp2), reinforced_crate (hp3)
+      lock family      (only chips from an ADJACENT clear, never a direct hit)
+        -> magic_chain
+      stone family     (power-blast only, never a plain match)
+        -> cursed_stone (1 hit, like plain stone), shadow_barrier (hp2, needs
+           2 separate power blasts)
+      timebomb family  (counts down each move, detonates if ignored)
+        -> dark_rune
+    """
     ch = chapter(lid)
     p = pos_in_chapter(lid)
     specs = []
 
-    if ch == 0:                                    # 1-10  teach: ice, then locks
-        if lid <= 5:
+    if ch == 0:                                    # 1-10  teach: crates, then chains
+        if lid <= 3:
             return []
-        if lid == 6:
-            specs = [("ice", 3, 2)]
-        elif lid == 7:
-            specs = [("ice", 4, 2)]
-        elif lid == 8:
-            specs = [("ice", 2, 2), ("lock", 1, 1)]
-        elif lid == 9:
-            specs = [("lock", 3, 1)]
-        else:                                      # 10 boss
-            specs = [("ice", 2, 2)]
+        if lid <= 5:
+            specs = [("wooden_crate", 3, 1)]
+        elif lid <= 7:
+            specs = [("wooden_crate", 4, 1)]
+        elif lid <= 9:
+            specs = [("wooden_crate", 2, 1), ("magic_chain", 2, 1)]
+        else:                                      # 10 boss (Poison Beast)
+            specs = [("frozen_crystal", 2, 2), ("magic_chain", 1, 1)]
 
-    elif ch == 1:                                  # 11-20  ice + locks, more
+    elif ch == 1:                                  # 11-20  frozen crystal + chains, denser
         if p <= 2:
-            specs = [("lock", 3, 1), ("ice", 2, 2)]
+            specs = [("magic_chain", 3, 1), ("frozen_crystal", 2, 2)]
         elif p <= 5:
-            specs = [("ice", 3, 2), ("lock", 2, 1)]
+            specs = [("frozen_crystal", 3, 2), ("magic_chain", 2, 1)]
         elif p <= 8:
-            specs = [("ice", 4, 2), ("lock", 2, 1)]
+            specs = [("reinforced_crate", 2, 3), ("frozen_crystal", 3, 2), ("magic_chain", 1, 1)]
         else:                                      # 20 boss (Ice Wraith)
-            specs = [("ice", 5, 2)]
+            specs = [("frozen_crystal", 3, 2), ("reinforced_crate", 2, 3)]
 
-    elif ch == 2:                                  # 21-30  stone joins in
+    elif ch == 2:                                  # 21-30  cursed stone joins in
         if p <= 2:
-            specs = [("stone", 3, 0), ("ice", 2, 2)]
+            specs = [("cursed_stone", 3, 0), ("frozen_crystal", 2, 2)]
         elif p <= 5:
-            specs = [("stone", 3, 0), ("ice", 3, 2)]
+            specs = [("cursed_stone", 3, 0), ("reinforced_crate", 2, 3)]
         elif p <= 8:
-            specs = [("stone", 3, 0), ("ice", 3, 2), ("lock", 2, 1)]
+            specs = [("cursed_stone", 3, 0), ("frozen_crystal", 3, 2), ("magic_chain", 2, 1)]
         else:                                      # 30 boss (Dark Knight)
-            specs = [("stone", 3, 0), ("ice", 2, 2)]
+            specs = [("cursed_stone", 3, 0), ("reinforced_crate", 2, 3)]
 
-    elif ch == 3:                                  # 31-40  timebombs join in
+    elif ch == 3:                                  # 31-40  dark runes + shadow barriers join in
         fuse = max(6, 10 - ch)                     # 7
         if p <= 2:
-            specs = [("ice", 3, 2), ("stone", 2, 0), ("timebomb", 1, fuse)]
+            specs = [("reinforced_crate", 2, 3), ("cursed_stone", 2, 0), ("dark_rune", 1, fuse)]
         elif p <= 5:
-            specs = [("stone", 3, 0), ("ice", 2, 2), ("lock", 1, 1), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 3, 0), ("frozen_crystal", 2, 2), ("magic_chain", 1, 1), ("dark_rune", 1, fuse)]
         elif p <= 8:
-            specs = [("stone", 4, 0), ("ice", 3, 2), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 3, 0), ("shadow_barrier", 1, 2), ("reinforced_crate", 2, 3), ("dark_rune", 1, fuse)]
         else:                                      # 40 boss (Chaos Sorcerer)
-            specs = [("stone", 3, 0), ("ice", 3, 2), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 2, 0), ("shadow_barrier", 1, 2), ("reinforced_crate", 2, 3), ("dark_rune", 1, fuse)]
 
-    else:                                          # 41-50  dense endgame mix
+    else:                                          # 41-50  dense endgame mix, every family present
         fuse = max(6, 10 - ch)                     # 6
         if p <= 2:
-            specs = [("stone", 3, 0), ("ice", 3, 2), ("lock", 1, 1), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 2, 0), ("shadow_barrier", 1, 2), ("frozen_crystal", 3, 2),
+                     ("magic_chain", 1, 1), ("dark_rune", 1, fuse)]
         elif p <= 5:
-            specs = [("stone", 4, 0), ("ice", 3, 2), ("lock", 2, 1), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 3, 0), ("shadow_barrier", 1, 2), ("reinforced_crate", 2, 3),
+                     ("magic_chain", 2, 1), ("dark_rune", 1, fuse)]
         elif p <= 8:
-            specs = [("stone", 4, 0), ("ice", 4, 2), ("lock", 2, 1), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 3, 0), ("shadow_barrier", 2, 2), ("reinforced_crate", 2, 3),
+                     ("magic_chain", 2, 1), ("dark_rune", 1, fuse)]
         else:                                      # 50 (Jinn) — fair boss race
-            specs = [("stone", 3, 0), ("ice", 3, 2), ("timebomb", 1, fuse)]
+            specs = [("cursed_stone", 2, 0), ("shadow_barrier", 1, 2), ("reinforced_crate", 2, 3), ("dark_rune", 1, fuse)]
 
     return specs
 
@@ -284,7 +300,7 @@ def _pick_colors(colors, k):
 
 
 _OBSTACLE_OBJ_KIND = {  # which obstacle a stage's obstacle-goal should name
-    0: "ice", 1: "lock", 2: "stone", 3: "stone", 4: "stone",
+    0: "wooden_crate", 1: "magic_chain", 2: "cursed_stone", 3: "cursed_stone", 4: "shadow_barrier",
 }
 
 
@@ -302,14 +318,14 @@ def objectives(lid, colors, obs):
             3: [{"type": "create_powers", "power": "any", "target": 2}],
             4: [{"type": "reach_score", "target": _score_goal(4, 0.38)}],
             5: [{"type": "clear_color", "color": colors[1], "target": 22}],
-            6: [{"type": "break_obstacles", "obstacle": "ice",
-                 "target": _count_obstacle(obs, "ice")}],
+            6: [{"type": "break_obstacles", "obstacle": "wooden_crate",
+                 "target": _count_obstacle(obs, "wooden_crate")}],
             7: [{"type": "clear_color", "color": colors[0], "target": 24},
                 {"type": "reach_score", "target": _score_goal(7, 0.42)}],
             8: [{"type": "create_powers", "power": "any", "target": 3},
                 {"type": "break_obstacles", "obstacle": "any", "target": len(obs)}],
-            9: [{"type": "break_obstacles", "obstacle": "lock",
-                 "target": _count_obstacle(obs, "lock")},
+            9: [{"type": "break_obstacles", "obstacle": "magic_chain",
+                 "target": _count_obstacle(obs, "magic_chain")},
                 {"type": "clear_color", "color": colors[2], "target": 20}],
             10: [{"type": "reach_score", "target": _score_goal(10, 0.95)},
                  {"type": "clear_color", "color": colors[0], "target": 20}],
@@ -396,12 +412,12 @@ def hint(lid):
         1: "Swipe across 3+ same-colour jewels, then release.",
         2: "Longer connections clear more — and score more.",
         3: "Connect 4+ to leave a POWER tile. Connect it again to fire it.",
-        6: "Ice takes two hits. Blast it with a power.",
-        9: "Locks open when you clear jewels right next to them.",
+        6: "Wooden Crates break in one hit — clear a jewel on top of one.",
+        9: "Magic Chains open when you clear jewels right next to them.",
         10: "Boss ahead — every match powers Jamie's attack.",
-        16: "Stone only breaks inside a power blast.",
+        16: "Cursed Stone only breaks inside a power blast.",
         21: "Line up 5 to leave a Lightning — it clears a whole row and column.",
-        31: "Time bombs count down every move — clear or blast them first!",
+        31: "Dark Runes count down every move — clear or blast them first!",
         41: "Endgame: chain powers together for the score you need.",
         50: "Jinn. Everything you've learned. Rescue Jasmine.",
     }.get(lid, "")

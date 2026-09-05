@@ -1,0 +1,20 @@
+{
+  "_comment": "Flavor label per power-pair combo (2026-09-05 depth pass), keyed by the two power ids sorted alphabetically and joined with '+'. Purely presentational — board_view.gd derives the actual tint (blend of each power's own _POW_FX_TINT) and sound (both powers' own sfx ids layered, never a brand-new synth def) from the pair itself, so this file only needs a name per combination, not a whole new effect spec. Every same-power and cross-power pair among the 5 existing powers (bomb/lightning/freeze/chain/rainbow) is listed so no combo falls back to a generic label.",
+  "combos": {
+    "bomb+bomb": "TWIN BLAST",
+    "bomb+lightning": "STORM BLAST",
+    "bomb+freeze": "SHATTER BLAST",
+    "bomb+chain": "CHAIN BLAST",
+    "bomb+rainbow": "RAINBOW BLAST",
+    "lightning+lightning": "CROSSFIRE",
+    "freeze+lightning": "FROSTBOLT",
+    "chain+lightning": "CHAIN STORM",
+    "lightning+rainbow": "RAINBOW STORM",
+    "freeze+freeze": "DEEP FREEZE",
+    "chain+freeze": "CHAIN FROST",
+    "freeze+rainbow": "RAINBOW FROST",
+    "chain+chain": "DOUBLE CHAIN",
+    "chain+rainbow": "RAINBOW CHAIN",
+    "rainbow+rainbow": "PRISM STORM"
+  }
+}

@@ -30,6 +30,11 @@ var _moves_value: Label
 var _moves_pill: PanelContainer
 var _objective_row: HBoxContainer
 var _objective_chips: Array[Node] = []
+## Tracks each objective's complete/incomplete state across calls to
+## set_objectives() (called every move) so a fresh completion can fire an
+## "OBJECTIVE COMPLETE" toast exactly once, not every subsequent move.
+## Size mismatch = a new level's objectives just loaded, so no toasts fire.
+var _prev_obj_complete: Array = []
 var _coins_label: Label
 var _fever_bar: FeverArt
 var _fever_label: Label
@@ -42,7 +47,7 @@ var _booster_slots: Dictionary = {}      # id -> Control (for scale/armed FX)
 var _booster_counts: Dictionary = {}     # id -> int (last known)
 var _armed_booster: StringName = &""
 var _hint_label: Label
-var _end_panel: PanelContainer
+var _end_panel: UiKit.GoldFramePanel
 var _end_center: CenterContainer
 var _end_title: Label
 var _end_stars: StarRow
@@ -58,7 +63,7 @@ var _settings_dialog: SettingsPanel
 var _booster_shop            # BoosterShop
 var _moves_prompt            # ExtraMovesPrompt
 var _pause_center: CenterContainer
-var _pause_panel: PanelContainer
+var _pause_panel: UiKit.GoldFramePanel
 var _scrim: ColorRect
 var _displayed_coins: int = 0
 var _fever_running := false
@@ -97,6 +102,11 @@ const TRAY_CONTENT_HEIGHT := 300.0
 ## Some Android gesture-nav devices report a full-height safe area (no bottom
 ## inset) yet still overlay a gesture pill — keep at least this much clear.
 const MIN_BOTTOM_CLEARANCE := 56.0
+## Height (viewport units) of the character combat arena band that sits
+## BETWEEN the match-3 board and the booster tray (Phase C). The board is
+## fitted above it so the three characters have a real stage and never
+## overlap the board.
+const ARENA_HEIGHT := 360.0
 
 ## Y (viewport units) below which the playfield may start — just under the
 ## top HUD column. app.gd fits the board between this and `playfield_bottom`.
@@ -109,10 +119,25 @@ func playfield_top() -> float:
 			col_h = m
 	return top + col_h + 14.0
 
-## Space (viewport units) to keep clear at the bottom for the booster tray —
-## the gap from the screen bottom up to the top of the tray's contents.
-func playfield_bottom() -> float:
+## Vertical space the booster tray reserves at the very bottom (screen edge
+## up to the top of the tray's contents).
+func tray_reserve() -> float:
 	return maxf(_safe_bottom, MIN_BOTTOM_CLEARANCE) + 12.0 + TRAY_CONTENT_HEIGHT
+
+## Space (viewport units) to keep clear at the bottom of the playfield —
+## now the tray reservation PLUS the character combat arena, so the board
+## stops above the arena and never overlaps the characters.
+func playfield_bottom() -> float:
+	return tray_reserve() + ARENA_HEIGHT
+
+## The combat arena band, in viewport units. `y` = arena top (just below the
+## board), `y + h` = arena floor (just above the tray). app.gd stands Jamie /
+## the enemy / Jasmine on this floor.
+func arena_floor_y() -> float:
+	return get_viewport_rect().size.y - tray_reserve()
+
+func arena_top_y() -> float:
+	return arena_floor_y() - ARENA_HEIGHT
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -161,6 +186,18 @@ func _track_size() -> void:
 	if _bottom_col != null:
 		_bottom_col.offset_top = -TRAY_COL_HEIGHT
 		_bottom_col.offset_bottom = -int(maxf(_safe_bottom, MIN_BOTTOM_CLEARANCE) + 12.0)
+	# Full-rect overlay children (Settings / booster shop / continue prompt) are
+	# constructed BEFORE this first runs, while HUD itself is still zero-sized
+	# (a Control parented to a CanvasLayer starts at (0,0) — see the note
+	# above). Their own _track_size() already ran once against that zero-sized
+	# parent, baking in wrong FULL_RECT offsets that double up once HUD grows
+	# to the real viewport size — on a real device this pushed the "NEED MORE
+	# MOVES?" panel and the booster shop off the right edge. Re-run each
+	# child's _track_size() now that HUD has its true size, and again on every
+	# future resize (this function already runs on size_changed).
+	for overlay in [_settings_dialog, _booster_shop, _moves_prompt]:
+		if overlay != null and overlay.has_method("_track_size"):
+			overlay._track_size()
 
 func _resolve_safe_area() -> void:
 	var vp := get_viewport_rect().size
@@ -330,6 +367,12 @@ func set_boss_hp(hp: int, hp_max: int) -> void:
 func boss_defeat_anim() -> void:
 	_boss_bar.play_defeat()
 
+func boss_hit(kind: StringName) -> void:
+	_boss_bar.play_hit(kind)
+
+func boss_taunt() -> void:
+	_boss_bar.play_taunt()
+
 func set_power_meters(meters: Dictionary) -> void:
 	_power_meters.set_meters(meters)
 
@@ -459,15 +502,11 @@ func _build_end_panel() -> void:
 	_end_center.visible = false
 	add_child(_end_center)
 
-	_end_panel = PanelContainer.new()
+	# Gold-framed chrome (2026-09-05 UI pass) — same dialog family as
+	# Settings/Inventory/BoosterShop/DailyRewards, replacing a hand-rolled
+	# glass stylebox that was the odd one out.
+	_end_panel = UiKit.GoldFramePanel.new(20)
 	_end_panel.custom_minimum_size = Vector2(560, 460)
-	var _epsb := UiKit.glass(28, true)
-	_epsb.bg_color = Color(0.08, 0.09, 0.18, 0.94)
-	_epsb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.4)
-	_epsb.set_border_width_all(2)
-	_epsb.content_margin_left = 26; _epsb.content_margin_right = 26
-	_epsb.content_margin_top = 24; _epsb.content_margin_bottom = 24
-	_end_panel.add_theme_stylebox_override("panel", _epsb)
 	_end_center.add_child(_end_panel)
 
 	_end_confetti = CPUParticles2D.new()
@@ -486,12 +525,12 @@ func _build_end_panel() -> void:
 	_end_confetti.angular_velocity_min = -720.0
 	_end_confetti.angular_velocity_max = 720.0
 	_end_confetti.position = Vector2(220, 30)
-	_end_panel.add_child(_end_confetti)
+	_end_panel.content().add_child(_end_confetti)
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_theme_constant_override("separation", 16)
-	_end_panel.add_child(vbox)
+	_end_panel.content().add_child(vbox)
 
 	_end_crown = TextureRect.new()
 	_end_crown.texture = AssetLibrary.tex(&"cel_victory_crown")
@@ -514,11 +553,11 @@ func _build_end_panel() -> void:
 	_end_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(_end_body)
 
-	_end_button = _cta_button("CONTINUE", VisualTheme.GOOD)
+	_end_button = _cta_button("CONTINUE", &"primary")
 	_end_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(_end_button)
 
-	_end_map_button = _cta_button("LEVEL MAP", VisualTheme.ACCENT)
+	_end_map_button = _cta_button("LEVEL MAP", &"tertiary")
 	_end_map_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_end_map_button.pressed.connect(func():
 		Audio.play(&"button_tap")
@@ -526,19 +565,14 @@ func _build_end_panel() -> void:
 	)
 	vbox.add_child(_end_map_button)
 
-func _cta_button(text: String, tint: Color) -> Button:
-	var b := Button.new()
-	b.text = text
+## Thin wrapper over the shared UiKit.button() (2026-09-05 UI pass) — this
+## used to be a bespoke hand-rolled stylebox parallel to UiKit's, now it's
+## the same button family as every other screen, just at the HUD's own CTA
+## size.
+func _cta_button(text: String, kind: StringName) -> Button:
+	var b := UiKit.button(text, kind, VisualTheme.FS_BUTTON)
 	b.custom_minimum_size = Vector2(300, 74)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.add_theme_font_size_override("font_size", VisualTheme.FS_BUTTON)
-	b.add_theme_color_override("font_color", VisualTheme.TEXT)
-	b.add_theme_constant_override("outline_size", 5)
-	b.add_theme_color_override("font_outline_color", VisualTheme.OUTLINE)
-	b.add_theme_stylebox_override("normal", VisualTheme.button_face(tint.darkened(0.1)))
-	b.add_theme_stylebox_override("hover", VisualTheme.button_face(tint))
-	b.add_theme_stylebox_override("pressed", VisualTheme.button_face(tint.darkened(0.3)))
-	b.focus_mode = Control.FOCUS_NONE
 	return b
 
 ## The in-level Settings dialog is now the shared SettingsPanel (built in
@@ -559,27 +593,20 @@ func _build_pause_panel() -> void:
 	_pause_center.z_index = 190
 	add_child(_pause_center)
 
-	_pause_panel = PanelContainer.new()
+	_pause_panel = UiKit.GoldFramePanel.new(18)
 	_pause_panel.custom_minimum_size = Vector2(480, 470)
-	var _ppsb := UiKit.glass(26, true)
-	_ppsb.bg_color = Color(0.08, 0.09, 0.18, 0.94)
-	_ppsb.border_color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.4)
-	_ppsb.set_border_width_all(2)
-	_ppsb.content_margin_left = 24; _ppsb.content_margin_right = 24
-	_ppsb.content_margin_top = 22; _ppsb.content_margin_bottom = 22
-	_pause_panel.add_theme_stylebox_override("panel", _ppsb)
 	_pause_center.add_child(_pause_panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	vbox.add_theme_constant_override("separation", 14)
-	_pause_panel.add_child(vbox)
+	_pause_panel.content().add_child(vbox)
 
 	var title := VisualTheme.label("PAUSED", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 
-	var resume := _cta_button("Resume", VisualTheme.GOOD)
+	var resume := _cta_button("Resume", &"primary")
 	resume.pressed.connect(func():
 		Audio.play(&"button_tap")
 		show_pause_panel(false)
@@ -587,7 +614,7 @@ func _build_pause_panel() -> void:
 	)
 	vbox.add_child(resume)
 
-	var restart := _cta_button("Restart", VisualTheme.FEVER)
+	var restart := _cta_button("Restart", &"danger")
 	restart.pressed.connect(func():
 		Audio.play(&"button_tap")
 		show_pause_panel(false)
@@ -595,14 +622,14 @@ func _build_pause_panel() -> void:
 	)
 	vbox.add_child(restart)
 
-	var settings := _cta_button("Settings", VisualTheme.ACCENT)
+	var settings := _cta_button("Settings", &"tertiary")
 	settings.pressed.connect(func():
 		Audio.play(&"button_tap")
 		_show_settings(true)
 	)
 	vbox.add_child(settings)
 
-	var to_map := _cta_button("Quit to Map", VisualTheme.ACCENT.darkened(0.2))
+	var to_map := _cta_button("Quit to Map", &"secondary")
 	to_map.pressed.connect(func():
 		Audio.play(&"button_tap")
 		show_pause_panel(false)
@@ -611,15 +638,20 @@ func _build_pause_panel() -> void:
 	vbox.add_child(to_map)
 
 func show_pause_panel(v: bool) -> void:
-	_pause_center.visible = v
-	_refresh_scrim()
 	if v:
-		_pop_in(_pause_panel)
+		_pause_center.visible = true
+		_refresh_scrim()
+		UiKit.pop_in(_pause_panel)
+	else:
+		var t := UiKit.pop_out(_pause_panel)
+		await t.finished
+		_pause_center.visible = false
+		_refresh_scrim()
 
 # ----------------------------------------------- in-level shop / continue --
 
-func open_shop() -> void:
-	_booster_shop.open()
+func open_shop(focus_id: StringName = &"") -> void:
+	_booster_shop.open(focus_id)
 
 func close_shop() -> void:
 	if _booster_shop.is_open():
@@ -641,6 +673,7 @@ func any_modal_open() -> bool:
 func set_level_info(level: LevelConfig) -> void:
 	_level_label.text = level.level_name.to_upper()
 	set_booster_armed(&"")
+	_prev_obj_complete = []  # fresh level: no "objective complete" toasts from stale state
 
 var _shown_score := 0
 func set_score(v: int) -> void:
@@ -679,6 +712,8 @@ func set_coins(amount: int) -> void:
 	t.tween_method(func(v: float): _coins_label.text = str(int(round(v))), float(from), float(amount), 0.4)
 
 func set_objectives(tracker: ObjectiveTracker, level: LevelConfig) -> void:
+	var is_new_level := _prev_obj_complete.size() != level.objectives.size()
+	var new_complete: Array = []
 	for c in _objective_chips:
 		c.queue_free()
 	_objective_chips.clear()
@@ -687,6 +722,9 @@ func set_objectives(tracker: ObjectiveTracker, level: LevelConfig) -> void:
 		var done: int = tracker.progress[i]
 		var tgt: int = maxi(tracker.target_for(i), 1)
 		var complete := done >= tgt
+		new_complete.append(complete)
+		if complete and not is_new_level and not bool(_prev_obj_complete[i]):
+			UiKit.show_toast(self, "OBJECTIVE COMPLETE", VisualTheme.GOOD)
 
 		# One objective "card": icon + count over a slim progress bar, on a
 		# rounded inset so each goal reads as a distinct tracked task.
@@ -733,6 +771,7 @@ func set_objectives(tracker: ObjectiveTracker, level: LevelConfig) -> void:
 
 		_objective_row.add_child(card)
 		_objective_chips.append(card)
+	_prev_obj_complete = new_complete
 
 func _obj_bar_color(obj: Dictionary) -> Color:
 	match String(obj.get("type", "")):
@@ -822,7 +861,7 @@ func show_win_panel(score: int, reward_coins: int, has_next_level: bool, stars: 
 	_rewire(_end_button, func(): next_level_pressed.emit())
 	_end_center.visible = true
 	_refresh_scrim()
-	_pop_in(_end_panel)
+	UiKit.pop_in(_end_panel)
 	_end_stars.play(stars)
 	_end_confetti.restart()
 	_end_confetti.emitting = true
@@ -842,10 +881,14 @@ func show_lose_panel(score: int) -> void:
 	_rewire(_end_button, func(): retry_pressed.emit())
 	_end_center.visible = true
 	_refresh_scrim()
-	_pop_in(_end_panel)
+	UiKit.pop_in(_end_panel)
 	_end_stars.play(0)
 
 func hide_end_panel() -> void:
+	if not _end_center.visible:
+		return
+	var t := UiKit.pop_out(_end_panel)
+	await t.finished
 	_end_center.visible = false
 	_refresh_scrim()
 
@@ -858,15 +901,6 @@ func _rewire(btn: Button, fn: Callable) -> void:
 	)
 
 # ------------------------------------------------------------ anims --
-
-func _pop_in(node: Control) -> void:
-	node.pivot_offset = node.size * 0.5
-	node.scale = Vector2(0.8, 0.8)
-	node.modulate.a = 0.0
-	var t := node.create_tween()
-	t.set_parallel(true)
-	t.tween_property(node, "scale", Vector2.ONE, 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	t.tween_property(node, "modulate:a", 1.0, 0.2)
 
 func _pulse(node: Control, amount: float = 1.08) -> void:
 	if node == null:
@@ -961,17 +995,24 @@ class BoosterChip extends Control:
 			_round(Rect2(rect.position + Vector2(6, rect.size.y - strip_h - 4), Vector2(rect.size.x - 12, strip_h)),
 				10.0, Color(0, 0, 0, 0.36))
 			var font := ThemeDB.fallback_font
-			var fs := int(clampf(size.x * 0.16, 14.0, 20.0))
+			var fs := VisualTheme.FS_MICRO
 			var tw := font.get_string_size(title, HORIZONTAL_ALIGNMENT_CENTER, -1, fs).x
 			var tp := Vector2(size.x * 0.5 - tw * 0.5, rect.position.y + rect.size.y - strip_h * 0.5 - 4.0 + fs * 0.34)
 			draw_string_outline(font, tp, title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0, 0, 0, 0.85))
 			draw_string(font, tp, title, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 0.96))
 
 		if not enabled:
-			_round(rect, rr, Color(0.03, 0.04, 0.08, 0.62))
+			# Owning zero of this booster is no longer a dead end (tapping it
+			# opens the shop straight to its buy dialog — see
+			# app.gd::_on_booster_pressed) — a gold "+" reads as "tap to buy"
+			# instead of a padlock's "this is off-limits".
+			_round(rect, rr, Color(0.03, 0.04, 0.08, 0.5))
 			var lc := Vector2(size.x * 0.5, size.y * 0.42)
-			draw_arc(lc + Vector2(0, -size.x * 0.08), size.x * 0.14, PI, TAU, 14, Color(0.82, 0.85, 0.94), 4.0, true)
-			draw_rect(Rect2(lc + Vector2(-size.x * 0.15, -size.x * 0.08), Vector2(size.x * 0.30, size.x * 0.22)), Color(0.82, 0.85, 0.94))
+			var pr: float = size.x * 0.15
+			draw_circle(lc, pr, Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.85))
+			draw_arc(lc, pr, 0, TAU, 20, Color(1, 1, 1, 0.9), 2.0, true)
+			draw_line(lc + Vector2(-pr * 0.5, 0), lc + Vector2(pr * 0.5, 0), Color(0.16, 0.1, 0.02), 4.0, true)
+			draw_line(lc + Vector2(0, -pr * 0.5), lc + Vector2(0, pr * 0.5), Color(0.16, 0.1, 0.02), 4.0, true)
 
 	func _round(r: Rect2, radius: float, col: Color) -> void:
 		var pts := ShapeDrawUtils.rounded_rect_points(r.size, radius, 5)
@@ -1277,7 +1318,7 @@ class LevelBadge extends Control:
 			if ch >= "0" and ch <= "9":
 				digits += ch
 		var label := digits if digits != "" else text
-		var fs := 24
+		var fs := VisualTheme.FS_LABEL
 		var ts := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
 		var pos := Vector2(size.x * 0.5 - ts.x * 0.5, size.y * 0.5 + bh * 0.22 + fs * 0.34)
 		draw_string_outline(font, pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.8))

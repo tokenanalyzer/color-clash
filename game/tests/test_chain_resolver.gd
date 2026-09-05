@@ -176,6 +176,33 @@ func test_power_blast_breaks_stone_and_cracks_ice() -> void:
 	check("stone_gone", not board.get_cell(Vector2i(1, 1)).is_stone())
 	check_eq("ice_cracked_not_broken", board.get_cell(Vector2i(3, 2)).obstacle_hp, 1)
 
+## 2026-09-05: obstacles_broken must report the CELL'S ACTUAL themed id
+## (cursed_stone/dark_rune/magic_chain/...), not the generic family name it
+## shares mechanics with — a break_obstacles objective targeting a specific
+## themed id (not "any") relies on this to ever accumulate progress.
+func test_obstacles_broken_reports_the_actual_themed_id_not_the_family() -> void:
+	var board := _checkerboard_board(5, 5, &"blue", &"green")
+	board.get_cell(Vector2i(2, 2)).color_id = &"red"
+	board.get_cell(Vector2i(2, 2)).power_id = &"bomb"
+	board.set_obstacle(Vector2i(1, 1), &"cursed_stone", 0)  # stone-family, themed id
+	var result := ChainResolver.resolve_power_tap(board, Vector2i(2, 2), _power_config(), _rng(), [&"red", &"blue"], 0.0)
+	var reported := ""
+	for b in result.obstacles_broken:
+		if b["pos"] == Vector2i(1, 1):
+			reported = String(b["obstacle_id"])
+	check_eq("reports cursed_stone, not the generic 'stone' family", reported, "cursed_stone")
+
+func test_magic_chain_unlock_reports_its_own_themed_id() -> void:
+	var board := _checkerboard_board(3, 3)
+	_paint(board, [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)], &"red")
+	board.set_obstacle(Vector2i(1, 1), &"magic_chain", 1)  # hex neighbour of (1,0), in the path
+	var result := ChainResolver.resolve_move(board, _typed([Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)]), _power_config(), _rng(), [&"red", &"blue"], 0.0)
+	var reported := ""
+	for b in result.obstacles_broken:
+		if b["pos"] == Vector2i(1, 1):
+			reported = String(b["obstacle_id"])
+	check_eq("reports magic_chain, not the generic 'lock' family", reported, "magic_chain")
+
 func test_rainbow_wildcard_in_path_resolves_to_group_color() -> void:
 	var board := _checkerboard_board(5, 5, &"blue", &"green")
 	board.get_cell(Vector2i(0, 0)).color_id = &"red"

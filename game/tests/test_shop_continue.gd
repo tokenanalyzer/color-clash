@@ -189,3 +189,26 @@ func test_moves_prompt_give_up_emits_without_spending() -> void:
 	check("gave_up signal fired", gave_up[0])
 	check_eq("no coins spent on giving up", Economy.coins, coins_before)
 	prompt.queue_free()
+
+# ------------------------------------- overlay sizing (device clip bug) --
+
+## Regression test for a physical-device bug: the booster shop / "Need More
+## Moves?" panels are constructed inside HUD._ready() BEFORE HUD itself has
+## a real size (a Control parented to a CanvasLayer starts at (0,0)). Their
+## FULL_RECT anchors baked size/offsets against that zero-sized parent; when
+## HUD grew to the real viewport a frame later, the anchor contribution and
+## the stale offset both counted the full width, doubling the overlay's
+## width and pushing "NEED MORE MOVES?" and the shop off the right edge.
+## HUD._track_size() now re-tracks each overlay after sizing itself.
+func test_overlay_children_are_not_double_sized_after_hud_settles() -> void:
+	var hud := HUD.new()
+	_root().add_child(hud)
+	var vp := hud.get_viewport_rect().size
+	check("HUD itself matches the viewport", hud.size.is_equal_approx(vp), "hud.size=%s vp=%s" % [hud.size, vp])
+	check("booster shop is NOT double-wide", hud._booster_shop.size.is_equal_approx(vp),
+		"shop.size=%s vp=%s" % [hud._booster_shop.size, vp])
+	check("moves prompt is NOT double-wide", hud._moves_prompt.size.is_equal_approx(vp),
+		"prompt.size=%s vp=%s" % [hud._moves_prompt.size, vp])
+	check("settings dialog is NOT double-wide", hud._settings_dialog.size.is_equal_approx(vp),
+		"settings.size=%s vp=%s" % [hud._settings_dialog.size, vp])
+	hud.queue_free()

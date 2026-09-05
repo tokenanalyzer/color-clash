@@ -9,7 +9,6 @@ signal closed()
 
 var _frame: UiKit.GoldFramePanel
 var _scrim: ColorRect
-var _toast: Label
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -36,6 +35,9 @@ func _ready() -> void:
 
 	_frame = UiKit.GoldFramePanel.new(20)
 	_frame.custom_minimum_size = Vector2(560, 0)
+	# Reference match (2026-09-05): a deep violet fill instead of the default
+	# navy — Settings' own supplied mock uses a saturated purple dialog.
+	_frame.set_bg_color(Color(0.16, 0.08, 0.28, 0.94))
 	center.add_child(_frame)
 
 	var col := VBoxContainer.new()
@@ -71,9 +73,12 @@ func _ready() -> void:
 	col.add_child(_audio_row("Haptics", &"haptics", false))
 	col.add_child(_divider())
 
-	col.add_child(_link_button("Privacy Policy"))
-	col.add_child(_link_button("Terms of Service"))
-	col.add_child(_link_button("Restore Purchases"))
+	var links := VBoxContainer.new()
+	links.add_theme_constant_override("separation", 10)
+	links.add_child(_link_button("Privacy Policy"))
+	links.add_child(_link_button("Terms of Service"))
+	links.add_child(_link_button("Restore Purchases"))
+	col.add_child(links)
 
 	var close_btn := UiKit.button("CLOSE", &"primary", VisualTheme.FS_BUTTON)
 	close_btn.custom_minimum_size = Vector2(0, 72)
@@ -83,13 +88,6 @@ func _ready() -> void:
 		close()
 	)
 	col.add_child(close_btn)
-
-	_toast = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT, 5)
-	_toast.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	_toast.add_theme_stylebox_override("normal", UiKit.glass(16, true))
-	_toast.modulate.a = 0.0
-	_toast.z_index = 10
-	add_child(_toast)
 
 func _track_size() -> void:
 	var vp := get_viewport_rect().size
@@ -118,58 +116,59 @@ func _divider() -> Control:
 	var d := Control.new()
 	d.custom_minimum_size = Vector2(0, 2)
 	var line := ColorRect.new()
-	line.color = Color(1, 1, 1, 0.08)
+	line.color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.30)
 	line.set_anchors_preset(Control.PRESET_FULL_RECT)
 	d.add_child(line)
 	return d
 
-## One audio row: icon + label, optional volume slider, ON/OFF toggle.
-func _audio_row(text: String, key: StringName, has_slider: bool) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	row.custom_minimum_size = Vector2(0, 52)
+## One audio row: icon + label + ON/OFF toggle on top, an optional full-width
+## volume slider on a second line beneath — matches the reference mock's
+## two-line layout (icon/label/toggle row, then the slider indented under
+## the label).
+func _audio_row(text: String, key: StringName, has_slider: bool) -> VBoxContainer:
+	var wrap := VBoxContainer.new()
+	wrap.add_theme_constant_override("separation", 6)
+	wrap.custom_minimum_size = Vector2(0, 78 if has_slider else 56)
+
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 12)
+	wrap.add_child(top)
 
 	var icon := _RowIcon.new()
 	icon.kind = key
-	icon.custom_minimum_size = Vector2(38, 38)
-	row.add_child(icon)
+	icon.custom_minimum_size = Vector2(44, 44)
+	top.add_child(icon)
 
 	var label := VisualTheme.label(text, VisualTheme.FS_BODY, VisualTheme.TEXT, 3)
-	label.custom_minimum_size = Vector2(150, 0)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(label)
+	top.add_child(label)
 
-	if has_slider:
-		var slider := HSlider.new()
-		slider.min_value = 0.0
-		slider.max_value = 1.0
-		slider.step = 0.01
-		slider.custom_minimum_size = Vector2(130, 0)
-		slider.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		slider.value = AudioSettings.music_volume if key == &"music" else AudioSettings.sfx_volume
-		slider.value_changed.connect(func(v):
-			if key == &"music": AudioSettings.set_music_volume(v)
-			else: AudioSettings.set_sfx_volume(v)
-		)
-		row.add_child(slider)
-	else:
-		var spacer := Control.new()
-		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spacer)
-
-	var toggle := CheckButton.new()
-	toggle.focus_mode = Control.FOCUS_NONE
-	toggle.button_pressed = _enabled(key)
-	toggle.toggled.connect(func(v):
+	var toggle := UiKit.toggle(_enabled(key))
+	toggle.toggled_value.connect(func(v):
 		Audio.play(&"button_tap")
 		match key:
 			&"music": AudioSettings.set_music_enabled(v)
 			&"sfx": AudioSettings.set_sfx_enabled(v)
 			&"haptics": AudioSettings.set_haptics_enabled(v)
 	)
-	row.add_child(toggle)
-	return row
+	top.add_child(toggle)
+
+	if has_slider:
+		var slider_row := HBoxContainer.new()
+		var indent := Control.new()
+		indent.custom_minimum_size = Vector2(56, 0)
+		slider_row.add_child(indent)
+		var slider := UiKit.volume_slider(AudioSettings.music_volume if key == &"music" else AudioSettings.sfx_volume)
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.value_changed_by_user.connect(func(v):
+			if key == &"music": AudioSettings.set_music_volume(v)
+			else: AudioSettings.set_sfx_volume(v)
+		)
+		slider_row.add_child(slider)
+		wrap.add_child(slider_row)
+
+	return wrap
 
 func _enabled(key: StringName) -> bool:
 	match key:
@@ -179,22 +178,14 @@ func _enabled(key: StringName) -> bool:
 	return true
 
 func _link_button(text: String) -> Button:
-	var b := UiKit.button(text, &"secondary", VisualTheme.FS_BODY)
+	var b := UiKit.button(text, &"secondary", VisualTheme.FS_BODY, 28)
 	b.custom_minimum_size = Vector2(0, 56)
 	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	b.pressed.connect(func():
 		Audio.play(&"button_tap")
-		_show_toast("%s — available at launch" % text)
+		UiKit.show_toast(self, "%s — available at launch" % text)
 	)
 	return b
-
-func _show_toast(text: String) -> void:
-	_toast.text = "  %s  " % text
-	_toast.position = Vector2((size.x - _toast.size.x) * 0.5, size.y * 0.72)
-	var t := _toast.create_tween()
-	t.tween_property(_toast, "modulate:a", 1.0, 0.14)
-	t.tween_interval(1.2)
-	t.tween_property(_toast, "modulate:a", 0.0, 0.3)
 
 
 ## Small code-drawn glyph for an audio setting row (note / speaker / wave).
@@ -205,8 +196,10 @@ class _RowIcon extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.4
-		draw_circle(c, r + 4.0, Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.16))
-		var col := UiKit.GOLD
+		# Solid purple badge + white glyph (reference match, 2026-09-05).
+		draw_circle(c, r + 6.0, UiKit.PURPLE_FACE.darkened(0.1))
+		draw_arc(c, r + 5.0, 0, TAU, 24, UiKit.GOLD.lerp(UiKit.PURPLE_FACE, 0.4), 1.5, true)
+		var col := Color(1, 1, 1)
 		match kind:
 			&"music":
 				draw_line(c + Vector2(-r * 0.2, r * 0.5), c + Vector2(-r * 0.2, -r * 0.7), col, 3.0, true)

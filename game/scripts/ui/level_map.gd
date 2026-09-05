@@ -33,7 +33,6 @@ var _top_bar_margin: MarginContainer
 var _coins_label: Label
 var _gems_label: Label
 var _home_btn: Button
-var _toast: Label
 var _scroll: KineticScroll
 var _canvas: Control
 var _env: MapEnvironment
@@ -48,7 +47,6 @@ func _ready() -> void:
 	add_child(_env)
 	_build_scroll_area()
 	_build_top_bar()
-	_build_toast()
 	_relayout()
 	get_viewport().size_changed.connect(_relayout)
 	refresh()
@@ -115,13 +113,17 @@ func _build_scroll_area() -> void:
 
 func _build_top_bar() -> void:
 	_top_bar = PanelContainer.new()
+	# Lighter fill (2026-09-05 UI pass) — the currency chips already carry
+	# their own frosted-glass pill, so this outer strip only needs to be a
+	# faint separator, not a second dark layer stacking into a flat "muddy
+	# black bar" look.
 	var sb := UiKit.glass(0, true)
-	sb.bg_color = Color(0.06, 0.07, 0.14, 0.55)
+	sb.bg_color = Color(0.10, 0.11, 0.20, 0.30)
 	sb.set_corner_radius_all(0)
 	sb.border_width_bottom = 1
 	sb.border_width_top = 0
 	sb.border_color = UiKit.GLASS_BORDER
-	sb.shadow_size = 18
+	sb.shadow_size = 10
 	_top_bar.add_theme_stylebox_override("panel", sb)
 	add_child(_top_bar)
 
@@ -138,45 +140,28 @@ func _build_top_bar() -> void:
 
 	var coin := UiKit.currency_chip(&"coin", VisualTheme.TEXT_GOLD, true)
 	_coins_label = coin["value"]
-	(coin["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	(coin["plus"] as Button).pressed.connect(func(): UiKit.show_toast(self, "Shop coming soon"))
 	row.add_child(coin["root"])
 
 	var gem := UiKit.currency_chip(&"crystal", Color(0.82, 0.72, 1.0), true)
 	_gems_label = gem["value"]
-	(gem["plus"] as Button).pressed.connect(func(): _show_toast("Shop coming soon"))
+	(gem["plus"] as Button).pressed.connect(func(): UiKit.show_toast(self, "Shop coming soon"))
 	row.add_child(gem["root"])
 
-	var gear := UiKit.icon_button(&"gear", 60)
+	var gear := UiKit.icon_button(&"gear", 68)
 	gear.pressed.connect(func():
 		Audio.play(&"button_tap")
-		_show_toast("Settings — use the pause menu in a level")
+		UiKit.show_toast(self, "Settings — use the pause menu in a level")
 	)
 	row.add_child(gear)
 
-	_home_btn = UiKit.icon_button(&"chevron", 60)
+	_home_btn = UiKit.icon_button(&"chevron", 68)
 	_home_btn.pressed.connect(func():
 		Audio.play(&"button_tap")
 		home_pressed.emit()
 	)
 	_home_btn.z_index = 5
 	add_child(_home_btn)
-
-func _build_toast() -> void:
-	_toast = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT, 5)
-	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_toast.set_anchors_preset(Control.PRESET_CENTER)
-	_toast.add_theme_stylebox_override("normal", UiKit.glass(18, true))
-	_toast.modulate.a = 0.0
-	_toast.z_index = 40
-	add_child(_toast)
-
-func _show_toast(text: String) -> void:
-	_toast.text = "  %s  " % text
-	_toast.position = Vector2((size.x - _toast.size.x) * 0.5, size.y * 0.66)
-	var t := _toast.create_tween()
-	t.tween_property(_toast, "modulate:a", 1.0, 0.14)
-	t.tween_interval(1.1)
-	t.tween_property(_toast, "modulate:a", 0.0, 0.35)
 
 # --------------------------------------------------------------- state --
 
@@ -199,7 +184,7 @@ func _scroll_to_current() -> void:
 func _on_node_pressed(level_id: int) -> void:
 	if not Progress.is_unlocked(level_id):
 		var isl := IslandModel.island_index_for_level(level_id)
-		_show_toast("%s locks until you clear the island before it" % IslandModel.island_name(isl))
+		UiKit.show_toast(self, "%s locks until you clear the island before it" % IslandModel.island_name(isl))
 		return
 	Audio.play(&"button_tap")
 	level_selected.emit(level_id)

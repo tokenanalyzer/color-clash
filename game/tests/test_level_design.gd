@@ -143,6 +143,39 @@ func test_create_powers_targets_stay_modest() -> void:
 			var target := int(obj.get("target", 0))
 			check("L%d create_powers target %d in 1..6" % [id, target], target >= 1 and target <= 6)
 
+# ------------------------------------------ themed blockers (2026-09-05) --
+
+const _THEMED_OBSTACLE_IDS: Array[String] = [
+	"wooden_crate", "reinforced_crate", "frozen_crystal", "magic_chain",
+	"cursed_stone", "shadow_barrier", "dark_rune",
+]
+
+func test_first_three_stages_are_a_clean_teaching_start() -> void:
+	for id in [1, 2, 3]:
+		var lv: LevelConfig = GameData.levels.get_level(id)
+		check("L%d has no obstacles yet (pure teaching)" % id, lv.obstacles.is_empty())
+
+func test_every_themed_blocker_appears_somewhere_in_the_campaign() -> void:
+	var seen := {}
+	for id in _ids():
+		for o in GameData.levels.get_level(id).obstacles:
+			seen[String(o.get("type", ""))] = true
+	for kind in _THEMED_OBSTACLE_IDS:
+		check("'%s' appears at least once across the 50 stages" % kind, seen.has(kind))
+
+func test_later_stages_layer_multiple_blocker_types_together() -> void:
+	# "Layered blockers" (islands 4-5): at least one late stage must combine
+	# 3+ distinct obstacle types on the same board, not just one repeated id.
+	var max_distinct := 0
+	for i in range(30, 50):
+		var lv: LevelConfig = GameData.levels.get_level(_ids()[i])
+		var kinds := {}
+		for o in lv.obstacles:
+			kinds[String(o.get("type", ""))] = true
+		max_distinct = maxi(max_distinct, kinds.size())
+	check("at least one island-4/5 stage layers 3+ blocker types", max_distinct >= 3,
+		"max distinct types seen = %d" % max_distinct)
+
 # --------------------------------------------------------------- boss --
 
 func test_boss_stages_exist_and_are_non_trivial() -> void:

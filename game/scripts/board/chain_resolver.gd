@@ -223,24 +223,37 @@ static func _clear_or_damage(board: BoardModel, result: MoveResult, pos: Vector2
 	var cell := board.get_cell(pos)
 	if cell == null:
 		return
+	# Report the cell's ACTUAL obstacle id (snapshotted before the damage call
+	# mutates it) — themed ids sharing a family (e.g. cursed_stone/
+	# shadow_barrier both "stone") must be distinguishable in
+	# `obstacles_broken` so a break_obstacles objective targeting a specific
+	# themed id can track it, not just the generic family.
 	if cell.is_stone():
+		var stone_id := cell.obstacle_id
 		if board.damage_stone(pos):
-			result.obstacles_broken.append({"pos": pos, "obstacle_id": &"stone"})
+			result.obstacles_broken.append({"pos": pos, "obstacle_id": stone_id})
 		return
 	if cell.is_empty():
 		return
 	if cell.is_ice():
+		var ice_id := cell.obstacle_id
 		if board.damage_ice(pos):
-			result.obstacles_broken.append({"pos": pos, "obstacle_id": &"ice"})
+			result.obstacles_broken.append({"pos": pos, "obstacle_id": ice_id})
 	if cell.is_timebomb():
+		var bomb_id := cell.obstacle_id
 		if board.defuse_timebomb(pos):
-			result.obstacles_broken.append({"pos": pos, "obstacle_id": &"timebomb"})
+			result.obstacles_broken.append({"pos": pos, "obstacle_id": bomb_id})
 	var cleared_color := cell.color_id
 	result.cleared_cells.append(pos)
 	if cleared_color != BoardModel.RAINBOW_COLOR_ID and cleared_color != CellData.COLOR_EMPTY:
 		result.colors_cleared[cleared_color] = int(result.colors_cleared.get(cleared_color, 0)) + 1
+	var lock_ids := {}
+	for n in board.get_orthogonal_neighbors(pos):
+		var ncell := board.get_cell(n)
+		if ncell != null and ncell.is_lock():
+			lock_ids[n] = ncell.obstacle_id
 	for unlocked_pos in board.unlock_neighbors(pos):
-		result.obstacles_broken.append({"pos": unlocked_pos, "obstacle_id": &"lock"})
+		result.obstacles_broken.append({"pos": unlocked_pos, "obstacle_id": lock_ids.get(unlocked_pos, &"lock")})
 	cell.clear_piece()
 
 ## Drains `queue` (which may already contain more than one origin — a big
@@ -389,12 +402,13 @@ static func _tick_timebombs(board: BoardModel, result: MoveResult) -> void:
 
 static func _detonate_timebomb(board: BoardModel, result: MoveResult, pos: Vector2i) -> void:
 	var cell := board.get_cell(pos)
+	var bomb_id: StringName = cell.obstacle_id if cell != null else &"timebomb"
 	if cell != null:
 		cell.obstacle_id = CellData.OBSTACLE_NONE
 		cell.obstacle_hp = 0
 	result.timebomb_explosions.append(pos)
 	result.move_penalty += TIMEBOMB_MOVE_PENALTY
-	result.obstacles_broken.append({"pos": pos, "obstacle_id": &"timebomb"})
+	result.obstacles_broken.append({"pos": pos, "obstacle_id": bomb_id})
 	result.chain_depth += 1
 
 	var touched: Array[Vector2i] = []

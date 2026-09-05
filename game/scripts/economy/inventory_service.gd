@@ -120,12 +120,19 @@ func add_collectible(id: StringName, n: int = 1) -> void:
 
 ## Called by app.gd after a boss stage is cleared. Grants that boss's
 ## equipment drop (if any) + a collectible shard. Coins/boosters are still
-## handled by the existing milestone-chest / level-reward path.
-func grant_boss_reward(level_id: int) -> void:
+## handled by the existing milestone-chest / level-reward path. Returns the
+## display name of newly-granted equipment (empty if none/already owned) so
+## the caller can show a "NEW EQUIPMENT" toast.
+func grant_boss_reward(level_id: int) -> String:
+	var granted_name := ""
 	for e in all_equipment():
 		if int(e.get("reward_stage", -1)) == level_id:
-			grant_equipment(StringName(String(e["id"])))
+			var id := StringName(String(e["id"]))
+			if not is_owned(id):
+				granted_name = String(e.get("name", String(id)))
+			grant_equipment(id)
 	add_collectible(&"kingdom_shard", 1)
+	return granted_name
 
 func _persist() -> void:
 	var lv := {}
