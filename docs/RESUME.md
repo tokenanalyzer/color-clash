@@ -1,3 +1,62 @@
+# Resume point — 2026-09-05  ·  WAR OF LOVE  ·  UI/UX POLISH SHIPPED
+
+**Latest commit: `7612d76`**  ·  branch `backup_asset_integration_2026-09-02`
+·  **PUSHED to `origin`** ·  **PR #1 open**: https://github.com/tokenanalyzer/color-clash/pull/1
+(`backup_asset_integration_2026-09-02` → `main`), not yet merged.
+
+## END-OF-DAY CHECKPOINT — 2026-09-05
+
+Today's session picked up the Phase C work frozen at the end of
+2026-09-04 (below) and shipped three things, all bundled into the single
+commit `7612d76` (git history for this branch had been uncommitted since
+`ca9ac2a`, so this one commit carries everything from Phase C through
+today's UI pass):
+
+1. **Asset/intro/audio/character/cinematic polish** — the full Phase C
+   work described below (poster, opening cinematic, villain art fixes,
+   Jasmine dynamic poses, real music tracks, the two real device-only
+   bugs found and fixed).
+2. **Gameplay depth & difficulty overhaul** — objective tracker (4 types),
+   new obstacle families, power-combo ladder (`power_combos.json`), boss
+   dual-win-condition + periodic boss-pressure cadence, data-driven
+   level/enemy generation. NOT via fewer moves/more HP/random unfairness.
+3. **Complete UI/UX polish pass** (today's main focus) — design-system
+   upgrades in `UiKit` (new `ToggleSwitch`, `VolumeSlider`, consolidated
+   `show_toast()`, tab-selected button kind, `GoldFramePanel.set_bg_color()`)
+   applied across Settings, Daily Rewards, Inventory, Booster Shop, HUD,
+   boss bar, story dialogue box. **Settings and Daily Rewards were
+   rebuilt from scratch to match user-supplied reference screenshots**
+   (`C:\Users\Administrator\Downloads\ref\settings.png` and
+   `daily reward screen.png`) — violet gold-frame panel, solid circle
+   icon badges, green volume sliders with ON/OFF-labelled toggles, a
+   pointed-tail ribbon banner title for Daily Rewards. Main menu
+   (bigger currency-chip icons, decluttered top bar, logo dropped) and
+   level-map top bar (lighter overlay, bigger gear/chevron) were also
+   tuned per direct live feedback. **Visual/UX only — no gameplay
+   mechanics changed in this pass**, confirmed by keeping all prior
+   gameplay tests green throughout.
+
+**Verification:** 1551/1551 unit tests pass throughout every iteration.
+APK rebuilt and reinstalled on device `3C15CB00ABS00000` repeatedly;
+screenshotted and visually confirmed: main menu, level map, Settings
+(new design), Daily Rewards (new design), Inventory (4 tabs), booster
+tray zero-count shortcut (code/smoke-test verified; live tap timing was
+imprecise but not blocking), a full level playthrough, and the
+LEVEL COMPLETE panel (new gold-frame + exit animation).
+
+**Shipped:** committed (`7612d76`), pushed to `origin/backup_asset_integration_2026-09-02`,
+PR #1 opened against `main`. Nothing left uncommitted (working tree
+clean except a harmless local `tools/keyed_sprites/__pycache__/`).
+
+**For tomorrow:** PR #1 is open but not merged/reviewed. Booster-shop
+zero-count tap shortcut still wants one clean live on-device tap to
+visually confirm (logic + smoke test already pass). Otherwise pick up
+at PHASE D below (booster → Jamie physical action polish + non-boss
+enemy actor), unless the user wants to merge PR #1 / start a new task
+first.
+
+---
+
 # Resume point — 2026-09-04  ·  WAR OF LOVE  ·  GAMEPLAY OVERHAUL
 
 **Latest commit: `c08b8ec`**  ·  branch `backup_asset_integration_2026-09-02`
