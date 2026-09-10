@@ -7,18 +7,61 @@ unavailable / offline / not yet integrated.
 
 ## Backend model
 
-`AdsService` is backend-agnostic. On `_ready()` it looks for a native
-AdMob plugin singleton (`AdMob`, `PoingGodotAdMob`, …). If found →
-`available = true` and it drives the plugin. If not (desktop, headless, or
-the plugin not installed yet) → `available = false`, every `show_rewarded`
-fails gracefully, `maybe_show_interstitial` no-ops, banners no-op.
+`AdsService` is backend-agnostic. On `_ready()` it looks for the native
+plugin singleton **`ColorClashAdMob`** (then, as a fallback, `AdMob`,
+`PoingGodotAdMob`, …). If found → `available = true`, it calls
+`initialize()` and drives the plugin. If not (desktop, headless, an
+iOS/other build, or the plugin failed to load) → `available = false`, every
+`show_rewarded` fails gracefully, `maybe_show_interstitial` no-ops, banners
+no-op. Until the plugin reports `initialized`, `can_show_rewarded()` is
+`false` and interstitials are blocked (`not_initialized`).
 
-**No native AdMob plugin is bundled yet.** To go live: add a Godot 4
-Android AdMob plugin (e.g. `poing-studios/godot-admob-android`) under
-`game/addons/` + `game/android/plugins/`, put the AdMob **App ID** in the
-Android manifest metadata, and fill the `prod` unit ids in `data/ads.json`
-+ set `use_test_ads=false`. The GDScript side already targets a generic
-plugin method/signal surface (`_plugin_show_rewarded`, `_wire_plugin`).
+### Native plugin — `ColorClashAdMob`
+
+A minimal in-tree Godot 4 Android plugin (Kotlin `GodotPlugin`) that wraps
+the **Google Mobile Ads SDK**
+(`com.google.android.gms:play-services-ads:23.6.0`). It only **loads /
+shows** a rewarded ad and an interstitial ad and reports every lifecycle
+step back over one generic signal, `ad_event(event, message)`. **No policy
+lives in the plugin** — reward-once guarding, frequency caps, cooldowns and
+failure-safe fallback are all in `ads_service.gd`.
+
+- **Canonical source + template patches + re-apply script:**
+  `game/android_plugin/admob/` (see its `README.md`). The Godot Android
+  build template `game/android/` is regenerable and **not** vendored, so
+  the plugin's real home is the tracked `android_plugin/admob/` directory;
+  `install.sh` re-applies it onto a freshly generated template.
+- **Registration:** `AndroidManifest.xml` meta-data
+  `org.godotengine.plugin.v1.ColorClashAdMob` →
+  `com.colorclash.admob.ColorClashAdMob`.
+- **App ID:** `AndroidManifest.xml` meta-data
+  `com.google.android.gms.ads.APPLICATION_ID` → `@string/admob_app_id`, a
+  `resValue` emitted by `build.gradle` from the `ADMOB_APP_ID` env var,
+  defaulting to Google's **test** App ID. Not a secret; no real value
+  committed.
+- **Build requirement:** a custom `GodotPlugin` compiles only under the
+  Gradle build, so `export_presets.cfg` sets
+  `gradle_build/use_gradle_build=true` on **both** the debug (`preset.0`)
+  and release (`preset.1`) presets.
+- **Permissions:** the Ads SDK needs network, so both presets now request
+  `INTERNET` and `ACCESS_NETWORK_STATE` (see `docs/PRIVACY_POLICY.md`).
+  `arm64-v8a`-only, `target_sdk=35`, package `com.colorclash.game` and the
+  release AAB format are unchanged.
+
+### GDScript ⇄ native flow
+
+`show_rewarded()` → if `isRewardedReady()` show immediately, else
+`loadRewarded(unit_id)` and show on the `rewarded_loaded` event. A 12 s
+watchdog (`_LOAD_TIMEOUT_MS`, driven by `_process`) turns a load that never
+returns into a normal `rewarded_failed` so a caller can never hang.
+`rewarded_earned` grants once; `rewarded_dismissed` clears the in-flight
+flag and preloads the next ad. Interstitial is analogous but fire-and-forget
+(no reward). Every native failure event (`*_load_failed`, `*_show_failed`,
+`init_failed`) degrades to the normal non-ad path.
+
+**To go to production:** fill the `prod` unit ids in `data/ads.json`, set
+`use_test_ads=false`, and export with `ADMOB_APP_ID` set to the real AdMob
+App ID.
 
 ## Placements (integrated only into flows that already exist)
 
@@ -63,17 +106,37 @@ fields are empty placeholders. Ad unit ids are not secrets; no keys or
 secrets are committed. **Never** run with production ids in testing, and
 **never** ship with `use_test_ads: true`.
 
-| unit | test id |
+| unit | test id | where it is read |
+|---|---|---|
+| app id | `ca-app-pub-3940256099942544~3347511713` | `build.gradle` `resValue admob_app_id` (env `ADMOB_APP_ID` overrides); **not** read from `ads.json` at runtime |
+| rewarded | `ca-app-pub-3940256099942544/5224354917` | `ads.json` → `unit_ids.rewarded.test` |
+| interstitial | `ca-app-pub-3940256099942544/1033173712` | `ads.json` → `unit_ids.interstitial.test` |
+| banner | `ca-app-pub-3940256099942544/6300978111` | unused (no banner placement) |
+
+The native plugin also registers `AdRequest.DEVICE_ID_EMULATOR` as a test
+device when `initialize(true)` is called (debug builds), so an emulator
+shows test ads even if a `prod` id were ever set.
+
+### Production IDs still to be supplied
+
+| item | how |
 |---|---|
-| app id | `ca-app-pub-3940256099942544~3347511713` |
-| rewarded | `ca-app-pub-3940256099942544/5224354917` |
-| interstitial | `ca-app-pub-3940256099942544/1033173712` |
-| banner | `ca-app-pub-3940256099942544/6300978111` |
+| `unit_ids.rewarded.prod` | AdMob console → fill in `data/ads.json` |
+| `unit_ids.interstitial.prod` | AdMob console → fill in `data/ads.json` |
+| `use_test_ads` | set to `false` in `data/ads.json` for a real release |
+| AdMob App ID | export with `ADMOB_APP_ID=ca-app-pub-XXXX~YYYY` |
 
 ## Tests
 
 `tests/test_ads_service.gd` (in `test_runner`): ad-free when no backend;
 reward granted exactly once and only on "earned"; dismissed / failed /
 unavailable grant nothing and don't get stuck in-flight; interstitial
-gating (session age, tutorial guard, cooldown, session cap, no
-back-to-back); reward amounts read from config.
+gating (session age, tutorial guard, cooldown, **session cap**, no
+back-to-back). Native-plugin glue is exercised headlessly with a GDScript
+stand-in (`_NativeStub` + `Ads.debug_install_native_stub` /
+`debug_feed_native_event`): plugin present but not yet `initialized` blocks
+every show; a preloaded rewarded shows and grants exactly once (a stray
+duplicate `rewarded_earned` does not re-grant); a not-preloaded rewarded
+loads then shows on `rewarded_loaded`; a native `rewarded_load_failed` is
+failure-safe (no reward, not stuck in-flight); a preloaded interstitial is
+shown via the native `showInterstitial()`.

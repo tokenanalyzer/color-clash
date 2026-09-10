@@ -101,7 +101,7 @@ func show_rewarded(placement: String, on_reward: Callable = Callable()) -> void:
 	_plugin_show_rewarded()
 
 func can_show_rewarded() -> bool:
-	return available and not _rewarded_in_flight
+	return available and not _rewarded_in_flight and (_debug_backend or _native_initialized)
 
 func is_rewarded_in_flight() -> bool:
 	return _rewarded_in_flight
@@ -172,6 +172,8 @@ func maybe_show_interstitial(placement: String, context: Dictionary = {}) -> boo
 func _interstitial_block_reason(context: Dictionary) -> String:
 	if not available:
 		return "unavailable"
+	if not (_debug_backend or _native_initialized):
+		return "not_initialized"
 	if _rewarded_in_flight:
 		return "rewarded_in_flight"
 	var i: Dictionary = config.get("interstitial", {})
@@ -242,63 +244,114 @@ func using_test_ads() -> bool:
 #  native plugin glue  (thin — the plugin API surface lives here only)
 # =====================================================================
 
+## The native side (game/android/build/src/com/colorclash/admob/ColorClashAdMob.kt)
+## exposes ONE generic signal — ad_event(event, message) — plus load/show
+## methods. This block is the ONLY place that talks to it; everything above
+## (policy, reward-once guard, interstitial gating, the public API) is
+## backend-independent.
+const _NATIVE_SINGLETON := "ColorClashAdMob"
+const _LOAD_TIMEOUT_MS := 12_000     ## give up waiting for a rewarded load after this
+
+var _native_initialized := false
+var _rewarded_wants_show := false    ## a show_rewarded() is waiting on a load
+var _rewarded_load_deadline_ms := 0
+
 func _detect_plugin() -> void:
 	if _debug_backend:
 		return
-	for name in _CANDIDATE_SINGLETONS:
+	if Engine.has_singleton(_NATIVE_SINGLETON):
+		_plugin = Engine.get_singleton(_NATIVE_SINGLETON)
+		return
+	for name in _CANDIDATE_SINGLETONS:      # tolerate an alternative plugin name
 		if Engine.has_singleton(name):
 			_plugin = Engine.get_singleton(name)
 			return
 
 func _wire_plugin() -> void:
-	# The exact signal names differ per plugin; connect the ones that exist.
-	var pairs := {
-		"rewarded_ad_user_earned_reward": _on_native_rewarded_earned,
-		"user_earned_rewarded": _on_native_rewarded_earned,
-		"on_rewarded_ad_user_earned_reward": _on_native_rewarded_earned,
-		"rewarded_ad_dismissed_full_screen_content": _on_native_rewarded_closed,
-		"rewarded_ad_closed": _on_native_rewarded_closed,
-		"rewarded_ad_failed_to_load": _on_native_rewarded_failed,
-		"rewarded_ad_failed_to_show_full_screen_content": _on_native_rewarded_failed,
-	}
-	for sig in pairs:
-		if _plugin.has_signal(sig) and not _plugin.is_connected(sig, pairs[sig]):
-			_plugin.connect(sig, pairs[sig])
+	if _plugin == null:
+		return
+	if _plugin.has_signal("ad_event") and not _plugin.is_connected("ad_event", _on_native_ad_event):
+		_plugin.connect("ad_event", _on_native_ad_event)
 	if _plugin.has_method("initialize"):
-		_plugin.call("initialize")
+		_plugin.call("initialize", OS.is_debug_build() or _test)
+	set_process(true)   # drives the rewarded load-timeout watchdog
 
-func _init_plugin() -> void:
-	_wire_plugin()
+## Single dispatcher for every native lifecycle event.
+func _on_native_ad_event(event: String, message: String) -> void:
+	_dbg("native ad_event: %s %s" % [event, message])
+	match event:
+		"initialized":
+			_native_initialized = true
+			_preload_rewarded()
+			_preload_interstitial()
+		"init_failed":
+			_native_initialized = false
+		"rewarded_loaded":
+			if _rewarded_wants_show and _rewarded_in_flight:
+				_rewarded_wants_show = false
+				if not _plugin.call("showRewarded"):
+					_on_native_rewarded_failed("show_returned_false")
+		"rewarded_load_failed":
+			if _rewarded_wants_show:
+				_rewarded_wants_show = false
+				_on_native_rewarded_failed("load_failed: " + message)
+			_preload_rewarded()   # try to have one ready next time
+		"rewarded_earned":
+			_on_native_rewarded_earned(message)
+		"rewarded_dismissed":
+			_on_native_rewarded_closed()
+			_preload_rewarded()
+		"rewarded_show_failed":
+			_on_native_rewarded_failed("show_failed: " + message)
+			_preload_rewarded()
+		"interstitial_loaded", "interstitial_shown":
+			pass
+		"interstitial_dismissed", "interstitial_show_failed", "interstitial_load_failed":
+			_preload_interstitial()
+
+func _process(_delta: float) -> void:
+	# watchdog: a rewarded show that never got a load/fail event must not
+	# leave the caller hanging — time it out into a normal failure.
+	if _rewarded_in_flight and _rewarded_wants_show \
+			and Time.get_ticks_msec() > _rewarded_load_deadline_ms:
+		_rewarded_wants_show = false
+		_on_native_rewarded_failed("load_timeout")
+
+func _preload_rewarded() -> void:
+	if _plugin != null and _native_initialized and _plugin.has_method("loadRewarded") \
+			and not bool(_plugin.call("isRewardedReady")):
+		_plugin.call("loadRewarded", unit_id("rewarded"))
+
+func _preload_interstitial() -> void:
+	if _plugin != null and _native_initialized and _plugin.has_method("loadInterstitial") \
+			and not bool(_plugin.call("isInterstitialReady")):
+		_plugin.call("loadInterstitial", unit_id("interstitial"))
 
 func _plugin_show_rewarded() -> void:
 	if _plugin == null:
 		_on_native_rewarded_failed("no_plugin"); return
-	if _plugin.has_method("load_rewarded_ad"):
-		_plugin.call("load_rewarded_ad", unit_id("rewarded"))
-	if _plugin.has_method("show_rewarded_ad"):
-		_plugin.call("show_rewarded_ad")
-	elif _plugin.has_method("show_rewarded"):
-		_plugin.call("show_rewarded", unit_id("rewarded"))
-	else:
-		_on_native_rewarded_failed("no_show_method")
+	if bool(_plugin.call("isRewardedReady")):
+		if not _plugin.call("showRewarded"):
+			_on_native_rewarded_failed("show_returned_false")
+		return
+	# not preloaded — load now and show on the "rewarded_loaded" event
+	_rewarded_wants_show = true
+	_rewarded_load_deadline_ms = Time.get_ticks_msec() + _LOAD_TIMEOUT_MS
+	_plugin.call("loadRewarded", unit_id("rewarded"))
 
 func _plugin_show_interstitial() -> void:
 	if _plugin == null:
 		return
-	if _plugin.has_method("load_interstitial_ad"):
-		_plugin.call("load_interstitial_ad", unit_id("interstitial"))
-	if _plugin.has_method("show_interstitial_ad"):
-		_plugin.call("show_interstitial_ad")
-	elif _plugin.has_method("show_interstitial"):
-		_plugin.call("show_interstitial", unit_id("interstitial"))
+	if bool(_plugin.call("isInterstitialReady")):
+		_plugin.call("showInterstitial")
+	else:
+		_plugin.call("loadInterstitial", unit_id("interstitial"))   # ready next time
 
 func _plugin_show_banner() -> void:
-	if _plugin != null and _plugin.has_method("show_banner_ad"):
-		_plugin.call("show_banner_ad", unit_id("banner"))
+	pass   # no banner placement (see docs/MONETIZATION.md); native side has none
 
 func _plugin_hide_banner() -> void:
-	if _plugin != null and _plugin.has_method("hide_banner_ad"):
-		_plugin.call("hide_banner_ad")
+	pass
 
 # =====================================================================
 #  test hooks
@@ -310,6 +363,7 @@ func _plugin_hide_banner() -> void:
 func debug_enable_fake_backend(now_available: bool = true) -> void:
 	_debug_backend = true
 	available = now_available
+	_native_initialized = now_available
 	_plugin = null
 
 ## Restore the real (no-plugin) headless state after a test.
@@ -317,6 +371,8 @@ func debug_disable_fake_backend() -> void:
 	_debug_backend = false
 	_plugin = null
 	available = false
+	_native_initialized = false
+	_rewarded_wants_show = false
 	_clear_rewarded()
 
 ## Simulate the end of an in-flight rewarded ad: "earned" | "closed" | "failed".
@@ -329,6 +385,23 @@ func debug_finish_rewarded(outcome: String, reason: String = "load_failed") -> v
 			_on_native_rewarded_closed()
 		"failed":
 			_on_native_rewarded_failed(reason)
+
+## Test hook: install a GDScript stand-in for the native plugin so the
+## load -> show -> ad_event glue can be exercised headlessly. The stub must
+## expose isRewardedReady/showRewarded/loadRewarded/isInterstitialReady/
+## showInterstitial/loadInterstitial/initialize and an `ad_event` signal.
+func debug_install_native_stub(stub: Object) -> void:
+	_debug_backend = false
+	_native_initialized = false
+	_rewarded_wants_show = false
+	_clear_rewarded()
+	_plugin = stub
+	available = stub != null
+	if stub != null:
+		_wire_plugin()
+
+func debug_feed_native_event(event: String, message: String = "") -> void:
+	_on_native_ad_event(event, message)
 
 func debug_reset_session() -> void:
 	_session_start_ms = Time.get_ticks_msec() - _MIN_SESSION_AGE_MS - 1

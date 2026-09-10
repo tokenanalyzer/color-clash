@@ -1,0 +1,26 @@
+--- build.gradle	2026-09-10 19:54:50.419063000 +0530
++++ build.gradle	2026-09-10 19:55:10.556649600 +0530
+@@ -34,6 +34,10 @@
+ }
+ 
+ dependencies {
++    // War of Love — native AdMob (see src/com/colorclash/admob/ColorClashAdMob.kt).
++    // Bump before a production release; kept at a version proven with AGP 8.2.
++    implementation "com.google.android.gms:play-services-ads:23.6.0"
++
+     implementation "androidx.fragment:fragment:$versions.fragmentVersion"
+     implementation "androidx.core:core-splashscreen:$versions.splashscreenVersion"
+ 
+@@ -117,6 +121,12 @@
+         minSdkVersion getExportMinSdkVersion()
+         targetSdkVersion getExportTargetSdkVersion()
+ 
++        // AdMob App ID as a string resource (referenced by AndroidManifest.xml
++        // meta-data). Google's TEST App ID by default; set ADMOB_APP_ID in the
++        // build environment for production. No secret is committed.
++        resValue "string", "admob_app_id",
++            (System.getenv("ADMOB_APP_ID") ?: "ca-app-pub-3940256099942544~3347511713")
++
+         missingDimensionStrategy 'products', 'template'
+     }
+ 

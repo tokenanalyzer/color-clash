@@ -1,0 +1,21 @@
+--- AndroidManifest.xml	2026-09-10 19:54:29.168581700 +0530
++++ AndroidManifest.xml	2026-09-10 19:54:40.055864900 +0530
+@@ -38,6 +38,18 @@
+             android:name="org.godotengine.rendering.method"
+             android:value="${godotRenderingMethod}"/>
+ 
++        <!-- War of Love — native AdMob. The App ID is a build resource
++             (defaultConfig resValue in build.gradle): Google's TEST App ID by
++             default, overridden with the ADMOB_APP_ID env var for production.
++             No secret is committed. -->
++        <meta-data
++            android:name="com.google.android.gms.ads.APPLICATION_ID"
++            android:value="@string/admob_app_id" />
++        <!-- Registers the ColorClashAdMob GodotPlugin singleton -->
++        <meta-data
++            android:name="org.godotengine.plugin.v1.ColorClashAdMob"
++            android:value="com.colorclash.admob.ColorClashAdMob" />
++
+         <activity
+             android:name=".GodotApp"
+             android:label="@string/godot_project_name_string"
