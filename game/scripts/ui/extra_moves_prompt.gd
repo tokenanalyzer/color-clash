@@ -20,6 +20,8 @@ var _scrim: ColorRect
 var _panel: UiKit.GoldFramePanel
 var _tier_box: VBoxContainer
 var _coins_label: Label
+var _ad_btn: Button
+var _ad_pending := false
 var _is_open := false
 
 func _ready() -> void:
@@ -75,6 +77,17 @@ func _ready() -> void:
 	_tier_box.add_theme_constant_override("separation", 10)
 	v.add_child(_tier_box)
 
+	# Rewarded-ad continue: only appears when an ad backend is actually
+	# available. Grants the reward ONLY on the ad-completion callback; if the
+	# ad is unavailable / fails / is dismissed early, nothing is granted and
+	# the coin tiers above still work. See AdsService.
+	_ad_btn = UiKit.button("", &"secondary", VisualTheme.FS_BODY)
+	_ad_btn.custom_minimum_size = Vector2(420, 72)
+	_ad_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_ad_btn.visible = false
+	_ad_btn.pressed.connect(_on_watch_ad)
+	v.add_child(_ad_btn)
+
 	var give_up := UiKit.button("GIVE UP", &"tertiary", VisualTheme.FS_MICRO)
 	give_up.custom_minimum_size = Vector2(300, 60)
 	give_up.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -103,6 +116,43 @@ func _rebuild() -> void:
 		c.queue_free()
 	for t in GameData.continue_offers.tiers():
 		_tier_box.add_child(_tier_button(t))
+	_refresh_ad_button()
+
+func _refresh_ad_button() -> void:
+	if _ad_btn == null:
+		return
+	var has_ads: bool = Ads.available and not _ad_pending
+	_ad_btn.visible = Ads.available
+	_ad_btn.disabled = not has_ads
+	_ad_btn.modulate.a = 1.0 if has_ads else 0.5
+	_ad_btn.text = ("LOADING AD…" if _ad_pending
+		else "▶  WATCH AD   +%d MOVES  (FREE)" % Ads.reward_continue_moves())
+
+## Rewarded continue. The +moves are emitted ONLY when the ad's single
+## terminal result says earned=true. `_ad_pending` blocks a second tap and
+## a duplicate grant; any non-earned outcome just re-enables the button so
+## the coin tiers above still work.
+func _on_watch_ad() -> void:
+	if _ad_pending or not Ads.available:
+		return
+	Audio.play(&"button_tap")
+	_ad_pending = true
+	_refresh_ad_button()
+	if not Ads.rewarded_result.is_connected(_on_ad_result):
+		Ads.rewarded_result.connect(_on_ad_result)
+	Ads.show_rewarded("continue_moves")
+
+func _on_ad_result(placement: String, earned: bool) -> void:
+	if placement != "continue_moves" or not _ad_pending:
+		return
+	Ads.rewarded_result.disconnect(_on_ad_result)
+	_ad_pending = false
+	if earned:
+		Audio.play(&"power_up", 0.7)
+		_close()
+		bought.emit(Ads.reward_continue_moves())
+	elif _is_open:
+		_refresh_ad_button()
 
 ## Label and price get their own columns (2026-09-05 UI pass) — previously
 ## one run-on string with no visual hierarchy between what you're buying

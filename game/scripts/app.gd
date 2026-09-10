@@ -156,6 +156,7 @@ func _build_game() -> void:
 	_hud.shop_use_booster.connect(_on_shop_use_booster)
 	_hud.continue_bought.connect(_on_continue_bought)
 	_hud.continue_declined.connect(_on_continue_declined)
+	_hud.double_coins_requested.connect(_on_double_coins_requested)
 	await _build_yield()
 
 	_board_layer = Node2D.new()
@@ -426,6 +427,7 @@ func _on_daily_closed() -> void:
 	_menu.refresh()
 
 func _on_map_pressed() -> void:
+	_maybe_transition_ad("to_map")
 	await _go_to_map()
 
 func _on_level_selected_from_map(world_id: StringName, local_level: int) -> void:
@@ -1057,7 +1059,51 @@ func _on_level_lost() -> void:
 ## "Next" from the win panel advances to the NEXT LEVEL OF THE SAME ISLAND.
 ## After level 100 (or if the next level somehow isn't unlocked) it drops back
 ## to the island map — where the newly-unlocked next island is now visible.
+## Interstitial at a genuine level->level / level->map transition ONLY. Never
+## called during active gameplay. AdsService self-gates on the frequency
+## rules (cooldown, per-session cap, tutorial guard, no back-to-back), so a
+## no-op is the common case and a real ad only ever plays over the black
+## transition, not the board.
+func _maybe_transition_ad(placement: String) -> void:
+	if not _level_ended:
+		return
+	Ads.maybe_show_interstitial(placement, {"levels_cleared": _total_levels_cleared()})
+
+func _total_levels_cleared() -> int:
+	var n := 0
+	for i in WorldCatalog.count():
+		n += IslandProgress.completed_count(WorldCatalog.world_id_at(i))
+	return n
+
+## Win-panel "▶ DOUBLE COINS" — rewarded ad. The extra coins are granted
+## ONLY when the ad's single terminal result says earned=true; a failed /
+## dismissed / unavailable ad grants nothing and the base reward stands.
+var _double_coins_base := 0
+
+func _on_double_coins_requested() -> void:
+	if _current_level == null or not Ads.available:
+		return
+	if _current_level.reward_coins <= 0:
+		return
+	_double_coins_base = _current_level.reward_coins
+	if not Ads.rewarded_result.is_connected(_on_double_coins_ad_result):
+		Ads.rewarded_result.connect(_on_double_coins_ad_result)
+	Ads.show_rewarded("double_win_coins")
+
+func _on_double_coins_ad_result(placement: String, earned: bool) -> void:
+	if placement != "double_win_coins" or _double_coins_base <= 0:
+		return
+	Ads.rewarded_result.disconnect(_on_double_coins_ad_result)
+	var base_coins := _double_coins_base
+	_double_coins_base = 0
+	if earned:
+		Economy.grant(base_coins)
+		_hud.set_coins(Economy.coins)
+		_hud.mark_win_coins_doubled()
+		Audio.play(&"power_up", 0.8)
+
 func _on_next_level_pressed() -> void:
+	_maybe_transition_ad("next_level")
 	var next_local := _active_local_level + 1
 	if next_local <= IslandProgress.LEVELS_PER_ISLAND \
 			and IslandProgress.is_level_unlocked(_active_world_id, next_local):
@@ -1070,6 +1116,7 @@ func _on_next_level_pressed() -> void:
 		await _go_to_map()
 
 func _on_retry_pressed() -> void:
+	_maybe_transition_ad("retry")
 	_start_level(WorldCatalog.authored_level_id(_active_world_id, _active_local_level))
 
 ## Test / dev helper: start an authored campaign level directly, wiring the

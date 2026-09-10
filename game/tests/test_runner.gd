@@ -29,6 +29,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_story_assets.gd",
 	"res://tests/test_enemy_model.gd",
 	"res://tests/test_boss_progression.gd",
+	"res://tests/test_ads_service.gd",
 	"res://tests/test_story_data.gd",
 	"res://tests/test_combat_system.gd",
 	"res://tests/test_inventory.gd",

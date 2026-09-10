@@ -10,6 +10,8 @@ signal booster_pressed(booster_id: StringName)
 signal next_level_pressed()
 signal retry_pressed()
 signal map_pressed()
+## Win-panel rewarded-ad "double your coins" — app.gd runs the ad + grant.
+signal double_coins_requested()
 signal pause_pressed()
 signal resume_pressed()
 ## In-level booster shop opened from the HUD (app.gd freezes the board).
@@ -76,6 +78,7 @@ var _end_stars: StarRow
 var _end_body: Label
 var _end_button: Button
 var _end_map_button: Button
+var _end_double_button: Button
 var _end_confetti: CPUParticles2D
 var _settings_dialog: SettingsPanel
 ## Instantiated via load() (not the BoosterShop / ExtraMovesPrompt class_name)
@@ -946,6 +949,20 @@ func _build_end_panel() -> void:
 	_end_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(_end_button)
 
+	# Optional rewarded "double your coins" on the WIN panel — only shown
+	# when an ad backend is available. Grant happens in app.gd on the ad's
+	# earned callback; declining/failure keeps the base reward.
+	_end_double_button = _cta_button("▶  DOUBLE COINS", &"secondary")
+	_end_double_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_end_double_button.visible = false
+	_end_double_button.pressed.connect(func():
+		Audio.play(&"button_tap")
+		_end_double_button.disabled = true
+		_end_double_button.modulate.a = 0.5
+		double_coins_requested.emit()
+	)
+	vbox.add_child(_end_double_button)
+
 	_end_map_button = _cta_button("LEVEL MAP", &"tertiary")
 	_end_map_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_end_map_button.pressed.connect(func():
@@ -1258,11 +1275,19 @@ func set_booster_counts(counts: Dictionary) -> void:
 		if n > prev:
 			flash_booster(id)
 
+var _win_reward_coins := 0
+
 func show_win_panel(score: int, reward_coins: int, has_next_level: bool, stars: int) -> void:
+	_win_reward_coins = reward_coins
 	_end_title.text = "LEVEL COMPLETE!"
 	_end_body.text = "Score  %s\n+%d coins" % [_fmt(score), reward_coins]
 	_end_button.text = "NEXT LEVEL" if has_next_level else "BACK TO MAP"
 	_end_map_button.visible = true
+	if _end_double_button != null:
+		_end_double_button.visible = Ads.available and Ads.double_win_coins_enabled() and reward_coins > 0
+		_end_double_button.disabled = false
+		_end_double_button.modulate.a = 1.0
+		_end_double_button.text = "▶  DOUBLE COINS  (+%d)" % reward_coins
 	if _end_crown != null:
 		_end_crown.visible = _end_crown.texture != null
 	_rewire(_end_button, func(): next_level_pressed.emit())
@@ -1280,11 +1305,24 @@ func show_win_panel(score: int, reward_coins: int, has_next_level: bool, stars: 
 		if stars >= 3:
 			_fx.play(&"cel_star_burst", cc, size.x * 0.7, Color(1, 1, 1), 0.7, true, 0.6)
 
+## Called by app.gd after a rewarded "double coins" ad is EARNED — reflects
+## the extra grant on the panel. Idempotent-safe: the button is already
+## disabled by its own press handler.
+func mark_win_coins_doubled() -> void:
+	if _end_double_button != null:
+		_end_double_button.text = "COINS DOUBLED  ✓"
+		_end_double_button.disabled = true
+		_end_double_button.modulate.a = 0.6
+	_end_body.text = _end_body.text.replace(
+		"+%d coins" % _win_reward_coins, "+%d coins  (x2!)" % (_win_reward_coins * 2))
+
 func show_lose_panel(score: int) -> void:
 	_end_title.text = "SO CLOSE!"
 	_end_body.text = "Score  %s\nTry again — you've got this!" % _fmt(score)
 	_end_button.text = "TRY AGAIN"
 	_end_map_button.visible = true
+	if _end_double_button != null:
+		_end_double_button.visible = false
 	_rewire(_end_button, func(): retry_pressed.emit())
 	_end_center.visible = true
 	_refresh_scrim()

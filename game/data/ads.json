@@ -1,0 +1,27 @@
+{
+  "_comment": "AdMob monetization config for War of Love (loaded by AdsService / autoload 'Ads'). use_test_ads=true keeps Google's OFFICIAL TEST ad unit ids in play — NEVER ship with test ids, NEVER test with production ids. The 'prod' fields are empty placeholders: fill them from the AdMob console before a real release and flip use_test_ads to false. Ad unit ids are not secrets; the AdMob app id also goes in the Android export/manifest metadata at integration time. The game stays fully playable with NO ads — every placement degrades to its normal non-ad behaviour when ads are unavailable/offline.",
+
+  "use_test_ads": true,
+
+  "unit_ids": {
+    "app_id":       { "test": "ca-app-pub-3940256099942544~3347511713", "prod": "" },
+    "rewarded":     { "test": "ca-app-pub-3940256099942544/5224354917", "prod": "" },
+    "interstitial": { "test": "ca-app-pub-3940256099942544/1033173712", "prod": "" },
+    "banner":       { "test": "ca-app-pub-3940256099942544/6300978111", "prod": "" }
+  },
+
+  "interstitial": {
+    "cooldown_seconds": 150,
+    "max_per_session": 4,
+    "min_levels_cleared": 4,
+    "min_session_launches": 2
+  },
+  "back_to_back_guard_seconds": 20,
+
+  "rewards": {
+    "continue_moves": 5,
+    "double_win_coins": true,
+    "free_coins": 120,
+    "free_booster": { "id": "bomb", "amount": 1 }
+  }
+}

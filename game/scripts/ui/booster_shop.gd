@@ -26,6 +26,8 @@ var _scrim: ColorRect
 var _frame: UiKit.GoldFramePanel
 var _list: VBoxContainer
 var _coins_label: Label
+var _free_btn: Button
+var _free_pending := false
 var _confirm_layer: Control
 var _confirm_id: StringName = &""
 var _is_open := false
@@ -79,6 +81,16 @@ func _ready() -> void:
 
 	col.add_child(VisualTheme.label("Buy or use boosters without leaving the level.",
 		VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0))
+
+	# Rewarded "free booster" — only when an ad backend is available. The
+	# booster is added ONLY on the ad's earned callback (see AdsService); a
+	# failed/dismissed ad grants nothing and the coin buy options still work.
+	_free_btn = UiKit.button("", &"secondary", VisualTheme.FS_BODY)
+	_free_btn.custom_minimum_size = Vector2(500, 66)
+	_free_btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_free_btn.visible = false
+	_free_btn.pressed.connect(_on_watch_ad_for_booster)
+	col.add_child(_free_btn)
 
 	var sc := ScrollContainer.new()
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -150,6 +162,44 @@ func _refresh() -> void:
 		_list.add_child(_row(id))
 	if _confirm_id != &"":
 		_populate_confirm(_confirm_id)
+	_refresh_free_btn()
+
+func _refresh_free_btn() -> void:
+	if _free_btn == null:
+		return
+	_free_btn.visible = Ads.available
+	_free_btn.disabled = _free_pending or not Ads.available
+	_free_btn.modulate.a = 0.5 if (_free_pending or not Ads.available) else 1.0
+	var r := Ads.reward_free_booster()
+	var label := String(GameData.boosters.get(r["id"], {}).get("label", r["id"])).to_upper()
+	_free_btn.text = ("LOADING AD…" if _free_pending
+		else "▶  WATCH AD  —  FREE %s x%d" % [label, int(r["amount"])])
+
+## Rewarded free booster. The booster is added ONLY when the ad's single
+## terminal result says earned=true. `_free_pending` blocks a second tap and
+## a duplicate grant.
+func _on_watch_ad_for_booster() -> void:
+	if _free_pending or not Ads.available:
+		return
+	Audio.play(&"button_tap")
+	_free_pending = true
+	_refresh_free_btn()
+	if not Ads.rewarded_result.is_connected(_on_free_ad_result):
+		Ads.rewarded_result.connect(_on_free_ad_result)
+	Ads.show_rewarded("free_booster")
+
+func _on_free_ad_result(placement: String, earned: bool) -> void:
+	if placement != "free_booster" or not _free_pending:
+		return
+	Ads.rewarded_result.disconnect(_on_free_ad_result)
+	_free_pending = false
+	if earned:
+		var r := Ads.reward_free_booster()
+		Boosters.add(r["id"], int(r["amount"]))
+		Audio.play(&"power_up", 0.7)
+		_refresh()
+	else:
+		_refresh_free_btn()
 
 func _row(id: StringName) -> PanelContainer:
 	var def: Dictionary = GameData.boosters[id]
