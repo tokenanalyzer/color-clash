@@ -32,10 +32,22 @@ func _ready() -> void:
 ## edge, `floor_y` the arena floor, `char_h` the target height — all in the
 ## PARENT's space. Returns the villain's torso point (parent space) for the
 ## Jamie rig to aim at.
-func configure(level_id: int, right_x: float, floor_y: float, char_h: float) -> Vector2:
+## `island_index` >= 0 uses the island-aware villain (real 100-level-per-
+## island progression): the chapter boss only shows when `is_finale` is true.
+## `island_index` < 0 keeps the flat authored-campaign pick. `is_first` is the
+## island's local level 1 — the villain's first appearance in that chapter,
+## which still gets the gradual slide-in.
+func configure(level_id: int, right_x: float, floor_y: float, char_h: float,
+		island_index: int = -1, is_finale: bool = false, is_first: bool = false) -> Vector2:
 	_defeated = false
-	_is_boss = EnemyModel.is_boss_stage(level_id)
-	var id := EnemyModel.boss_for_stage(level_id) if _is_boss else EnemyModel.enemy_for_stage(level_id)
+	var id: StringName
+	if island_index >= 0:
+		var v := EnemyModel.island_villain(island_index, is_finale)
+		_is_boss = bool(v["is_boss"])
+		id = v["id"]
+	else:
+		_is_boss = EnemyModel.is_boss_stage(level_id)
+		id = EnemyModel.boss_for_stage(level_id) if _is_boss else EnemyModel.enemy_for_stage(level_id)
 	var tex: Texture2D = null
 	if id == &"jinn":
 		tex = Cast.portrait(Cast.WHO_JINN)
@@ -58,7 +70,7 @@ func configure(level_id: int, right_x: float, floor_y: float, char_h: float) -> 
 	# rather than popping in already at Jamie/Jasmine's side. Every other
 	# stage in that same chapter snaps straight to _home: the villain is
 	# already an established presence, not re-entering the scene each time.
-	var is_chapter_start := (level_id - 1) % EnemyModel.BOSS_EVERY == 0
+	var is_chapter_start := is_first if island_index >= 0 else ((level_id - 1) % EnemyModel.BOSS_EVERY == 0)
 	if is_chapter_start and is_inside_tree():
 		position = _home + Vector2(w * 0.55, 0.0)
 		modulate = Color(1, 1, 1, 0.0)
@@ -144,6 +156,29 @@ func play_defeat() -> void:
 	t.tween_property(self, "modulate:a", 0.0, 0.5)
 	t.tween_property(self, "position", _home + Vector2(-14.0, 24.0), 0.5)
 	t.tween_property(self, "rotation", -0.5, 0.5)
+	t.chain().tween_callback(func(): visible = false)
+
+## Phase D — a NON-boss stage clear: the chapter's minor villain isn't
+## killed (it's a recurring per-chapter presence), it recoils and flees
+## off its own side of the arena. Lighter than play_defeat(): a quick
+## flinch, then a fade-and-slide outward, no death spin/fall. Marks the
+## actor defeated so any late hit reaction is a no-op.
+func play_retreat() -> void:
+	if _defeated:
+		return
+	_defeated = true
+	if _idle_tween != null and _idle_tween.is_valid():
+		_idle_tween.kill()
+	if not is_inside_tree():
+		visible = false
+		return
+	var away := Vector2(absf(size.x) * 0.9, -18.0)
+	var t := create_tween()
+	t.tween_property(self, "position", _home + Vector2(-10.0, 0.0), 0.08).set_trans(Tween.TRANS_SINE)
+	t.set_parallel(true)
+	t.tween_property(self, "position", _home + away, 0.42).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	t.tween_property(self, "modulate:a", 0.0, 0.42)
+	t.tween_property(self, "rotation", 0.18, 0.42)
 	t.chain().tween_callback(func(): visible = false)
 
 func is_boss_actor() -> bool:

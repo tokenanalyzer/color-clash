@@ -1,16 +1,12 @@
 extends SceneTree
-## Manual dev tool: boots the real game to confirm the campaign map screen
-## works end to end — boots into the main menu, PLAY opens the map (not
-## straight into a level), selecting an unlocked node transitions into
-## play, winning a level
-## records progress/stars and unlocks the next node, and a not-yet-reached
-## level stays locked. Not part of the CI test_runner; run manually after
-## any map/progress change.
+## Manual dev tool: boots the real game and drives the corrected per-ISLAND
+## progression end to end — PLAY -> 10 islands -> island 1 -> its internal
+## level map -> play level 1 -> win -> return to map -> level 2 unlocked.
+## Then the exact bug repro: clear island 1 level 10 and assert island 1
+## level 11 unlocks while island 2 stays LOCKED.
 ##
-## Note: other smoke tests / unit tests persist to the same user://save.json,
-## so this avoids hard-asserting on levels those may have already touched
-## (level 1, and levels 24/25 which test_progress.gd uses) — it works with
-## whatever the current save state is rather than assuming a pristine one.
+## Not part of the CI test_runner. Uses a fresh IslandProgress (reset()) so it
+## does not depend on other tests' save state.
 
 func _initialize() -> void:
 	await process_frame
@@ -22,88 +18,118 @@ func _initialize() -> void:
 	await process_frame
 	await process_frame
 
-	var progress := get_root().get_node("Progress")
-	var game_data := get_root().get_node("GameData")
-	var first_id: int = game_data.levels.first_level_id()
-	var second_id: int = game_data.levels.next_level_id(first_id)
-	# A level deep enough that nothing else in the test suite plays through
-	# to it sequentially, so it should reliably still be locked.
-	var far_id: int = game_data.levels.ordered_ids[14]
+	var ip := get_root().get_node("IslandProgress")
+	ip.reset()
 
-	print("App booted. Menu visible=", app._menu.visible, " board=", app._board)
+	var w1: StringName = WorldCatalog.world_id_at(0)
+	var w2: StringName = WorldCatalog.world_id_at(1)
+
 	if not app._menu.visible or app._board != null:
-		push_error("should boot into the main menu with no level running")
-		quit(1)
-		return
+		push_error("should boot into the main menu with no level running"); quit(1); return
 
-	# PLAY opens the campaign map.
 	await app._on_menu_play_pressed()
 	await process_frame
-	print("After PLAY. Map visible=", app._map.visible)
-	if not app._map.visible:
-		push_error("PLAY should open the campaign map")
-		quit(1)
-		return
+	if not app._islands.visible or not app._sea_clip.visible:
+		push_error("PLAY should open the island screen with SEA CLIP behind it"); quit(1); return
+	if WorldCatalog.count() != 10:
+		push_error("expected 10 islands"); quit(1); return
 
-	var first_btn: LevelNodeButton = app._map._node_buttons[first_id]
-	var far_btn: LevelNodeButton = app._map._node_buttons[far_id]
-	print("Level %d state=%s disabled=%s" % [first_id, first_btn.state, first_btn.disabled])
-	print("Level %d state=%s disabled=%s" % [far_id, far_btn.state, far_btn.disabled])
-	if first_btn.disabled:
-		push_error("the first campaign level must always be selectable")
-		quit(1)
-		return
-	if not progress.is_completed(far_id) and not far_btn.disabled:
-		push_error("a not-yet-reached level must be locked/disabled")
-		quit(1)
-		return
+	# --- initial lock state ---
+	if not ip.is_level_unlocked(w1, 1):
+		push_error("island 1 level 1 must start unlocked"); quit(1); return
+	if ip.is_level_unlocked(w1, 2):
+		push_error("island 1 level 2 must start LOCKED"); quit(1); return
+	if ip.is_island_unlocked(w2):
+		push_error("island 2 must start LOCKED"); quit(1); return
 
-	print("Selecting level %d from the map..." % first_id)
-	app._map.level_selected.emit(first_id)
+	# --- enter island 1 ---
+	await app._on_world_selected(w1)
 	await process_frame
-	var guard := 0
-	while app._board == null and guard < 120:
+	if not app._worldmap.visible or app._worldmap.world_id != w1:
+		push_error("selecting island 1 should open its internal map"); quit(1); return
+	if not app._sea_clip.visible:
+		push_error("SEA CLIP must stay on the internal map"); quit(1); return
+
+	var pooled: int = app._worldmap._scroller.live_node_count()
+	if pooled > InfiniteLevelScroller.POOL_SIZE:
+		push_error("scroller pool exceeded its bound"); quit(1); return
+	app._worldmap._scroller.debug_scroll_to_local_level(90)
+	await process_frame
+	if app._worldmap._scroller.live_node_count() != pooled:
+		push_error("far scroll must not create more nodes"); quit(1); return
+	app._worldmap._scroller.setup(w1)
+
+	# --- play + win island 1 level 1 THROUGH the real app win flow ---
+	_win_via_app(app, w1, 1)
+	await process_frame
+	if not ip.is_level_completed(w1, 1):
+		push_error("level 1 should be completed via app._on_level_won"); quit(1); return
+	if not ip.is_level_unlocked(w1, 2):
+		push_error("completing island 1 level 1 must unlock island 1 level 2"); quit(1); return
+	if ip.is_level_unlocked(w1, 3):
+		push_error("island 1 level 3 must still be locked"); quit(1); return
+
+	# --- THE BUG REPRO: clear island 1 up to level 10 ---
+	for n in range(2, 11):
+		ip.record_completion(w1, n, 3, 1000)
 		await process_frame
-		guard += 1
-	if app._board == null or app._map.visible:
-		push_error("selecting a level from the map should start it and hide the map")
-		quit(1)
-		return
-	print("Level started via map tap: ", app._current_level.level_name)
+	if not ip.is_level_completed(w1, 10):
+		push_error("island 1 level 10 should be completed"); quit(1); return
+	if not ip.is_level_unlocked(w1, 11):
+		push_error("completing island 1 level 10 must unlock island 1 level 11"); quit(1); return
+	if ip.is_island_unlocked(w2):
+		push_error("BUG: completing island 1 level 10 must NOT unlock island 2"); quit(1); return
+	if ip.is_level_unlocked(w2, 1):
+		push_error("BUG: island 2 level 1 must still be LOCKED"); quit(1); return
+	print("Bug repro OK: island 1 L11 unlocked, island 2 still locked.")
 
-	print("Forcing a win to test progress recording + unlock...")
-	var score_before: int = progress.get_best_score(first_id)
-	app._moves_left = app._current_level.move_limit # finishing with a full move budget -> 3 stars
-	app._score = score_before + 999
-	app._on_level_won()
-	await process_frame
-	if not progress.is_completed(first_id):
-		push_error("level should be marked completed after winning")
-		quit(1)
-		return
-	if progress.get_stars(first_id) != 3:
-		push_error("finishing with a full move budget should award 3 stars")
-		quit(1)
-		return
-	if not progress.is_unlocked(second_id):
-		push_error("completing a level should unlock the next one")
-		quit(1)
-		return
-	print("Progress recorded: stars=%d, next level %d unlocked=%s" % [progress.get_stars(first_id), second_id, progress.is_unlocked(second_id)])
-
-	print("Returning to the map...")
+	# --- return to map, still island 1 ---
+	app._active_world_id = w1
+	app._active_local_level = 10
 	await app._go_to_map()
-	var refreshed_first_btn: LevelNodeButton = app._map._node_buttons[first_id]
-	var refreshed_second_btn: LevelNodeButton = app._map._node_buttons[second_id]
-	if refreshed_first_btn.state != &"completed":
-		push_error("map should reflect the completed level")
-		quit(1)
-		return
-	if refreshed_second_btn.state == &"locked":
-		push_error("map should reflect the newly-unlocked level")
-		quit(1)
-		return
-	print("Map refreshed: level %d=%s, level %d=%s" % [first_id, refreshed_first_btn.state, second_id, refreshed_second_btn.state])
+	if not app._worldmap.visible or app._worldmap.world_id != w1:
+		push_error("Quit to Map should return to island 1's map"); quit(1); return
+	if WorldCatalog.node_state(w1, 11) == &"locked":
+		push_error("map should show island 1 level 11 as reachable"); quit(1); return
+
+	# --- finish island 1 (levels 11..100) -> island 2 unlocks ---
+	for n in range(11, 101):
+		ip.record_completion(w1, n, 3, 1000)
+	await process_frame
+	if not ip.is_island_complete(w1):
+		push_error("island 1 should be complete after level 100"); quit(1); return
+	if not ip.is_island_unlocked(w2):
+		push_error("completing island 1 level 100 must unlock island 2"); quit(1); return
+	if not ip.is_level_unlocked(w2, 1):
+		push_error("island 2 level 1 must be unlocked once island 2 opens"); quit(1); return
+	if ip.is_level_unlocked(w2, 2):
+		push_error("island 2 level 2 must still be locked"); quit(1); return
+
+	# island 2 level 1 -> level 2, but level 10 must NOT touch island 3
+	_win_via_app(app, w2, 1)
+	await process_frame
+	if not ip.is_level_unlocked(w2, 2):
+		push_error("island 2 level 1 completion must unlock island 2 level 2"); quit(1); return
+	for n in range(2, 11):
+		ip.record_completion(w2, n, 3, 1000)
+	var w3: StringName = WorldCatalog.world_id_at(2)
+	if ip.is_island_unlocked(w3):
+		push_error("island 2 level 10 must NOT unlock island 3"); quit(1); return
+	if not ip.is_level_unlocked(w2, 11):
+		push_error("island 2 level 11 should be unlocked"); quit(1); return
 
 	print("LEVEL MAP SMOKE TEST PASSED")
 	quit(0)
+
+## Wins a world-local level THROUGH the real app win flow (integration check
+## that app._on_level_won records into IslandProgress with the right slot).
+func _win_via_app(app, world_id: StringName, local_level: int) -> void:
+	var authored := WorldCatalog.authored_level_id(world_id, local_level)
+	app._active_world_id = world_id
+	app._active_local_level = local_level
+	app._start_level(authored)
+	app._level_ended = false
+	app._moves_left = app._current_level.move_limit
+	app._score = 999999
+	app._on_level_won()
+	app._hud.hide_end_panel()

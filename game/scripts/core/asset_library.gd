@@ -185,6 +185,105 @@ const _STORY_ART := {
 	&"story_villain_chaos_sorcerer": "res://assets/story/villains/chaos_sorcerer.png",
 }
 
+## User-supplied UI art sheets (2026-09-06 UI asset integration). The two
+## PNGs are byte-identical copies of the artist's sheets and are never
+## modified — `ui_slice(id)` returns an AtlasTexture over the sub-rect named
+## in `data/ui_atlas.json` (source PNG untouched), `ui_texture(id)` returns a
+## whole supplied button PNG, `ui_safe(id)` the frame content inset. Same
+## graceful-null contract as `tex()`: a missing sheet/region returns null and
+## the screen keeps its previous look.
+const _UI_ATLAS_PATH := "res://data/ui_atlas.json"
+
+static var _ui_atlas: Dictionary = {}
+static var _ui_slice_cache: Dictionary = {}
+static var _ui_sheet_cache: Dictionary = {}
+
+static func _ui_atlas_data() -> Dictionary:
+	if _ui_atlas.is_empty():
+		_ui_atlas = JsonLoader.load_json(_UI_ATLAS_PATH)
+	return _ui_atlas
+
+static func _ui_sheet(sheet_id: String) -> Texture2D:
+	if _ui_sheet_cache.has(sheet_id):
+		return _ui_sheet_cache[sheet_id]
+	var path: String = _ui_atlas_data().get("sheets", {}).get(sheet_id, "")
+	var t: Texture2D = null
+	if path != "" and ResourceLoader.exists(path):
+		var res := load(path)
+		if res is Texture2D:
+			t = res
+	_ui_sheet_cache[sheet_id] = t
+	return t
+
+## AtlasTexture for one named region of a supplied UI sheet, or null. Cached
+## for the process lifetime. `filter_clip` is set so bilinear sampling can
+## never pull a neighbouring element's pixels into the crop.
+static func ui_slice(id: StringName) -> Texture2D:
+	if _ui_slice_cache.has(id):
+		return _ui_slice_cache[id]
+	var r: Dictionary = _ui_atlas_data().get("regions", {}).get(String(id), {})
+	var out: Texture2D = null
+	if not r.is_empty():
+		var sheet := _ui_sheet(String(r.get("sheet", "")))
+		var rect: Array = r.get("rect", [])
+		if sheet != null and rect.size() == 4:
+			var at := AtlasTexture.new()
+			at.atlas = sheet
+			at.region = Rect2(rect[0], rect[1], rect[2], rect[3])
+			at.filter_clip = true
+			out = at
+	_ui_slice_cache[id] = out
+	return out
+
+## NinePatch patch margins [l, t, r, b] for a region that declares them
+## (the stretchable slider tracks), else an empty array.
+static func ui_nine(id: StringName) -> Array:
+	return _ui_atlas_data().get("regions", {}).get(String(id), {}).get("nine", [])
+
+## Whole supplied button PNG (btn_settings / btn_inventory / btn_daily_reward).
+static func ui_texture(id: StringName) -> Texture2D:
+	if _ui_slice_cache.has(id):
+		return _ui_slice_cache[id]
+	var path: String = _ui_atlas_data().get("textures", {}).get(String(id), "")
+	var t: Texture2D = null
+	if path != "" and ResourceLoader.exists(path):
+		var res := load(path)
+		if res is Texture2D:
+			t = res
+	_ui_slice_cache[id] = t
+	return t
+
+## Content-area inset for a frame region, as fractions of the DISPLAYED
+## frame rect: {left, top, right, bottom}. Screens inset their content
+## MarginContainer by these so nothing overlaps the decorative gold border.
+## Falls back to a mild uniform inset when the region declares no `safe`.
+static func ui_safe(id: StringName) -> Dictionary:
+	var r: Dictionary = _ui_atlas_data().get("regions", {}).get(String(id), {})
+	var rect: Array = r.get("rect", [])
+	var safe: Array = r.get("safe", [])
+	if rect.size() == 4 and safe.size() == 4 and float(rect[2]) > 0.0 and float(rect[3]) > 0.0:
+		return {
+			"left": float(safe[0]) / float(rect[2]),
+			"top": float(safe[1]) / float(rect[3]),
+			"right": float(safe[2]) / float(rect[2]),
+			"bottom": float(safe[3]) / float(rect[3]),
+		}
+	return {"left": 0.09, "top": 0.06, "right": 0.09, "bottom": 0.06}
+
+## The fraction of a frame slice's half-width that is transparent glow/AA
+## outside the solid decorative border. AssetFramePanel over-sizes the frame
+## by this so the *visible* gold border lands at the requested side margin
+## (not the artwork's transparent bounding box). 0 when undeclared.
+static func ui_bleed(id: StringName) -> float:
+	return float(_ui_atlas_data().get("regions", {}).get(String(id), {}).get("bleed", 0.0))
+
+## Aspect ratio (w / h) of a supplied region, or 1.0 if unknown.
+static func ui_aspect(id: StringName) -> float:
+	var rect: Array = _ui_atlas_data().get("regions", {}).get(String(id), {}).get("rect", [])
+	if rect.size() == 4 and float(rect[3]) > 0.0:
+		return float(rect[2]) / float(rect[3])
+	return 1.0
+
 ## Real recorded music tracks (2026-09-05 polish pass) — the first sampled
 ## audio in the project; everything else is still synthesized at runtime
 ## (see music_director.gd). `music_gameplay_theme` (the louder, more
@@ -292,8 +391,8 @@ static func audit() -> Dictionary:
 	return {"present": present, "missing": missing, "total": _PATHS.size()}
 
 func _ready() -> void:
-	var a := audit()
-	if a["missing"].is_empty():
-		print("[Assets] %d/%d textures loaded" % [a["present"].size(), a["total"]])
-	else:
-		push_warning("[Assets] missing %d textures: %s" % [a["missing"].size(), a["missing"]])
+	# NB: the old boot-time 74-texture presence audit LOADED every texture —
+	# several seconds of cold decode that stalled the Rectangle Studio splash.
+	# It was a diagnostic only (test_assets.gd calls audit() directly), so it
+	# is no longer run at startup. Textures load lazily on first tex() use.
+	pass

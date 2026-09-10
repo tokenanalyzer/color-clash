@@ -29,3 +29,7 @@ firebase-debug.log
 # Generated Firebase files
 backend/.firebase/
 backend/node_modules/
+
+# Python
+__pycache__/
+*.pyc

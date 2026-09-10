@@ -47,7 +47,7 @@ func _initialize() -> void:
 	var gd = get_root().get_node("GameData")
 	# a mid-game level: has a big score target so a couple of seeded connects
 	# can't instantly finish it, and it has obstacles + 5 colours.
-	await app._go_to_level(16)
+	app._debug_start_authored_level(16)
 	await _frames(40)
 	await _shot("03_gameplay")
 
@@ -90,7 +90,7 @@ func _initialize() -> void:
 	await _shot("05_win")
 
 	app._hud.hide_end_panel()
-	await app._go_to_level(gd.levels.first_level_id())
+	app._debug_start_authored_level(gd.levels.first_level_id())
 	await _frames(20)
 	app._hud.show_pause_panel(true)
 	await _frames(25)
@@ -138,7 +138,7 @@ func _initialize() -> void:
 
 	# Time bomb level
 	board.set_fever(false)
-	await app._go_to_level(38)
+	app._debug_start_authored_level(38)
 	await _frames(40)
 	await _shot("10_timebomb_level")
 

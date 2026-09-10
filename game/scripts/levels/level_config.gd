@@ -19,6 +19,12 @@ var starting_moves: int
 var difficulty_rank: int = 1
 var objectives: Array[Dictionary] = []
 var obstacles: Array[Dictionary] = []
+## Escort specials seated on the board at level start: [{x, y, type}].
+## `type` is currently always "relic" (the Love Crystal).
+var specials: Array[Dictionary] = []
+## AssetLibrary env id for this level's in-level backdrop. Empty -> the
+## backdrop falls back to its per-island / per-band default.
+var env: StringName = &""
 var reward_coins: int
 var difficulty: String
 ## Ascending score thresholds [s1, s2, s3] for the 1/2/3-star rating. Empty
@@ -43,6 +49,9 @@ static func from_dict(d: Dictionary) -> LevelConfig:
 		lc.objectives.append(o)
 	for ob in d.get("obstacles", []):
 		lc.obstacles.append(ob)
+	for sp in d.get("specials", []):
+		lc.specials.append(sp)
+	lc.env = StringName(String(d.get("env", "")))
 	lc.reward_coins = int((d.get("reward", {}) as Dictionary).get("coins", 0))
 	lc.difficulty = String(d.get("difficulty", "normal"))
 	for s in d.get("star_scores", []):

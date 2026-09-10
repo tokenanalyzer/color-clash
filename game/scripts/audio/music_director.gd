@@ -23,20 +23,33 @@ var _ambient_id: StringName = &""
 var _ambient_tween: Tween
 
 func _ready() -> void:
+	# Create the (cheap) layer player nodes now. Their loop buffers are
+	# SYNTHESISED LAZILY on the first start() — runtime music synthesis of
+	# every layer used to block startup for seconds (it stalled the Rectangle
+	# Studio splash even when deferred). start() only runs once actual level
+	# play begins, well after the menu.
 	for layer_id in GameData.music.layers.keys():
 		var player := AudioStreamPlayer.new()
 		player.bus = AudioSettings.MUSIC_BUS
 		player.volume_db = -80.0
 		add_child(player)
-		var buf := MusicLayerBuilder.build(GameData.music, StringName(String(layer_id)))
-		if not buf.is_empty():
-			player.stream = Synth.build_wav(buf, true)
 		_layer_players[layer_id] = player
 
 	_ambient_player = AudioStreamPlayer.new()
 	_ambient_player.bus = AudioSettings.MUSIC_BUS
 	_ambient_player.volume_db = -80.0
 	add_child(_ambient_player)
+
+## Builds every layer's seamless loop buffer (runtime synthesis). Called
+## lazily from start() so it never touches the boot / branding-splash path.
+func _ensure_layers_synthesised() -> void:
+	for layer_id in _layer_players.keys():
+		var player: AudioStreamPlayer = _layer_players[layer_id]
+		if player.stream != null:
+			continue
+		var buf := MusicLayerBuilder.build(GameData.music, StringName(String(layer_id)))
+		if not buf.is_empty():
+			player.stream = Synth.build_wav(buf, true)
 
 ## Crossfades to a real looping ambient track (AssetLibrary.audio() id) for
 ## a non-gameplay screen (menu/map). Calling it again with the same `id` is
@@ -80,6 +93,7 @@ func start() -> void:
 	if _started:
 		return
 	_started = true
+	_ensure_layers_synthesised()   # lazy runtime synth — kept off the boot path
 	for p in _layer_players.values():
 		var player: AudioStreamPlayer = p
 		if player.stream != null:

@@ -11,8 +11,13 @@ run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4")
 config/icon="res://icon.png"
 run/max_fps=60
-boot_splash/bg_color=Color(0.02, 0.03, 0.07, 1)
-boot_splash/show_image=true
+; Engine boot frame + Android system-splash background are the near-white of
+; the Rectangle Studio branding splash (#fbfdff) so the very first pixels
+; match it — no white flash, and no poster pre-flash (the poster is now the
+; SECOND startup screen only, drawn by SplashScreen). The launcher icon that
+; Android shows on the system splash is unrelated and left as-is.
+boot_splash/bg_color=Color(0.984, 0.992, 1.0, 1)
+boot_splash/show_image=false
 boot_splash/image="res://assets/branding/splash.png"
 boot_splash/fullsize=true
 boot_splash/use_filter=true
@@ -25,6 +30,7 @@ AudioSettings="*res://scripts/audio/audio_settings.gd"
 Economy="*res://scripts/economy/economy_service.gd"
 Boosters="*res://scripts/economy/booster_inventory.gd"
 Progress="*res://scripts/economy/progress_service.gd"
+IslandProgress="*res://scripts/economy/island_progress.gd"
 Inventory="*res://scripts/economy/inventory_service.gd"
 Audio="*res://scripts/audio/audio_hooks.gd"
 Music="*res://scripts/audio/music_director.gd"

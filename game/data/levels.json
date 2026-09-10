@@ -15,6 +15,7 @@
       "move_limit": 30,
       "difficulty": "tutorial",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "reach_score",
@@ -46,6 +47,7 @@
       "move_limit": 30,
       "difficulty": "tutorial",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "clear_color",
@@ -78,6 +80,7 @@
       "move_limit": 30,
       "difficulty": "tutorial",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "create_powers",
@@ -110,10 +113,16 @@
       "move_limit": 30,
       "difficulty": "tutorial",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 20
+        },
+        {
           "type": "reach_score",
-          "target": 5500
+          "target": 5000
         }
       ],
       "obstacles": [
@@ -159,11 +168,12 @@
       "move_limit": 30,
       "difficulty": "tutorial",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "blue",
-          "target": 22
+          "type": "break_obstacles",
+          "obstacle": "wooden_crate",
+          "target": 3
         }
       ],
       "obstacles": [
@@ -193,7 +203,8 @@
       ],
       "reward": {
         "coins": 150
-      }
+      },
+      "hint": "Wooden Crates break in one hit \u2014 clear a jewel on top of one."
     },
     {
       "id": 6,
@@ -210,11 +221,17 @@
       "move_limit": 30,
       "difficulty": "easy",
       "difficulty_rank": 1,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "break_obstacles",
           "obstacle": "wooden_crate",
-          "target": 4
+          "target": 3
+        },
+        {
+          "type": "clear_color",
+          "color": "yellow",
+          "target": 18
         }
       ],
       "obstacles": [
@@ -250,8 +267,7 @@
       ],
       "reward": {
         "coins": 166
-      },
-      "hint": "Wooden Crates break in one hit \u2014 clear a jewel on top of one."
+      }
     },
     {
       "id": 7,
@@ -268,15 +284,16 @@
       "move_limit": 30,
       "difficulty": "easy",
       "difficulty_rank": 2,
+      "env": "env_floating_islands",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 24
+          "type": "create_powers",
+          "power": "any",
+          "target": 3
         },
         {
           "type": "reach_score",
-          "target": 8500
+          "target": 8000
         }
       ],
       "obstacles": [
@@ -329,16 +346,17 @@
       "move_limit": 30,
       "difficulty": "easy",
       "difficulty_rank": 2,
+      "env": "env_floating_islands",
       "objectives": [
         {
-          "type": "create_powers",
-          "power": "any",
-          "target": 3
+          "type": "deliver",
+          "special": "relic",
+          "target": 1
         },
         {
-          "type": "break_obstacles",
-          "obstacle": "any",
-          "target": 4
+          "type": "clear_color",
+          "color": "red",
+          "target": 16
         }
       ],
       "obstacles": [
@@ -374,7 +392,15 @@
       ],
       "reward": {
         "coins": 198
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 5,
+          "y": 1
+        }
+      ],
+      "hint": "Free the Love Crystal \u2014 clear jewels beneath it so it can fall to the bottom."
     },
     {
       "id": 9,
@@ -391,6 +417,7 @@
       "move_limit": 30,
       "difficulty": "easy",
       "difficulty_rank": 2,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "break_obstacles",
@@ -399,7 +426,7 @@
         },
         {
           "type": "clear_color",
-          "color": "yellow",
+          "color": "blue",
           "target": 20
         }
       ],
@@ -454,15 +481,21 @@
       "move_limit": 32,
       "difficulty": "easy",
       "difficulty_rank": 2,
+      "env": "env_floating_islands",
       "objectives": [
         {
           "type": "reach_score",
-          "target": 13000
+          "target": 12000
         },
         {
           "type": "clear_color",
           "color": "red",
-          "target": 20
+          "target": 22
+        },
+        {
+          "type": "break_obstacles",
+          "obstacle": "any",
+          "target": 3
         }
       ],
       "obstacles": [
@@ -486,14 +519,14 @@
         }
       ],
       "star_scores": [
-        13000,
-        20500,
-        31000
+        12000,
+        19500,
+        29000
       ],
       "reward": {
         "coins": 230
       },
-      "hint": "Boss ahead \u2014 every match powers Jamie's attack."
+      "hint": "Chapter finale \u2014 finish every goal to drive the villain off."
     },
     {
       "id": 11,
@@ -510,6 +543,7 @@
       "move_limit": 29,
       "difficulty": "easy",
       "difficulty_rank": 2,
+      "env": "env_crystal_formations",
       "objectives": [
         {
           "type": "clear_color",
@@ -577,16 +611,17 @@
       "move_limit": 29,
       "difficulty": "easy",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
-        {
-          "type": "clear_color",
-          "color": "blue",
-          "target": 27
-        },
         {
           "type": "break_obstacles",
           "obstacle": "magic_chain",
           "target": 3
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 27
         }
       ],
       "obstacles": [
@@ -645,6 +680,7 @@
       "move_limit": 29,
       "difficulty": "medium",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
         {
           "type": "create_powers",
@@ -695,7 +731,8 @@
       ],
       "reward": {
         "coins": 278
-      }
+      },
+      "hint": "Frozen Crystals need two hits \u2014 any clear that touches them counts."
     },
     {
       "id": 14,
@@ -712,16 +749,17 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 1
+        },
         {
           "type": "clear_color",
           "color": "red",
           "target": 29
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 21
         }
       ],
       "obstacles": [
@@ -763,7 +801,14 @@
       ],
       "reward": {
         "coins": 294
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 3
+        }
+      ]
     },
     {
       "id": 15,
@@ -780,6 +825,7 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
         {
           "type": "clear_color",
@@ -849,16 +895,16 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 31
+          "type": "reach_score",
+          "target": 12500
         },
         {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 22
+          "type": "create_powers",
+          "power": "any",
+          "target": 4
         }
       ],
       "obstacles": [
@@ -919,20 +965,21 @@
       "move_limit": 27,
       "difficulty": "medium",
       "difficulty_rank": 3,
+      "env": "env_crystal_formations",
       "objectives": [
         {
+          "type": "break_obstacles",
+          "obstacle": "magic_chain",
+          "target": 1
+        },
+        {
           "type": "clear_color",
-          "color": "blue",
+          "color": "red",
           "target": 32
         },
         {
           "type": "reach_score",
           "target": 12000
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "magic_chain",
-          "target": 1
         }
       ],
       "obstacles": [
@@ -998,21 +1045,17 @@
       "move_limit": 27,
       "difficulty": "medium",
       "difficulty_rank": 4,
+      "env": "env_crystal_formations",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 33
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 24
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "magic_chain",
+          "type": "deliver",
+          "special": "relic",
           "target": 1
+        },
+        {
+          "type": "create_powers",
+          "power": "any",
+          "target": 4
         }
       ],
       "obstacles": [
@@ -1060,7 +1103,14 @@
       ],
       "reward": {
         "coins": 358
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 3,
+          "y": 4
+        }
+      ]
     },
     {
       "id": 19,
@@ -1078,6 +1128,7 @@
       "move_limit": 27,
       "difficulty": "medium",
       "difficulty_rank": 4,
+      "env": "env_crystal_formations",
       "objectives": [
         {
           "type": "clear_color",
@@ -1090,9 +1141,9 @@
           "target": 24
         },
         {
-          "type": "create_powers",
-          "power": "any",
-          "target": 4
+          "type": "break_obstacles",
+          "obstacle": "magic_chain",
+          "target": 1
         }
       ],
       "obstacles": [
@@ -1158,15 +1209,21 @@
       "move_limit": 31,
       "difficulty": "medium",
       "difficulty_rank": 4,
+      "env": "env_crystal_formations",
       "objectives": [
         {
           "type": "reach_score",
-          "target": 18000
+          "target": 17500
+        },
+        {
+          "type": "break_obstacles",
+          "obstacle": "any",
+          "target": 5
         },
         {
           "type": "clear_color",
           "color": "red",
-          "target": 25
+          "target": 35
         }
       ],
       "obstacles": [
@@ -1202,9 +1259,9 @@
         }
       ],
       "star_scores": [
-        18000,
-        29000,
-        43500
+        17500,
+        28000,
+        42000
       ],
       "reward": {
         "coins": 390
@@ -1226,6 +1283,7 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 4,
+      "env": "env_large_structures",
       "objectives": [
         {
           "type": "clear_color",
@@ -1292,16 +1350,17 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 4,
+      "env": "env_large_structures",
       "objectives": [
-        {
-          "type": "clear_color",
-          "color": "blue",
-          "target": 35
-        },
         {
           "type": "break_obstacles",
           "obstacle": "cursed_stone",
           "target": 3
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 35
         }
       ],
       "obstacles": [
@@ -1358,6 +1417,7 @@
       "move_limit": 28,
       "difficulty": "medium",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
         {
           "type": "create_powers",
@@ -1423,16 +1483,17 @@
       "move_limit": 27,
       "difficulty": "medium",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 1
+        },
         {
           "type": "clear_color",
           "color": "red",
           "target": 37
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 27
         }
       ],
       "obstacles": [
@@ -1471,7 +1532,15 @@
       ],
       "reward": {
         "coins": 454
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 4
+        }
+      ],
+      "hint": "Two Love Crystals \u2014 bring both down before the moves run out."
     },
     {
       "id": 25,
@@ -1489,6 +1558,7 @@
       "move_limit": 27,
       "difficulty": "hard",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
         {
           "type": "clear_color",
@@ -1555,21 +1625,21 @@
       "move_limit": 27,
       "difficulty": "hard",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 39
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 28
+          "type": "reach_score",
+          "target": 15500
         },
         {
           "type": "create_powers",
           "power": "any",
           "target": 5
+        },
+        {
+          "type": "clear_color",
+          "color": "yellow",
+          "target": 28
         }
       ],
       "obstacles": [
@@ -1626,20 +1696,21 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
         {
+          "type": "break_obstacles",
+          "obstacle": "cursed_stone",
+          "target": 3
+        },
+        {
           "type": "clear_color",
-          "color": "blue",
+          "color": "red",
           "target": 40
         },
         {
           "type": "reach_score",
           "target": 15000
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "cursed_stone",
-          "target": 3
         }
       ],
       "obstacles": [
@@ -1714,21 +1785,17 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 5,
+      "env": "env_large_structures",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 41
+          "type": "deliver",
+          "special": "relic",
+          "target": 1
         },
         {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 30
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "cursed_stone",
-          "target": 3
+          "type": "create_powers",
+          "power": "any",
+          "target": 5
         }
       ],
       "obstacles": [
@@ -1785,7 +1852,14 @@
       ],
       "reward": {
         "coins": 518
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 4,
+          "y": 2
+        }
+      ]
     },
     {
       "id": 29,
@@ -1803,6 +1877,7 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 6,
+      "env": "env_large_structures",
       "objectives": [
         {
           "type": "clear_color",
@@ -1815,9 +1890,9 @@
           "target": 30
         },
         {
-          "type": "create_powers",
-          "power": "any",
-          "target": 5
+          "type": "break_obstacles",
+          "obstacle": "cursed_stone",
+          "target": 3
         }
       ],
       "obstacles": [
@@ -1892,15 +1967,21 @@
       "move_limit": 30,
       "difficulty": "hard",
       "difficulty_rank": 6,
+      "env": "env_large_structures",
       "objectives": [
         {
           "type": "reach_score",
-          "target": 23000
+          "target": 22000
+        },
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 1
         },
         {
           "type": "clear_color",
           "color": "red",
-          "target": 31
+          "target": 43
         }
       ],
       "obstacles": [
@@ -1933,13 +2014,20 @@
         }
       ],
       "star_scores": [
-        23000,
-        36500,
-        55000
+        22000,
+        35500,
+        53000
       ],
       "reward": {
         "coins": 550
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 4,
+          "y": 1
+        }
+      ]
     },
     {
       "id": 31,
@@ -1958,6 +2046,7 @@
       "move_limit": 27,
       "difficulty": "hard",
       "difficulty_rank": 6,
+      "env": "env_clouds_mists",
       "objectives": [
         {
           "type": "clear_color",
@@ -2031,16 +2120,17 @@
       "move_limit": 27,
       "difficulty": "hard",
       "difficulty_rank": 6,
+      "env": "env_clouds_mists",
       "objectives": [
-        {
-          "type": "clear_color",
-          "color": "blue",
-          "target": 45
-        },
         {
           "type": "break_obstacles",
           "obstacle": "cursed_stone",
           "target": 2
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 45
         },
         {
           "type": "create_powers",
@@ -2104,6 +2194,7 @@
       "move_limit": 27,
       "difficulty": "hard",
       "difficulty_rank": 6,
+      "env": "env_clouds_mists",
       "objectives": [
         {
           "type": "create_powers",
@@ -2176,16 +2267,17 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 2
+        },
         {
           "type": "clear_color",
           "color": "red",
           "target": 47
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 34
         },
         {
           "type": "break_obstacles",
@@ -2241,7 +2333,19 @@
       ],
       "reward": {
         "coins": 614
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 2,
+          "y": 2
+        },
+        {
+          "type": "relic",
+          "x": 4,
+          "y": 2
+        }
+      ]
     },
     {
       "id": 35,
@@ -2260,6 +2364,7 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
         {
           "type": "clear_color",
@@ -2344,21 +2449,21 @@
       "move_limit": 26,
       "difficulty": "hard",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 49
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 35
+          "type": "reach_score",
+          "target": 15000
         },
         {
           "type": "create_powers",
           "power": "any",
           "target": 6
+        },
+        {
+          "type": "clear_color",
+          "color": "yellow",
+          "target": 35
         }
       ],
       "obstacles": [
@@ -2428,20 +2533,21 @@
       "move_limit": 25,
       "difficulty": "hard",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
         {
+          "type": "break_obstacles",
+          "obstacle": "cursed_stone",
+          "target": 3
+        },
+        {
           "type": "clear_color",
-          "color": "blue",
+          "color": "red",
           "target": 50
         },
         {
           "type": "reach_score",
           "target": 14500
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "cursed_stone",
-          "target": 3
         }
       ],
       "obstacles": [
@@ -2511,16 +2617,17 @@
       "move_limit": 25,
       "difficulty": "hard",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 51
+          "type": "deliver",
+          "special": "relic",
+          "target": 2
         },
         {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 37
+          "type": "create_powers",
+          "power": "any",
+          "target": 6
         },
         {
           "type": "break_obstacles",
@@ -2576,7 +2683,20 @@
       ],
       "reward": {
         "coins": 678
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 4,
+          "y": 4
+        },
+        {
+          "type": "relic",
+          "x": 2,
+          "y": 4
+        }
+      ],
+      "hint": "Shadow Barriers take two separate power blasts to shatter."
     },
     {
       "id": 39,
@@ -2595,6 +2715,7 @@
       "move_limit": 25,
       "difficulty": "expert",
       "difficulty_rank": 7,
+      "env": "env_clouds_mists",
       "objectives": [
         {
           "type": "clear_color",
@@ -2607,9 +2728,9 @@
           "target": 37
         },
         {
-          "type": "create_powers",
-          "power": "any",
-          "target": 6
+          "type": "break_obstacles",
+          "obstacle": "cursed_stone",
+          "target": 3
         }
       ],
       "obstacles": [
@@ -2679,20 +2800,21 @@
       "move_limit": 29,
       "difficulty": "expert",
       "difficulty_rank": 8,
+      "env": "env_clouds_mists",
       "objectives": [
         {
           "type": "reach_score",
-          "target": 27000
+          "target": 26000
+        },
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 2
         },
         {
           "type": "clear_color",
           "color": "red",
-          "target": 38
-        },
-        {
-          "type": "create_powers",
-          "power": "any",
-          "target": 4
+          "target": 53
         }
       ],
       "obstacles": [
@@ -2732,13 +2854,25 @@
         }
       ],
       "star_scores": [
-        27000,
-        43500,
-        65000
+        26000,
+        42000,
+        63000
       ],
       "reward": {
         "coins": 710
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 5,
+          "y": 3
+        },
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 4
+        }
+      ]
     },
     {
       "id": 41,
@@ -2757,6 +2891,7 @@
       "move_limit": 26,
       "difficulty": "expert",
       "difficulty_rank": 8,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
           "type": "clear_color",
@@ -2829,7 +2964,7 @@
       "reward": {
         "coins": 726
       },
-      "hint": "Endgame: chain powers together for the score you need."
+      "hint": "Endgame: chain powers together and escort the crystals home."
     },
     {
       "id": 42,
@@ -2848,16 +2983,17 @@
       "move_limit": 26,
       "difficulty": "expert",
       "difficulty_rank": 8,
+      "env": "env_aurora_energy_bands",
       "objectives": [
-        {
-          "type": "clear_color",
-          "color": "blue",
-          "target": 53
-        },
         {
           "type": "break_obstacles",
           "obstacle": "shadow_barrier",
           "target": 1
+        },
+        {
+          "type": "clear_color",
+          "color": "blue",
+          "target": 53
         },
         {
           "type": "create_powers",
@@ -2939,6 +3075,7 @@
       "move_limit": 26,
       "difficulty": "expert",
       "difficulty_rank": 8,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
           "type": "create_powers",
@@ -3029,16 +3166,17 @@
       "move_limit": 25,
       "difficulty": "expert",
       "difficulty_rank": 8,
+      "env": "env_aurora_energy_bands",
       "objectives": [
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 2
+        },
         {
           "type": "clear_color",
           "color": "red",
           "target": 55
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 40
         },
         {
           "type": "break_obstacles",
@@ -3106,7 +3244,19 @@
       ],
       "reward": {
         "coins": 774
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "type": "relic",
+          "x": 5,
+          "y": 4
+        }
+      ]
     },
     {
       "id": 45,
@@ -3125,6 +3275,7 @@
       "move_limit": 25,
       "difficulty": "expert",
       "difficulty_rank": 9,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
           "type": "clear_color",
@@ -3221,21 +3372,21 @@
       "move_limit": 25,
       "difficulty": "expert",
       "difficulty_rank": 9,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 57
-        },
-        {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 41
+          "type": "reach_score",
+          "target": 18000
         },
         {
           "type": "create_powers",
           "power": "any",
           "target": 6
+        },
+        {
+          "type": "clear_color",
+          "color": "yellow",
+          "target": 41
         }
       ],
       "obstacles": [
@@ -3317,20 +3468,21 @@
       "move_limit": 24,
       "difficulty": "expert",
       "difficulty_rank": 9,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
+          "type": "break_obstacles",
+          "obstacle": "shadow_barrier",
+          "target": 2
+        },
+        {
           "type": "clear_color",
-          "color": "blue",
+          "color": "red",
           "target": 58
         },
         {
           "type": "reach_score",
           "target": 17000
-        },
-        {
-          "type": "break_obstacles",
-          "obstacle": "shadow_barrier",
-          "target": 2
         }
       ],
       "obstacles": [
@@ -3418,16 +3570,17 @@
       "move_limit": 24,
       "difficulty": "expert",
       "difficulty_rank": 9,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
-          "type": "clear_color",
-          "color": "red",
-          "target": 59
+          "type": "deliver",
+          "special": "relic",
+          "target": 3
         },
         {
-          "type": "clear_color",
-          "color": "yellow",
-          "target": 42
+          "type": "create_powers",
+          "power": "any",
+          "target": 6
         },
         {
           "type": "break_obstacles",
@@ -3501,7 +3654,24 @@
       ],
       "reward": {
         "coins": 838
-      }
+      },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 3
+        },
+        {
+          "type": "relic",
+          "x": 2,
+          "y": 1
+        },
+        {
+          "type": "relic",
+          "x": 3,
+          "y": 3
+        }
+      ]
     },
     {
       "id": 49,
@@ -3520,6 +3690,7 @@
       "move_limit": 24,
       "difficulty": "expert",
       "difficulty_rank": 9,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
           "type": "clear_color",
@@ -3532,9 +3703,9 @@
           "target": 43
         },
         {
-          "type": "create_powers",
-          "power": "any",
-          "target": 6
+          "type": "break_obstacles",
+          "obstacle": "shadow_barrier",
+          "target": 2
         }
       ],
       "obstacles": [
@@ -3622,20 +3793,21 @@
       "move_limit": 28,
       "difficulty": "expert",
       "difficulty_rank": 10,
+      "env": "env_aurora_energy_bands",
       "objectives": [
         {
           "type": "reach_score",
-          "target": 26000
+          "target": 25500
+        },
+        {
+          "type": "deliver",
+          "special": "relic",
+          "target": 2
         },
         {
           "type": "clear_color",
           "color": "red",
-          "target": 44
-        },
-        {
-          "type": "create_powers",
-          "power": "any",
-          "target": 5
+          "target": 61
         }
       ],
       "obstacles": [
@@ -3675,13 +3847,25 @@
         }
       ],
       "star_scores": [
-        26000,
-        42000,
-        63000
+        25500,
+        40500,
+        61000
       ],
       "reward": {
         "coins": 870
       },
+      "specials": [
+        {
+          "type": "relic",
+          "x": 3,
+          "y": 3
+        },
+        {
+          "type": "relic",
+          "x": 1,
+          "y": 2
+        }
+      ],
       "hint": "Jinn. Everything you've learned. Rescue Jasmine."
     }
   ]

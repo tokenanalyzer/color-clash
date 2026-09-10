@@ -37,35 +37,30 @@ func test_combo_and_ultimate_naming() -> void:
 	check("ultimate does more than a single power",
 		JamiePowers.new().attack_damage(&"ultimate") > JamiePowers.new().attack_damage(&"fire_sword"))
 
-func test_combat_director_flags_boss_stages() -> void:
+func test_combat_director_flags_finale_stages() -> void:
+	# 2026-09-07: `is_boss` now means "chapter finale" (every 10th stage) —
+	# it drives the villain-defeat presentation + boss music, NOT a health
+	# bar. There is no boss HP any more.
 	var c10 := CombatDirector.new(10)
-	check("stage 10 is a boss fight", c10.is_boss)
-	check_eq("stage 10 boss is the Poison Beast", c10.boss_id, &"poison_beast")
-	check_eq("boss starts at full HP", c10.boss_hp, c10.boss_hp_max)
-	check("boss has real HP", c10.boss_hp_max > 0)
+	check("stage 10 is a chapter finale", c10.is_boss)
+	check_eq("stage 10 villain is the Poison Beast", c10.boss_id, &"poison_beast")
+	check("CombatDirector no longer tracks boss HP", not ("boss_hp" in c10))
 	var c50 := CombatDirector.new(50)
-	check("stage 50 is the final boss", c50.is_final_boss())
+	check("stage 50 is the final chapter (Jinn)", c50.is_final_boss())
 	var c3 := CombatDirector.new(3)
-	check("a normal stage has no boss", not c3.is_boss)
-	check_eq("normal stage boss HP is 0", c3.boss_hp_max, 0)
+	check("a normal stage is not a finale", not c3.is_boss)
 
-func test_matching_damages_and_eventually_defeats_the_boss() -> void:
+func test_feed_move_builds_energy_without_any_hp_side_effect() -> void:
+	# A finale stage's feed_move builds power-meter energy + emits jamie_attack
+	# exactly like a normal stage — and never emits the (now-dead) HP signals.
 	var c := CombatDirector.new(10)
-	var damaged := [0]
-	var defeated := [false]
-	c.boss_damaged.connect(func(_a, _hp, _mx): damaged[0] += 1)
-	c.boss_defeated.connect(func(): defeated[0] = true)
-	var guard := 0
-	while c.boss_hp > 0 and guard < 60:
-		c.feed_move(_move(12, 1, 3), 3, 12, true, 20)
-		guard += 1
-	check("boss took damage from matches", damaged[0] > 0)
-	check("boss was defeated by matching", defeated[0])
-	check_eq("boss HP floored at 0", c.boss_hp, 0)
-
-func test_boss_attacks_when_moves_run_low() -> void:
-	var c := CombatDirector.new(20)
-	var hit := [false]
-	c.boss_attacked.connect(func(): hit[0] = true)
-	c.feed_move(_move(4, 0, 1), 1, 4, true, 2)   # moves_left <= 3, boss still alive
-	check("boss counter-attacks near fail", hit[0])
+	var hp_signal := [false]
+	c.boss_damaged.connect(func(_a, _hp, _mx): hp_signal[0] = true)
+	c.boss_defeated.connect(func(): hp_signal[0] = true)
+	c.boss_attacked.connect(func(): hp_signal[0] = true)
+	var attacks := [0]
+	c.jamie_attack.connect(func(_k, _d, _b): attacks[0] += 1)
+	for i in 8:
+		c.feed_move(_move(12, 1, 3), 3, 12, true, 2)   # low moves_left too
+	check("feed_move drives Jamie attacks", attacks[0] == 8)
+	check("no boss-HP signal ever fires on a finale stage", not hp_signal[0])

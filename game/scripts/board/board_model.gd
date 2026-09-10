@@ -78,13 +78,33 @@ func set_obstacle(pos: Vector2i, obstacle_id: StringName, hp: int) -> void:
 	if CellData.family_of(obstacle_id) == &"lock":
 		cell.locked_empty = true
 
+## Seats an escort special (the Love Crystal, &"relic") on a cell before the
+## board is generated. The cell then holds no colour, is not selectable, and
+## only ever falls with gravity toward delivery at the bottom row.
+func set_special(pos: Vector2i, special_id: StringName) -> void:
+	var cell := get_cell(pos)
+	if cell == null:
+		return
+	cell.special_id = special_id
+	cell.color_id = CellData.COLOR_EMPTY
+	cell.power_id = CellData.POWER_NONE
+
+## Every board position currently carrying an escort special.
+func special_positions() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for x in width:
+		for y in height:
+			if _grid[x][y].has_special():
+				out.append(Vector2i(x, y))
+	return out
+
 ## Fills every fillable empty cell with a random color from available_colors.
 ## Stone and still-locked cells are skipped (they hold no piece).
 func generate(rng: RandomNumberGenerator, available_colors: Array[StringName]) -> void:
 	for x in width:
 		for y in height:
 			var cell: CellData = _grid[x][y]
-			if cell.is_stone() or cell.locked_empty:
+			if cell.is_stone() or cell.locked_empty or cell.has_special():
 				continue
 			cell.color_id = available_colors[rng.randi_range(0, available_colors.size() - 1)]
 
@@ -231,7 +251,13 @@ func unlock_neighbors(pos: Vector2i) -> Array[Vector2i]:
 	return unlocked
 
 ## Compacts pieces downward per column, stopping at stone/locked blockers.
-## Returns the list of {from, to} moves for the view layer to animate.
+## Escort specials (&"relic") fall the same way; any special that ends up in
+## the bottom row is DELIVERED (removed) on this same pass.
+##
+## Returns the list of moves for the view layer to animate. A plain piece
+## move is `{from, to}`; a special that moved carries `special`; a special
+## that was delivered carries `{from, to, special, delivered = true}` with
+## `to` == the bottom-row cell it left from.
 func apply_gravity() -> Array[Dictionary]:
 	var moves: Array[Dictionary] = []
 	for x in width:
@@ -241,16 +267,31 @@ func apply_gravity() -> Array[Dictionary]:
 			if cell.is_stone() or cell.locked_empty:
 				write_y = y - 1
 				continue
-			if cell.is_empty():
+			if not cell.has_movable_content():
 				continue
 			if y != write_y:
 				var target: CellData = _grid[x][write_y]
 				target.color_id = cell.color_id
 				target.power_id = cell.power_id
+				target.special_id = cell.special_id
+				var was_special := cell.has_special()
 				cell.color_id = CellData.COLOR_EMPTY
 				cell.power_id = CellData.POWER_NONE
-				moves.append({"from": Vector2i(x, y), "to": Vector2i(x, write_y)})
+				cell.special_id = CellData.SPECIAL_NONE
+				var m := {"from": Vector2i(x, y), "to": Vector2i(x, write_y)}
+				if was_special:
+					m["special"] = target.special_id
+				moves.append(m)
 			write_y -= 1
+		# deliver any special that has come to rest in the bottom row
+		var bottom: CellData = _grid[x][height - 1]
+		if bottom.has_special():
+			var sid := bottom.special_id
+			bottom.special_id = CellData.SPECIAL_NONE
+			moves.append({
+				"from": Vector2i(x, height - 1), "to": Vector2i(x, height - 1),
+				"special": sid, "delivered": true,
+			})
 	return moves
 
 ## Fills empty, fillable cells (top rows after gravity) with new pieces.
@@ -259,7 +300,7 @@ func refill(rng: RandomNumberGenerator, available_colors: Array[StringName], rai
 	for x in width:
 		for y in height:
 			var cell: CellData = _grid[x][y]
-			if cell.is_empty() and not cell.is_stone() and not cell.locked_empty:
+			if cell.is_empty() and not cell.is_stone() and not cell.locked_empty and not cell.has_special():
 				if rainbow_chance > 0.0 and rng.randf() < rainbow_chance:
 					cell.color_id = RAINBOW_COLOR_ID
 				else:

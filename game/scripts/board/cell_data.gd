@@ -6,11 +6,19 @@ extends RefCounted
 const COLOR_EMPTY: StringName = &""
 const POWER_NONE: StringName = &"none"
 const OBSTACLE_NONE: StringName = &"none"
+const SPECIAL_NONE: StringName = &""
 
 var color_id: StringName = COLOR_EMPTY
 var power_id: StringName = POWER_NONE
 var obstacle_id: StringName = OBSTACLE_NONE
 var obstacle_hp: int = 0
+## An escort object riding this cell (currently only &"relic" — the Love
+## Crystal the player must bring safely to the bottom of the board). A
+## special holds NO colour piece, is never selectable for a connection, and
+## is never destroyed by a clear/blast — it only ever moves: it falls with
+## gravity like a piece, and is DELIVERED (removed, counts toward a
+## `deliver` objective) once it reaches the bottom row. See BoardModel.
+var special_id: StringName = SPECIAL_NONE
 ## True once a lock obstacle has been fully unlocked and can be refilled.
 var locked_empty: bool = false
 
@@ -22,6 +30,15 @@ func has_power() -> bool:
 
 func has_obstacle() -> bool:
 	return obstacle_id != OBSTACLE_NONE
+
+func has_special() -> bool:
+	return special_id != SPECIAL_NONE
+
+## Anything gravity should carry down a column: a colour piece OR an escort
+## special. (A special cell reports is_empty() == true because it holds no
+## colour, so gravity code must ask this, not is_empty().)
+func has_movable_content() -> bool:
+	return not is_empty() or has_special()
 
 ## Obstacle "family" — the underlying mechanic a themed obstacle id reuses.
 ## The 2026-09-05 difficulty pass introduced new named blockers for variety
@@ -70,6 +87,8 @@ func is_selectable() -> bool:
 		return false
 	if is_stone():
 		return false
+	if has_special():
+		return false
 	if locked_empty:
 		return false
 	return true
@@ -78,11 +97,15 @@ func clear_piece() -> void:
 	color_id = COLOR_EMPTY
 	power_id = POWER_NONE
 
+func clear_special() -> void:
+	special_id = SPECIAL_NONE
+
 func duplicate_cell() -> CellData:
 	var c := CellData.new()
 	c.color_id = color_id
 	c.power_id = power_id
 	c.obstacle_id = obstacle_id
 	c.obstacle_hp = obstacle_hp
+	c.special_id = special_id
 	c.locked_empty = locked_empty
 	return c

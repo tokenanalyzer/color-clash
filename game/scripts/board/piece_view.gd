@@ -14,6 +14,9 @@ var color_id: StringName = CellData.COLOR_EMPTY
 var power_id: StringName = CellData.POWER_NONE
 var obstacle_id: StringName = CellData.OBSTACLE_NONE
 var obstacle_hp: int = 0
+## Escort special riding this cell (&"relic" = the Love Crystal). Drawn as a
+## glowing crystal that gently bobs; never selectable, never cleared.
+var special_id: StringName = CellData.SPECIAL_NONE
 var cell_size: float = 64.0
 var selected: bool = false
 
@@ -47,11 +50,12 @@ const _POWER_GLOW := {
 	&"chain": Color(0.4, 1.0, 0.6),
 }
 
-func configure(p_color_id: StringName, p_power_id: StringName, p_obstacle_id: StringName, p_obstacle_hp: int, p_cell_size: float, palette: PieceColorPalette) -> void:
+func configure(p_color_id: StringName, p_power_id: StringName, p_obstacle_id: StringName, p_obstacle_hp: int, p_cell_size: float, palette: PieceColorPalette, p_special_id: StringName = CellData.SPECIAL_NONE) -> void:
 	color_id = p_color_id
 	power_id = p_power_id
 	obstacle_id = p_obstacle_id
 	obstacle_hp = p_obstacle_hp
+	special_id = p_special_id
 	cell_size = p_cell_size
 	_palette = palette
 	if palette != null and palette.has(color_id):
@@ -65,7 +69,7 @@ func configure(p_color_id: StringName, p_power_id: StringName, p_obstacle_id: St
 	queue_redraw()
 
 func _update_processing() -> void:
-	set_process(power_id != CellData.POWER_NONE or CellData.family_of(obstacle_id) == &"timebomb")
+	set_process(power_id != CellData.POWER_NONE or CellData.family_of(obstacle_id) == &"timebomb" or special_id != CellData.SPECIAL_NONE)
 
 func _process(delta: float) -> void:
 	_phase += delta
@@ -115,6 +119,14 @@ func _blit_tex(tex: Texture2D, k: float = 0.92, y_off: float = 0.0, tint: Color 
 	draw_texture_rect(tex, Rect2(-w * 0.5, -h * 0.5 + y_off, w, h), false, tint)
 
 func _draw() -> void:
+	# Escort special (Love Crystal): drawn on its own, above everything, and
+	# it owns the whole cell — a special cell never also holds a piece.
+	if special_id != CellData.SPECIAL_NONE:
+		_draw_special()
+		if selected:
+			_draw_selection()
+		return
+
 	var has_piece := color_id != CellData.COLOR_EMPTY
 	if not has_piece and obstacle_id == CellData.OBSTACLE_NONE:
 		return
@@ -145,6 +157,32 @@ func _draw() -> void:
 
 	if selected:
 		_draw_selection()
+
+## The Love Crystal escort object: a warm rose glow, the prepared crystal art
+## (or a drawn heart-diamond fallback), gently bobbing so it always reads as
+## the live thing the player is working to save.
+const _SPECIAL_GLOW := Color(1.0, 0.45, 0.62)
+func _draw_special() -> void:
+	var bob := sin(_phase * 2.2) * cell_size * 0.045
+	var pulse := 0.5 + 0.5 * sin(_phase * 3.0)
+	# layered soft glow
+	for i in range(4, 0, -1):
+		var t := float(i) / 4.0
+		draw_circle(Vector2(0, bob), cell_size * 0.62 * t,
+			Color(_SPECIAL_GLOW.r, _SPECIAL_GLOW.g, _SPECIAL_GLOW.b, (0.06 + 0.05 * pulse) * pow(1.0 - t, 1.6)))
+	var tex := AssetLibrary.tex(&"eco_reward_crystal")
+	if tex != null:
+		_blit_tex(tex, 0.86, bob)
+	else:
+		var pts := PackedVector2Array([
+			Vector2(0, -cell_size * 0.42 + bob), Vector2(cell_size * 0.34, bob),
+			Vector2(0, cell_size * 0.42 + bob), Vector2(-cell_size * 0.34, bob),
+		])
+		draw_colored_polygon(pts, Color(1.0, 0.62, 0.78))
+		draw_polyline(pts + PackedVector2Array([pts[0]]), Color(1.0, 0.9, 0.7, 0.9), 2.5, true)
+	# a bright sparkle riding the top
+	var sp := Vector2(cell_size * 0.18, -cell_size * 0.24 + bob)
+	draw_circle(sp, cell_size * (0.03 + 0.02 * pulse), Color(1, 1, 1, 0.7 + 0.3 * pulse))
 
 ## The core faceted-gem body used by every coloured piece.
 func _draw_gem(c_top: Color, c_mid: Color, c_deep: Color, c_rim: Color, c_glow: Color, glow_boost := 1.0) -> void:

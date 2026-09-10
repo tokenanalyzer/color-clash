@@ -1,11 +1,25 @@
 class_name DailyRewardsScreen
 extends Control
-## The 7-day daily-reward calendar, reference-matched: a gold-framed
-## frosted-glass dialog with a banner title, a 4+3 day grid whose tiles read
-## claimed / current / upcoming / locked at a glance, and a large CLAIM
-## button with a claim animation. Streak maths still lives in the pure
+## The 7-day daily-reward calendar. Streak maths still lives in the pure
 ## DailyRewards class; this screen owns the SaveService keys and grants the
 ## reward through Economy/Boosters exactly as before.
+##
+## 2026-09-06 UI asset integration: chrome is the artist-supplied artwork
+## (assets/ui_kit/daily_rewards_elements.png, sliced via AssetLibrary.ui_slice
+## — source PNG untouched). The gold frame is shown at nearly the full
+## portrait width (~10px each side), aspect-locked, never stretched; the
+## DAILY REWARDS ribbon, red ✕, day tiles (baked "DAY N"), reward icons,
+## value pills (baked numbers), BOOST pill and green CLAIM button are all
+## supplied slices. Only the "come back tomorrow" status line is live text
+## (the supplied bar bakes a fixed "Day 5" and can't carry an arbitrary
+## day). Every piece falls back to the previous procedural draw if missing.
+##
+## Value-pill ↔ reward-day mapping (matches DailyRewards.TABLE 1:1):
+##   day 1→100  day 2→150  day 3→BOOST  day 4→250  day 5→BOOST  day 6→400  day 7→600
+## Reward-icon mapping: coin days use the crown coin, day 3 the crystal
+## (the sheet's crossed-swords icon has the green tick composited over it in
+## the source and is NOT cleanly separable), day 5 the rainbow swirl, day 7
+## the second crown.
 
 signal closed()
 
@@ -13,10 +27,11 @@ const KEY_LAST := "daily_last_claim_day"
 const KEY_STREAK := "daily_streak"
 
 var _tiles: Array[DayTile] = []
-var _claim_btn: Button
+var _claim_btn: Control
+var _claim_press: Callable = Callable()
 var _status: Label
 var _state: Dictionary = {}
-var _frame: UiKit.GoldFramePanel
+var _panel: UiKit.AssetFramePanel
 var _scrim: ColorRect
 
 ## Does the player have a daily reward waiting right now? (for the menu badge)
@@ -27,8 +42,6 @@ static func has_claimable() -> bool:
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_track_size()
-	get_viewport().size_changed.connect(_track_size)
 
 	var bg := Backdrop.new()
 	bg.accent = VisualTheme.STAR
@@ -41,95 +54,109 @@ func _ready() -> void:
 	_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_scrim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-
-	_frame = UiKit.GoldFramePanel.new(20)
-	_frame.set_accent(VisualTheme.STAR)
-	_frame.custom_minimum_size = Vector2(600, 0)
-	center.add_child(_frame)
+	_panel = UiKit.AssetFramePanel.new(&"dr_frame", 10.0, 30.0)
+	add_child(_panel)
+	_panel.set_banner(&"dr_title", 0.72)
+	_panel.set_close_x(&"dr_close_x", func():
+		Audio.play(&"button_tap")
+		closed.emit())
+	# Reference match: the 4+3 grid + status + CLAIM are distributed down the
+	# panel (grid near the top, CLAIM near the bottom) instead of crammed up
+	# top. The frame slice is more elongated than the ref mock, so a little
+	# breathing room top and bottom keeps it from reading as top-heavy.
+	_panel.set_content_top(0.015)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 18)
-	_frame.content().add_child(col)
+	col.add_theme_constant_override("separation", 24)
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_panel.content().add_child(col)
+	if AssetLibrary.ui_slice(&"dr_title") == null:
+		col.add_child(VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD))
 
-	# --- ribbon banner title, hung over the frame's top edge (reference
-	# match, 2026-09-05) — a proper pointed-tail ribbon instead of a plain
-	# pill, poking above the panel like a ceremonial plaque + close X ------
-	var title_row := Control.new()
-	title_row.custom_minimum_size = Vector2(0, 40)
-	col.add_child(title_row)
+	# The dr_frame slice is more elongated than the reference mock, so the
+	# whole grid + status + CLAIM block is vertically centred between two
+	# equal expanding spacers — a clean, spacious calendar instead of a
+	# top-crammed grid with a stranded button far below it.
+	var lead := Control.new()
+	lead.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(lead)
 
-	var banner := RibbonBanner.new()
-	banner.anchor_left = 0.5
-	banner.anchor_right = 0.5
-	banner.anchor_top = 0.0
-	banner.anchor_bottom = 0.0
-	banner.offset_left = -170
-	banner.offset_right = 170
-	banner.offset_top = -34
-	banner.offset_bottom = 30
-	title_row.add_child(banner)
-	var title := VisualTheme.label("DAILY REWARDS", VisualTheme.FS_TITLE, Color(1, 1, 1))
-	title.set_anchors_preset(Control.PRESET_FULL_RECT)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	banner.add_child(title)
-
-	var x_btn := UiKit.icon_button(&"close", 52)
-	x_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	x_btn.position = Vector2(4, -30)
-	x_btn.z_index = 5
-	var xsb := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 26)
-	xsb.content_margin_left = 0; xsb.content_margin_right = 0
-	xsb.content_margin_top = 0; xsb.content_margin_bottom = 0
-	x_btn.add_theme_stylebox_override("normal", xsb)
-	x_btn.add_theme_stylebox_override("hover", xsb)
-	x_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		closed.emit()
-	)
-	title_row.add_child(x_btn)
-
-	# --- 4 + 3 day grid ------------------------------------------
-	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 14)
-	grid.add_theme_constant_override("v_separation", 14)
-	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	col.add_child(grid)
+	# --- 4 + 3 day grid — both rows the SAME card size, each row centred.
+	# Every tile is registered with the panel's aspect-fit pass at the same
+	# wfrac/aspect, so all 7 come out identical (ref: DAY 1-4 span the
+	# interior, DAY 5-7 are a centred group of three the same size). wfrac
+	# is kept small enough that 4 cards + gaps never collide.
+	var row1 := HBoxContainer.new()
+	row1.alignment = BoxContainer.ALIGNMENT_CENTER
+	row1.add_theme_constant_override("separation", 24)
+	col.add_child(row1)
+	var row2 := HBoxContainer.new()
+	row2.alignment = BoxContainer.ALIGNMENT_CENTER
+	row2.add_theme_constant_override("separation", 24)
+	col.add_child(row2)
 	for day in range(1, 8):
 		var tile := DayTile.new()
 		tile.day = day
 		tile.reward = DailyRewards.reward_for_day(day)
-		tile.custom_minimum_size = Vector2(128, 142)
-		grid.add_child(tile)
+		UiKit.tag_aspect_fit(tile, 0.66, 0.205)
+		(row1 if day <= 4 else row2).add_child(tile)
 		_tiles.append(tile)
 
-	_status = VisualTheme.label("", VisualTheme.FS_BODY, VisualTheme.TEXT_DIM, 0)
+	var gap := Control.new()
+	gap.custom_minimum_size = Vector2(0, 18)
+	col.add_child(gap)
+
+	_status = VisualTheme.label("", VisualTheme.FS_HEADING, VisualTheme.TEXT, 0)
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(_status)
 
-	_claim_btn = UiKit.button("CLAIM", &"primary", VisualTheme.FS_HEADING)
-	_claim_btn.custom_minimum_size = Vector2(0, 80)
-	_claim_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_claim_btn.pressed.connect(_on_claim)
+	var gap2 := Control.new()
+	gap2.custom_minimum_size = Vector2(0, 44)
+	col.add_child(gap2)
+
+	_claim_btn = _build_claim_button()
 	col.add_child(_claim_btn)
 
+	var trail := Control.new()
+	trail.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(trail)
+
+	_track_size()
+	get_viewport().size_changed.connect(_track_size)
 	refresh()
+
+## Green CLAIM button — supplied art when present, else the old primary
+## button. Returns the node to add; the click wiring is the same either way.
+func _build_claim_button() -> Control:
+	var b := UiKit.asset_button_fw(AssetLibrary.ui_slice(&"dr_btn_claim"), 0.58)
+	if b != null:
+		b.pressed.connect(_on_claim)
+		_claim_press = func(disabled: bool):
+			b.disabled = disabled
+			b.modulate.a = 0.5 if disabled else 1.0
+		return b
+	var pb := UiKit.button("CLAIM", &"primary", VisualTheme.FS_HEADING)
+	pb.custom_minimum_size = Vector2(0, 80)
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.pressed.connect(_on_claim)
+	_claim_press = func(disabled: bool):
+		pb.disabled = disabled
+		pb.modulate.a = 0.5 if disabled else 1.0
+	return pb
 
 func _track_size() -> void:
 	var vp := get_viewport_rect().size
 	size = vp
 	custom_minimum_size = vp
+	if _panel != null:
+		_panel.layout(vp)
 
 ## Called by app.gd when the screen becomes visible — play the entrance.
 func play_entrance() -> void:
-	if _frame != null:
-		UiKit.pop_in(_frame)
+	if _panel != null:
+		_track_size()
+		UiKit.pop_in(_panel.visual())
 
 func refresh() -> void:
 	var last := SaveService.get_int(KEY_LAST, -1)
@@ -148,12 +175,12 @@ func refresh() -> void:
 
 	if _state["claimable"]:
 		_status.text = "Day %d reward is ready!" % int(_state["day"])
-		_claim_btn.disabled = false
-		_claim_btn.modulate.a = 1.0
+		if _claim_press.is_valid():
+			_claim_press.call(false)
 	else:
 		_status.text = "Come back tomorrow for Day %d!" % clampi(claimed_through + 1, 1, 7)
-		_claim_btn.disabled = true
-		_claim_btn.modulate.a = 0.5
+		if _claim_press.is_valid():
+			_claim_press.call(true)
 
 func _on_claim() -> void:
 	if not _state.get("claimable", false):
@@ -162,7 +189,6 @@ func _on_claim() -> void:
 	var day := int(_state["day"])
 	var reward: Dictionary = DailyRewards.reward_for_day(day)
 
-	# claim-burst on the current tile
 	for tile in _tiles:
 		if tile.day == day:
 			tile.play_claim_burst()
@@ -185,130 +211,188 @@ func _on_claim() -> void:
 	RewardPopup.present(self, popup_rewards, {"title": "Day %d Reward" % day})
 
 
-## One day cell in the calendar. States: claimed | current | upcoming | future.
+## One day cell in the calendar, built from the supplied tile / icon / pill
+## slices. States: claimed | current | upcoming | future — the state only
+## changes tint/overlay, never the artwork. Falls back to a code-drawn tile
+## when the sheet is missing.
 class DayTile extends Control:
 	var day := 1
 	var reward: Dictionary = {}
 	var state: StringName = &"future"
-	var _t := 0.0
-	var _burst := 0.0
+
+	var _bg: TextureRect
+	var _icon: TextureRect
+	var _pill: Control
+	var _check: TextureRect
+	var _fx: _TileFx
+	var _has_art := false
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bg_tex := AssetLibrary.ui_slice(StringName("dr_tile_day%d" % clampi(day, 1, 7)))
+		_has_art = bg_tex != null
+		if _has_art:
+			_bg = TextureRect.new()
+			_bg.texture = bg_tex
+			_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+			_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_bg)
+
+			_icon = TextureRect.new()
+			_icon.texture = _reward_icon()
+			_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			add_child(_icon)
+
+			_pill = UiKit.asset_rect(_value_pill_id())
+			if _pill != null:
+				# asset_rect floors the size at the native texture width — clear
+				# it so _relayout() can shrink the pill to fit inside the card.
+				_pill.custom_minimum_size = Vector2.ZERO
+				_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+				add_child(_pill)
+
+			_check = TextureRect.new()
+			_check.texture = AssetLibrary.ui_slice(&"dr_icon_check")
+			_check.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			_check.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			_check.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_check.visible = false
+			add_child(_check)
+
+		_fx = _TileFx.new()
+		_fx.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_fx)
+		resized.connect(_relayout)
+		_relayout()
+		_apply_state()
+
+	func _reward_icon() -> Texture2D:
+		match day:
+			3: return AssetLibrary.ui_slice(&"dr_icon_crystal")
+			5: return AssetLibrary.ui_slice(&"dr_icon_rainbow")
+			7: return AssetLibrary.ui_slice(&"dr_icon_crown_b")
+			_: return AssetLibrary.ui_slice(&"dr_icon_crown_a")
+
+	func _value_pill_id() -> StringName:
+		match day:
+			1: return &"dr_pill_100"
+			2: return &"dr_pill_150"
+			3: return &"dr_btn_boost"
+			4: return &"dr_pill_250"
+			5: return &"dr_btn_boost"
+			6: return &"dr_pill_400"
+			_: return &"dr_pill_600"
+
+	func _relayout() -> void:
+		if not _has_art:
+			return
+		var w := size.x
+		var h := size.y
+		# Proportions read off Daily Reward Panel Reference.png: baked "DAY N"
+		# occupies the top ~18% of the card, the reward icon is centred at
+		# ~45% height, the value pill sits at ~80%, the claimed ✓ overlaps the
+		# bottom-right and spills slightly past the card edge.
+		if _icon != null:
+			var d := w * 0.50
+			_icon.size = Vector2(d, d)
+			_icon.position = Vector2((w - d) * 0.5, h * 0.21)
+		if _pill != null:
+			var pw := w * 0.72
+			var ph := pw / 2.1
+			_pill.size = Vector2(pw, ph)
+			_pill.position = Vector2((w - pw) * 0.5, h * 0.78 - ph * 0.5)
+		if _check != null:
+			# tucked into the card's bottom-right corner, clear of the value
+			# pill (matches the reference)
+			var cs := w * 0.34
+			_check.size = Vector2(cs, cs)
+			_check.position = Vector2(w - cs * 0.88, h * 0.66)
 
 	func set_state(s: StringName) -> void:
 		state = s
-		set_process(s == &"current" or _burst > 0.0)
-		queue_redraw()
+		_apply_state()
+
+	func _apply_state() -> void:
+		if _fx != null:
+			_fx.current = state == &"current"
+			_fx.set_process(state == &"current" or _fx._burst > 0.0)
+			_fx.queue_redraw()
+		if not _has_art:
+			queue_redraw()
+			return
+		var dim := state == &"future"
+		modulate = Color(1, 1, 1, 0.45) if dim else Color(1, 1, 1, 1)
+		if _check != null:
+			_check.visible = state == &"claimed"
 
 	func play_claim_burst() -> void:
-		_burst = 1.0
-		set_process(true)
-		var t := create_tween()
-		t.tween_method(func(v): _burst = v; queue_redraw(), 1.0, 0.0, 0.7)
-
-	func _process(delta: float) -> void:
-		_t += delta
-		queue_redraw()
+		if _fx != null:
+			_fx.play_burst()
 
 	func _draw() -> void:
+		# fallback tile (no supplied art)
+		if _has_art:
+			return
 		var r := Rect2(Vector2.ZERO, size)
-		var big := day == 7
-		var body := UiKit.GLASS_BG_DEEP
-		var border := UiKit.GLASS_BORDER
+		var body := Color(0.07, 0.08, 0.15, 0.7)
+		var border := Color(1, 1, 1, 0.10)
 		match state:
-			&"claimed":
-				# Same neutral charcoal as every other tile (reference match,
-				# 2026-09-05) — the big check overlay alone signals "claimed",
-				# no separate green-tinted background needed.
-				body = Color(0.07, 0.08, 0.15, 0.7)
-				border = Color(0.4, 0.7, 0.5, 0.35)
-			&"current":
-				var p := 0.5 + 0.5 * sin(_t * 6.0)
-				body = Color(0.17, 0.15, 0.08, 0.95)
-				border = VisualTheme.STAR.lerp(Color(1, 1, 1), p)
-				VisualTheme.draw_glow(self, r.size * 0.5, r.size.x * 0.75, Color(1, 0.85, 0.3, 0.22 + 0.16 * p), 4)
-			&"upcoming":
-				body = Color(0.10, 0.12, 0.22, 0.82)
-				border = Color(0.7, 0.8, 1.0, 0.4)
-			_:
-				body = Color(0.07, 0.08, 0.15, 0.7)
-				border = Color(1, 1, 1, 0.10)
-		_round_rect(r, 16.0, body)
-		# Day 7 "hero" treatment (2026-09-05 UI pass) — the streak payoff gets
-		# a gold outline of its own regardless of claim state, not just a
-		# bigger coin icon, so it visually reads as the grand prize.
-		if big and state != &"current":
-			border = border.lerp(UiKit.GOLD, 0.6)
-		var rp := ShapeDrawUtils.rounded_rect_points(r.size, 16.0, 5)
-		var moved := PackedVector2Array()
-		for pt in rp:
-			moved.append(pt + r.size * 0.5)
-		moved.append(moved[0])
-		draw_polyline(moved, border, 3.0 if (state == &"current" or big) else 2.0, true)
-
-		var font := ThemeDB.fallback_font
-		draw_string(font, Vector2(11, 25), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, VisualTheme.FS_MICRO,
-			VisualTheme.STAR if (big or state == &"current") else VisualTheme.TEXT_DIM)
-
-		var c := Vector2(r.size.x * 0.5, r.size.y * 0.55)
-		var dim := state == &"future"
-		var mod := Color(1, 1, 1, 0.4) if dim else Color(1, 1, 1)
-		var boosters: Dictionary = reward.get("boosters", {})
-		if boosters.size() > 0:
-			var bid := StringName(String(boosters.keys()[0]))
-			var ptex := AssetLibrary.power(bid)
-			if ptex != null:
-				var d := 54.0
-				var m: float = maxf(float(ptex.get_width()), float(ptex.get_height()))
-				draw_texture_rect(ptex, Rect2(c - Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m) * 0.5,
-					Vector2(d * ptex.get_width() / m, d * ptex.get_height() / m)), false, mod)
-			else:
-				IconDraw.draw_icon(self, bid, c, 40.0)
-		else:
-			var coin_tex := AssetLibrary.tex(&"eco_coin_stack" if big else &"eco_gold_coin")
-			if coin_tex != null:
-				var d := 60.0 if big else 48.0
-				var m: float = maxf(float(coin_tex.get_width()), float(coin_tex.get_height()))
-				draw_texture_rect(coin_tex, Rect2(c - Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m) * 0.5,
-					Vector2(d * coin_tex.get_width() / m, d * coin_tex.get_height() / m)), false, mod)
-			else:
-				draw_circle(c, 21.0, VisualTheme.COIN)
-
-		var amt := int(reward.get("coins", 0))
-		var lbl := ("%d" % amt) if amt > 0 else "BOOST"
-		var lfs := VisualTheme.FS_CAPTION
-		var ls := font.get_string_size(lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs)
-		draw_string_outline(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, 4, Color(0, 0, 0, 0.7))
-		draw_string(font, Vector2(c.x - ls.x * 0.5, r.size.y - 13), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, lfs, VisualTheme.TEXT if not dim else VisualTheme.TEXT_DIM)
-
-		if state == &"claimed":
-			# Bigger green check overlapping the reward icon (reference match,
-			# 2026-09-05) — reads as "claimed" at a glance instead of a small
-			# corner badge that's easy to miss.
-			var bc := Vector2(r.size.x - 22.0, r.size.y * 0.55 - 18.0)
-			draw_circle(bc, 17.0, Color(0.14, 0.4, 0.18))
-			draw_circle(bc, 17.0, Color(0.4, 0.85, 0.5, 0.92))
-			draw_circle(bc, 13.0, Color(0.16, 0.46, 0.22))
-			draw_line(bc + Vector2(-6, 0), bc + Vector2(-1, 5), Color.WHITE, 3.5, true)
-			draw_line(bc + Vector2(-1, 5), bc + Vector2(7, -6), Color.WHITE, 3.5, true)
-
-		if _burst > 0.0:
-			var rad := (1.0 - _burst) * r.size.x * 0.9
-			draw_arc(r.size * 0.5, rad, 0, TAU, 28, Color(1, 0.9, 0.4, _burst), 4.0, true)
-			VisualTheme.draw_glow(self, r.size * 0.5, rad * 0.7, Color(1, 0.85, 0.3, _burst * 0.5), 4)
-
-	func _round_rect(rect: Rect2, radius: float, color: Color) -> void:
-		var pts := ShapeDrawUtils.rounded_rect_points(rect.size, radius, 5)
+			&"claimed": border = Color(0.4, 0.7, 0.5, 0.35)
+			&"current": border = VisualTheme.STAR
+			&"upcoming": border = Color(0.7, 0.8, 1.0, 0.4)
+		var pts := ShapeDrawUtils.rounded_rect_points(r.size, 16.0, 5)
 		var moved := PackedVector2Array()
 		for p in pts:
-			moved.append(p + rect.position + rect.size * 0.5)
-		draw_colored_polygon(moved, color)
+			moved.append(p + r.size * 0.5)
+		draw_colored_polygon(moved, body)
+		moved.append(moved[0])
+		draw_polyline(moved, border, 2.0, true)
+		var font := ThemeDB.fallback_font
+		draw_string(font, Vector2(10, 22), "DAY %d" % day, HORIZONTAL_ALIGNMENT_LEFT, -1, VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM)
+		var amt := int(reward.get("coins", 0))
+		var lbl := ("%d" % amt) if amt > 0 else "BOOST"
+		draw_string(font, Vector2(10, r.size.y - 12), lbl, HORIZONTAL_ALIGNMENT_LEFT, -1, VisualTheme.FS_CAPTION, VisualTheme.TEXT)
+
+	## Highlight/burst effects layer — a glow pulse for the "current" day and
+	## a claim ring. These are transient feedback, never a redraw of the
+	## supplied tile artwork.
+	class _TileFx extends Control:
+		var current := false
+		var _burst := 0.0
+		var _t := 0.0
+
+		func _ready() -> void:
+			mouse_filter = Control.MOUSE_FILTER_IGNORE
+			set_process(false)
+
+		func play_burst() -> void:
+			_burst = 1.0
+			set_process(true)
+			var tw := create_tween()
+			tw.tween_method(func(v): _burst = v; queue_redraw(), 1.0, 0.0, 0.7)
+
+		func _process(delta: float) -> void:
+			_t += delta
+			queue_redraw()
+			if not current and _burst <= 0.0:
+				set_process(false)
+
+		func _draw() -> void:
+			if current:
+				var p := 0.5 + 0.5 * sin(_t * 6.0)
+				VisualTheme.draw_glow(self, size * 0.5, size.x * 0.7, Color(1, 0.85, 0.3, 0.18 + 0.14 * p), 4)
+			if _burst > 0.0:
+				var rad := (1.0 - _burst) * size.x * 0.9
+				draw_arc(size * 0.5, rad, 0, TAU, 28, Color(1, 0.9, 0.4, _burst), 4.0, true)
 
 
-## A pointed-tail ribbon banner (reference match, 2026-09-05) — a purple
-## body with a V-notch cut into each end and small folded "tail" triangles,
-## gold-bordered, standing in for the plain pill title used previously.
+## Pointed-tail ribbon banner — kept only as the fallback title when the
+## supplied DAILY REWARDS ribbon slice is unavailable.
 class RibbonBanner extends Control:
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -317,7 +401,6 @@ class RibbonBanner extends Control:
 		var w := size.x
 		var h := size.y
 		var body := PackedVector2Array([Vector2(0, 0), Vector2(w, 0), Vector2(w, h), Vector2(0, h)])
-		# flared tails beyond each edge, reading as a hanging ribbon's ends
 		var tail_l := PackedVector2Array([Vector2(0, 0), Vector2(0, h), Vector2(-16, h * 0.5)])
 		var tail_r := PackedVector2Array([Vector2(w, 0), Vector2(w, h), Vector2(w + 16, h * 0.5)])
 		draw_colored_polygon(tail_l, UiKit.PURPLE_DEEP)

@@ -28,6 +28,7 @@ const TEST_SCRIPTS := [
 	"res://tests/test_island_assets.gd",
 	"res://tests/test_story_assets.gd",
 	"res://tests/test_enemy_model.gd",
+	"res://tests/test_boss_progression.gd",
 	"res://tests/test_story_data.gd",
 	"res://tests/test_combat_system.gd",
 	"res://tests/test_inventory.gd",
@@ -35,6 +36,12 @@ const TEST_SCRIPTS := [
 	"res://tests/test_jamie_actions.gd",
 	"res://tests/test_jasmine_actor.gd",
 	"res://tests/test_story_scene.gd",
+	"res://tests/test_ui_assets.gd",
+	"res://tests/test_special_object.gd",
+	"res://tests/test_gameplay_progression.gd",
+	"res://tests/test_world_system.gd",
+	"res://tests/test_island_progress.gd",
+	"res://tests/test_startup_splash.gd",
 ]
 
 func _initialize() -> void:

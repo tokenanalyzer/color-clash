@@ -9,7 +9,14 @@ signal closed()
 
 const _TABS := ["POWERS", "BOOSTERS", "EQUIP", "ITEMS"]
 
-var _frame: UiKit.GoldFramePanel
+## 2026-09-06 UI asset integration: no dedicated Inventory panel art was
+## supplied, so per the user's decision this screen reuses the artist's
+## Settings gold-frame slice (assets/ui_kit/settings_elements.png ::
+## settings_frame) as its panel shell + the supplied red ✕, shown at nearly
+## the full portrait width (~10px each side). The tab row, scrolling list
+## and all item cards are unchanged. Falls back to the old GoldFramePanel if
+## the sheet is missing.
+var _panel: UiKit.AssetFramePanel
 var _scrim: ColorRect
 var _body: VBoxContainer
 var _tab_row: HBoxContainer
@@ -21,8 +28,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	z_index = 210
-	_track_size()
-	get_viewport().size_changed.connect(_track_size)
 
 	_scrim = ColorRect.new()
 	_scrim.color = Color(0, 0, 0, 0.62)
@@ -33,40 +38,49 @@ func _ready() -> void:
 			close())
 	add_child(_scrim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-
-	_frame = UiKit.GoldFramePanel.new(18)
-	_frame.custom_minimum_size = Vector2(620, 780)
-	center.add_child(_frame)
+	_panel = UiKit.AssetFramePanel.new(&"settings_frame", 10.0, 34.0)
+	add_child(_panel)
+	# a little top space so the header row clears the frame's corner scrolls
+	_panel.set_content_top(0.045)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 12)
-	_frame.content().add_child(col)
+	col.add_theme_constant_override("separation", 18)
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_panel.content().add_child(col)
+
+	_track_size()
+	get_viewport().size_changed.connect(_track_size)
 
 	var head := HBoxContainer.new()
-	head.add_theme_constant_override("separation", 10)
+	head.add_theme_constant_override("separation", 14)
 	col.add_child(head)
 	var title := VisualTheme.label("INVENTORY", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(title)
-	_coins_label = VisualTheme.label("", VisualTheme.FS_LABEL, VisualTheme.TEXT_GOLD)
+	_coins_label = VisualTheme.label("", VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD)
+	_coins_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	head.add_child(_coins_label)
-	var x := UiKit.icon_button(&"close", 48)
-	var xs := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 24)
-	xs.content_margin_left = 0; xs.content_margin_right = 0; xs.content_margin_top = 0; xs.content_margin_bottom = 0
-	x.add_theme_stylebox_override("normal", xs); x.add_theme_stylebox_override("hover", xs)
-	x.pressed.connect(func(): Audio.play(&"button_tap"); close())
-	head.add_child(x)
+	var x_tex := AssetLibrary.ui_slice(&"settings_close_x")
+	if x_tex != null:
+		var xb := UiKit.asset_button(x_tex)
+		xb.custom_minimum_size = Vector2(78, 78)
+		xb.pressed.connect(func(): Audio.play(&"button_tap"); close())
+		head.add_child(xb)
+	else:
+		var x := UiKit.icon_button(&"close", 60)
+		var xs := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 30)
+		xs.content_margin_left = 0; xs.content_margin_right = 0; xs.content_margin_top = 0; xs.content_margin_bottom = 0
+		x.add_theme_stylebox_override("normal", xs); x.add_theme_stylebox_override("hover", xs)
+		x.pressed.connect(func(): Audio.play(&"button_tap"); close())
+		head.add_child(x)
 
 	_tab_row = HBoxContainer.new()
-	_tab_row.add_theme_constant_override("separation", 8)
+	_tab_row.add_theme_constant_override("separation", 10)
 	col.add_child(_tab_row)
 	for i in _TABS.size():
 		var b := UiKit.button(_TABS[i], &"tab_active" if i == 0 else &"tab_inactive", VisualTheme.FS_BUTTON)
-		b.custom_minimum_size = Vector2(0, 52)
+		b.custom_minimum_size = Vector2(0, 74)
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		b.pressed.connect(func(idx = i): Audio.play(&"button_tap"); _tab = idx; _rebuild())
 		_tab_row.add_child(b)
@@ -74,10 +88,10 @@ func _ready() -> void:
 	var sc := ScrollContainer.new()
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	sc.custom_minimum_size = Vector2(560, 560)
+	sc.custom_minimum_size = Vector2(560, 640)
 	col.add_child(sc)
 	_body = VBoxContainer.new()
-	_body.add_theme_constant_override("separation", 10)
+	_body.add_theme_constant_override("separation", 14)
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(_body)
 
@@ -88,17 +102,20 @@ func _track_size() -> void:
 	var vp := get_viewport_rect().size
 	size = vp
 	custom_minimum_size = vp
+	if _panel != null:
+		_panel.layout(vp)
 
 func open() -> void:
 	visible = true
 	_tab = 0
+	_track_size()
 	_rebuild()
 	_scrim.modulate.a = 0.0
 	_scrim.create_tween().tween_property(_scrim, "modulate:a", 1.0, 0.16)
-	UiKit.pop_in(_frame)
+	UiKit.pop_in(_panel.visual())
 
 func close() -> void:
-	var t := UiKit.pop_out(_frame)
+	var t := UiKit.pop_out(_panel.visual())
 	_scrim.create_tween().tween_property(_scrim, "modulate:a", 0.0, 0.16)
 	await t.finished
 	visible = false
@@ -132,7 +149,7 @@ func _row_card() -> PanelContainer:
 ## tabs read as one consistent "item card" system instead of icon-less
 ## plain text rows. `icon_id` is an IconDraw glyph id, or "" for a plain
 ## texture (boosters already have real art via AssetLibrary.power()).
-func _icon_badge(tint: Color, icon_id: StringName, tex: Texture2D = null, size_px: int = 60) -> Control:
+func _icon_badge(tint: Color, icon_id: StringName, tex: Texture2D = null, size_px: int = 82) -> Control:
 	var wrap := PanelContainer.new()
 	wrap.custom_minimum_size = Vector2(size_px, size_px)
 	var sb := StyleBoxFlat.new()
@@ -182,7 +199,7 @@ func _build_powers() -> void:
 		var cost: int = Inventory.power_upgrade_cost(id)
 		var btn := UiKit.button("MAX" if cost < 0 else "UPGRADE  %d¢" % cost,
 			&"primary" if (cost > 0 and Economy.can_afford(cost)) else &"tertiary", VisualTheme.FS_CAPTION)
-		btn.custom_minimum_size = Vector2(180, 64)
+		btn.custom_minimum_size = Vector2(210, 82)
 		btn.disabled = cost < 0 or not Economy.can_afford(cost)
 		btn.pressed.connect(func():
 			if Inventory.upgrade_power(id):
@@ -212,7 +229,7 @@ func _build_boosters() -> void:
 		row.add_child(VisualTheme.label("x %d" % Boosters.get_count(id), VisualTheme.FS_HEADING, VisualTheme.TEXT_GOLD))
 		var buy := UiKit.button("BUY  %d¢" % int(def.get("cost", 0)),
 			&"primary" if Economy.can_afford(int(def.get("cost", 0))) else &"tertiary", VisualTheme.FS_CAPTION)
-		buy.custom_minimum_size = Vector2(150, 64)
+		buy.custom_minimum_size = Vector2(180, 82)
 		buy.disabled = not Economy.can_afford(int(def.get("cost", 0)))
 		buy.pressed.connect(func():
 			if Boosters.purchase(id):
@@ -238,7 +255,7 @@ func _build_equipment() -> void:
 		sb.border_color = UiKit.GOLD if is_eq else (UiKit.GLASS_BORDER if owned else Color(1, 1, 1, 0.08))
 		sb.set_border_width_all(2 if is_eq else 1)
 		card.add_theme_stylebox_override("panel", sb)
-		card.custom_minimum_size = Vector2(170, 150)
+		card.custom_minimum_size = Vector2(210, 186)
 		card.modulate.a = 1.0 if owned else 0.55
 		var v := VBoxContainer.new()
 		v.add_theme_constant_override("separation", 3)
@@ -248,7 +265,7 @@ func _build_equipment() -> void:
 		v.add_child(VisualTheme.label("%s  ·  T%d" % [String(slot).capitalize(), int(e.get("tier", 1))], VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0))
 		var desc := VisualTheme.label(String(e.get("bonus", "")), VisualTheme.FS_MICRO, VisualTheme.TEXT, 0)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.custom_minimum_size = Vector2(150, 46)
+		desc.custom_minimum_size = Vector2(184, 58)
 		v.add_child(desc)
 		if not owned:
 			v.add_child(VisualTheme.label("\U0001f512 boss reward", VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0))
@@ -256,7 +273,7 @@ func _build_equipment() -> void:
 			v.add_child(VisualTheme.label("EQUIPPED", VisualTheme.FS_MICRO, VisualTheme.GOOD, 0))
 		else:
 			var eq := UiKit.button("EQUIP", &"primary", VisualTheme.FS_MICRO)
-			eq.custom_minimum_size = Vector2(0, 40)
+			eq.custom_minimum_size = Vector2(0, 52)
 			eq.pressed.connect(func(): Audio.play(&"button_tap"); Inventory.equip(id))
 			v.add_child(eq)
 		grid.add_child(card)

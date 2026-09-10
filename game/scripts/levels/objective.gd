@@ -1,9 +1,10 @@
 class_name ObjectiveTracker
 extends RefCounted
 ## Evaluates a level's data-driven objectives against running match stats.
-## Supported types: clear_color, reach_score, create_powers, break_obstacles.
-## A level with multiple objectives requires ALL of them complete (mixed
-## objectives), matching docs/GAME_DESIGN.md.
+## Supported types: clear_color, reach_score, create_powers, break_obstacles,
+## deliver (escort the Love Crystal to the bottom of the board). A level with
+## multiple objectives requires ALL of them complete (mixed objectives),
+## matching docs/GAME_DESIGN.md.
 
 var objectives: Array[Dictionary] = []
 var progress: Array[int] = []
@@ -24,7 +25,9 @@ func is_complete() -> bool:
 	return true
 
 ## Feeds one resolved move's stats into every objective's progress.
-func apply_move(colors_cleared: Dictionary, total_score: int, powers_created: Array[Dictionary], obstacles_broken: Array[Dictionary]) -> void:
+## `specials_delivered` is the count of escort specials (Love Crystals) that
+## reached the bottom row this move (ChainResolver.MoveResult.specials_delivered.size()).
+func apply_move(colors_cleared: Dictionary, total_score: int, powers_created: Array[Dictionary], obstacles_broken: Array[Dictionary], specials_delivered: int = 0) -> void:
 	for i in objectives.size():
 		var obj: Dictionary = objectives[i]
 		match String(obj.get("type", "")):
@@ -43,6 +46,8 @@ func apply_move(colors_cleared: Dictionary, total_score: int, powers_created: Ar
 				for o in obstacles_broken:
 					if wanted_obs == "any" or String(o["obstacle_id"]) == wanted_obs:
 						progress[i] += 1
+			"deliver":
+				progress[i] += specials_delivered
 			_:
 				pass
 		progress[i] = min(progress[i], target_for(i))

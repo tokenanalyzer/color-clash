@@ -116,6 +116,12 @@ func _on_phase(event: StringName, action_id: StringName, meta: Dictionary) -> vo
 	var a: Dictionary = _actions.get(String(action_id), {})
 	match event:
 		&"windup_start":
+			# Phase D: the instant-booster beats are not attacks — a light
+			# body anticipation only, no weapon-hand charge glow.
+			if action_id == &"gesture_shuffle" or action_id == &"brace":
+				_move_to(_home + Vector2(-6.0 * _facing, 4.0), 0.1, Tween.TRANS_SINE)
+				_scale_to(Vector2(_facing * 1.03, 0.95), 0.1)
+				return
 			_move_to(_home + Vector2(-16.0 * _facing, 10.0), 0.12, Tween.TRANS_SINE)
 			_scale_to(Vector2(_facing * 1.07, 0.9), 0.12)
 			_rot_to(-0.05 * _facing, 0.12)
@@ -123,6 +129,19 @@ func _on_phase(event: StringName, action_id: StringName, meta: Dictionary) -> vo
 			# just a body lean) — same hand-glow, held through the windup.
 			_hand_flash(a, true, maxf(float(a.get("windup", 0.2)), 0.08))
 		&"strike":
+			# Phase D: instant-booster beats are a self-only flourish — no
+			# lunge, no projectile, no impact on the enemy (their action def
+			# carries enemy_reaction:none, but we also skip the whole
+			# offence path here so nothing spawns over the villain).
+			if action_id == &"gesture_shuffle":
+				_scale_to(Vector2(_facing * 0.97, 1.05), 0.1)
+				_rot_to(0.0, 0.08)
+				_battlefield_sweep()
+				return
+			if action_id == &"brace":
+				_move_to(_home + Vector2(0.0, -8.0), 0.1, Tween.TRANS_SINE)
+				_scale_to(Vector2(_facing * 1.04, 0.96), 0.1)
+				return
 			var sub := StringName(String(meta.get("sub_action", action_id)))
 			var sa: Dictionary = _actions.get(String(sub), a)
 			var lunge := clampf(float(a.get("lunge", 0.4)), -0.35, 0.95)
@@ -240,6 +259,34 @@ func _sword_slash(sa: Dictionary) -> void:
 	t.parallel().tween_property(slash, "rotation", 0.9 * _facing, 0.11).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	t.tween_property(slash, "modulate:a", 0.0, 0.1)
 	t.tween_callback(slash.queue_free)
+
+## Phase D — the Shuffle-booster read: a wide expanding ring sweeping out of
+## Jamie across the whole arena, "stirring" the battlefield. Reuses the
+## shockwave-ring art, tinted cool so it doesn't read as an attack. One
+## tween, self-freeing, capped by _fx_saturated().
+func _battlefield_sweep() -> void:
+	if _fx_saturated() or not is_inside_tree():
+		return
+	var tex := AssetLibrary.tex(&"vfx_shockwave_ring")
+	if tex == null:
+		return
+	var ring := TextureRect.new()
+	ring.texture = tex
+	ring.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ring.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.modulate = Color(0.45, 0.8, 1.0, 0.0)
+	var start := size.y * 0.5
+	ring.size = Vector2(start, start)
+	ring.pivot_offset = ring.size * 0.5
+	ring.position = size * Vector2(0.5, 0.55) - ring.size * 0.5
+	var reach: float = maxf(absf(_enemy.x), size.x) * 2.0
+	_fx_layer.add_child(ring)
+	var t := ring.create_tween()
+	t.tween_property(ring, "modulate:a", 0.7, 0.06)
+	t.parallel().tween_property(ring, "scale", Vector2(reach / start, reach / start), 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	t.tween_property(ring, "modulate:a", 0.0, 0.14)
+	t.tween_callback(ring.queue_free)
 
 ## A travelling projectile from Jamie's attacking hand to the enemy.
 func _launch_projectile(sa: Dictionary) -> void:

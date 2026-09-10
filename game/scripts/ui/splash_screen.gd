@@ -12,7 +12,18 @@ signal finished()
 const _DURATION := 1.35
 
 var _t := 0.0
-var _running := true
+## Held idle until begin() — app.gd shows the Rectangle Studio branding splash
+## FIRST and only then hands off to this poster/loading screen.
+var _running := false
+var _started := false
+## Optional gate: once the poster's own minimum beat has elapsed, it still
+## waits for this to return true before fading out (so it stays visible while
+## the game finishes building / warming up). Unset -> fade at min_hold.
+var loading_ready: Callable = Callable()
+## Minimum time the poster stays up before it may fade (default = _DURATION).
+## app.gd drops this to a short beat when the game is already fully ready at
+## hand-off, so there is no unnecessary loading-screen delay.
+var min_hold := _DURATION
 var _fx: Control
 var _img: TextureRect
 var _ground: ColorRect
@@ -57,6 +68,17 @@ func _ready() -> void:
 
 	_track_size()
 	get_viewport().size_changed.connect(_track_size)
+	visible = _started   # stays hidden until begin()
+
+## Start the poster/loading beat. Called by app.gd after the Rectangle Studio
+## branding splash has played out. Idempotent.
+func begin() -> void:
+	if _started:
+		return
+	_started = true
+	_running = true
+	visible = true
+	modulate.a = 1.0
 
 func _track_size() -> void:
 	var vp := get_viewport_rect().size
@@ -78,14 +100,20 @@ func _process(delta: float) -> void:
 	if _fx != null:
 		_fx.t = _t
 		_fx.queue_redraw()
-	if _t >= _DURATION:
-		_running = false
-		var tw := create_tween()
-		tw.tween_property(self, "modulate:a", 0.0, 0.3)
-		tw.tween_callback(func():
-			finished.emit()
-			queue_free()
-		)
+	if _t < min_hold:
+		return
+	# Poster's own minimum beat is up — but hold while background warm-up is
+	# still running (Case A). If loading is already done (Case B/C), fade now
+	# with no extra delay.
+	if loading_ready.is_valid() and not bool(loading_ready.call()):
+		return
+	_running = false
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(func():
+		finished.emit()
+		queue_free()
+	)
 
 
 ## All splash vector work on its own layer so it sits above the Backdrop.

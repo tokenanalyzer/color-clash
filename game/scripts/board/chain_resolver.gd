@@ -69,6 +69,12 @@ class MoveResult:
 	var wave_cells: Array = [] # Array[Array[Vector2i]] -- cells touched per wave, parallel to score_events
 	var gravity_moves: Array[Dictionary] = []
 	var refilled_cells: Array[Vector2i] = []
+	## Escort specials (&"relic") that reached the bottom row and were
+	## delivered this move — each entry is the bottom-row cell it left from.
+	## `app.gd` feeds `.size()` into a `deliver` objective's progress.
+	var specials_delivered: Array[Vector2i] = []
+	## Escort specials that fell (but weren't delivered) this move: {from, to}.
+	var specials_moved: Array[Dictionary] = []
 
 ## One player connection. Three outcomes:
 ##  * SMALL plain match (below the power threshold) — clears the group.
@@ -124,8 +130,20 @@ static func resolve_move(board: BoardModel, path: Array[Vector2i], power_config:
 
 	_tick_timebombs(board, result)
 	result.gravity_moves = board.apply_gravity()
+	_collect_specials(result)
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result
+
+## Splits gravity's special entries into delivered / merely-moved so the
+## objective + view layers don't each have to re-scan gravity_moves.
+static func _collect_specials(result: MoveResult) -> void:
+	for m in result.gravity_moves:
+		if not m.has("special"):
+			continue
+		if m.get("delivered", false):
+			result.specials_delivered.append(m["from"])
+		else:
+			result.specials_moved.append(m)
 
 ## A single tap on one power tile — detonate just that power (and whatever
 ## it chains into). Counts as a move (ticks time bombs).
@@ -139,6 +157,7 @@ static func resolve_power_tap(board: BoardModel, pos: Vector2i, power_config: Po
 	_process_chain_queue(board, result, power_config, [pos], true, {pos: true})
 	_tick_timebombs(board, result)
 	result.gravity_moves = board.apply_gravity()
+	_collect_specials(result)
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result
 
@@ -170,6 +189,7 @@ static func detonate_power_at(board: BoardModel, pos: Vector2i, power_id: String
 	_process_chain_queue(board, result, power_config, queue, horizontal, path_oriented)
 
 	result.gravity_moves = board.apply_gravity()
+	_collect_specials(result)
 	result.refilled_cells = board.refill(rng, available_colors, rainbow_chance)
 	return result
 

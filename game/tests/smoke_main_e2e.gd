@@ -18,21 +18,30 @@ func _initialize() -> void:
 	assert(app._menu.visible, "app should boot into the main menu")
 	assert(app._board == null, "board should not exist before a level is selected")
 
-	# PLAY on the menu opens the campaign map.
+	# PLAY on the menu opens the 10-world island-selection screen (over SEA CLIP).
 	await app._on_menu_play_pressed()
 	await process_frame
-	assert(app._map.visible, "PLAY should open the level map")
+	assert(app._islands.visible, "PLAY should open the main island (world) screen")
+	assert(app._sea_clip.visible, "SEA CLIP background should be shown on the island screen")
 
-	var game_data := get_root().get_node("GameData")
-	var first_id: int = game_data.levels.first_level_id()
-	await app._go_to_level(first_id)
+	# Pick island 1 -> its internal level map.
+	var wid: StringName = WorldCatalog.world_id_at(0)
+	await app._on_world_selected(wid)
 	await process_frame
+	assert(app._worldmap.visible, "selecting an island should open its internal level map")
+	assert(not app._islands.visible, "the world-selection screen should hide behind the internal map")
+
+	# Enter island 1, world-local level 1.
+	await app._go_to_level(wid, 1)
+	await process_frame
+	assert(app._active_world_id == wid and app._active_local_level == 1, "island slot wired")
 
 	var board = app._board
 	var hud = app._hud
 	assert(board != null, "board not created")
 	assert(hud != null, "hud not created")
-	assert(not app._map.visible, "map should be hidden once a level starts")
+	assert(not app._worldmap.visible, "the level map should be hidden once a level starts")
+	assert(not app._sea_clip.visible, "SEA CLIP should be hidden during gameplay")
 	print("Level loaded: ", app._current_level.level_name, " size=", board.board.width, "x", board.board.height)
 
 	var path := _find_valid_path(board.board)

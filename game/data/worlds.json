@@ -1,0 +1,158 @@
+{
+  "_doc": "Data-driven catalogue for the 10 main worlds (2026-09-08 island system). Artwork under res://assets/islands_v2/ is byte-identical to the supplied package (see docs/RESUME.md). Worlds 1-5 route onto the existing 50 campaign levels via WorldCatalog -> IslandModel (10 stages each, order-1 == island index). Worlds 6-10 have NO authored gameplay yet: playable=false -> their internal map opens as COMING SOON with every node locked, no routing. parts[] are 5 REUSABLE visual templates cycled by (localLevel-1) % 5 - they are NOT five finite levels.",
+  "board_asset": "res://assets/islands_v2/level_board.png",
+  "sea_clip": "res://assets/islands_v2/sea_clip.ogv",
+  "levels_per_world": 10,
+  "worlds": [
+    {
+      "id": "evergreen_kingdom",
+      "display_name": "Evergreen Kingdom",
+      "order": 1,
+      "playable": true,
+      "campaign_span": [1, 10],
+      "main_asset": "res://assets/islands_v2/worlds/01_evergreen_kingdom.png",
+      "parts": [
+        "res://assets/islands_v2/parts/01_evergreen_kingdom/1.png",
+        "res://assets/islands_v2/parts/01_evergreen_kingdom/2.png",
+        "res://assets/islands_v2/parts/01_evergreen_kingdom/3.png",
+        "res://assets/islands_v2/parts/01_evergreen_kingdom/4.png",
+        "res://assets/islands_v2/parts/01_evergreen_kingdom/5.png"
+      ]
+    },
+    {
+      "id": "emberfall_isle",
+      "display_name": "Emberfall Isle",
+      "order": 2,
+      "playable": true,
+      "campaign_span": [11, 20],
+      "main_asset": "res://assets/islands_v2/worlds/02_emberfall_isle.png",
+      "parts": [
+        "res://assets/islands_v2/parts/02_emberfall_isle/1.png",
+        "res://assets/islands_v2/parts/02_emberfall_isle/2.png",
+        "res://assets/islands_v2/parts/02_emberfall_isle/3.png",
+        "res://assets/islands_v2/parts/02_emberfall_isle/4.png",
+        "res://assets/islands_v2/parts/02_emberfall_isle/5.png"
+      ]
+    },
+    {
+      "id": "golden_oasis",
+      "display_name": "Golden Oasis",
+      "order": 3,
+      "playable": true,
+      "campaign_span": [21, 30],
+      "main_asset": "res://assets/islands_v2/worlds/03_golden_oasis.png",
+      "parts": [
+        "res://assets/islands_v2/parts/03_golden_oasis/1.png",
+        "res://assets/islands_v2/parts/03_golden_oasis/2.png",
+        "res://assets/islands_v2/parts/03_golden_oasis/3.png",
+        "res://assets/islands_v2/parts/03_golden_oasis/4.png",
+        "res://assets/islands_v2/parts/03_golden_oasis/5.png"
+      ]
+    },
+    {
+      "id": "mystic_crystal_grove",
+      "display_name": "Mystic Crystal Grove",
+      "order": 4,
+      "playable": true,
+      "campaign_span": [31, 40],
+      "main_asset": "res://assets/islands_v2/worlds/04_mystic_crystal_grove.png",
+      "parts": [
+        "res://assets/islands_v2/parts/04_mystic_crystal_grove/1.png",
+        "res://assets/islands_v2/parts/04_mystic_crystal_grove/2.png",
+        "res://assets/islands_v2/parts/04_mystic_crystal_grove/3.png",
+        "res://assets/islands_v2/parts/04_mystic_crystal_grove/4.png",
+        "res://assets/islands_v2/parts/04_mystic_crystal_grove/5.png"
+      ]
+    },
+    {
+      "id": "celestial_haven",
+      "display_name": "Celestial Haven",
+      "order": 5,
+      "playable": true,
+      "campaign_span": [41, 50],
+      "main_asset": "res://assets/islands_v2/worlds/05_celestial_haven.png",
+      "parts": [
+        "res://assets/islands_v2/parts/05_celestial_haven/1.png",
+        "res://assets/islands_v2/parts/05_celestial_haven/2.png",
+        "res://assets/islands_v2/parts/05_celestial_haven/3.png",
+        "res://assets/islands_v2/parts/05_celestial_haven/4.png",
+        "res://assets/islands_v2/parts/05_celestial_haven/5.png"
+      ]
+    },
+    {
+      "id": "pirates_paradise",
+      "display_name": "Pirate’s Paradise",
+      "order": 6,
+      "playable": false,
+      "campaign_span": null,
+      "main_asset": "res://assets/islands_v2/worlds/06_pirates_paradise.png",
+      "parts": [
+        "res://assets/islands_v2/parts/06_pirates_paradise/1.png",
+        "res://assets/islands_v2/parts/06_pirates_paradise/2.png",
+        "res://assets/islands_v2/parts/06_pirates_paradise/3.png",
+        "res://assets/islands_v2/parts/06_pirates_paradise/4.png",
+        "res://assets/islands_v2/parts/06_pirates_paradise/5.png"
+      ]
+    },
+    {
+      "id": "whispering_wilds",
+      "display_name": "Whispering Wilds",
+      "order": 7,
+      "playable": false,
+      "campaign_span": null,
+      "main_asset": "res://assets/islands_v2/worlds/07_whispering_wilds.png",
+      "parts": [
+        "res://assets/islands_v2/parts/07_whispering_wilds/1.png",
+        "res://assets/islands_v2/parts/07_whispering_wilds/2.png",
+        "res://assets/islands_v2/parts/07_whispering_wilds/3.png",
+        "res://assets/islands_v2/parts/07_whispering_wilds/4.png",
+        "res://assets/islands_v2/parts/07_whispering_wilds/5.png"
+      ]
+    },
+    {
+      "id": "crystal_skylands",
+      "display_name": "Crystal Skylands",
+      "order": 8,
+      "playable": false,
+      "campaign_span": null,
+      "main_asset": "res://assets/islands_v2/worlds/08_crystal_skylands.png",
+      "parts": [
+        "res://assets/islands_v2/parts/08_crystal_skylands/1.png",
+        "res://assets/islands_v2/parts/08_crystal_skylands/2.png",
+        "res://assets/islands_v2/parts/08_crystal_skylands/3.png",
+        "res://assets/islands_v2/parts/08_crystal_skylands/4.png",
+        "res://assets/islands_v2/parts/08_crystal_skylands/5.png"
+      ]
+    },
+    {
+      "id": "frostcrown_isle",
+      "display_name": "Frostcrown Isle",
+      "order": 9,
+      "playable": false,
+      "campaign_span": null,
+      "main_asset": "res://assets/islands_v2/worlds/09_frostcrown_isle.png",
+      "parts": [
+        "res://assets/islands_v2/parts/09_frostcrown_isle/1.png",
+        "res://assets/islands_v2/parts/09_frostcrown_isle/2.png",
+        "res://assets/islands_v2/parts/09_frostcrown_isle/3.png",
+        "res://assets/islands_v2/parts/09_frostcrown_isle/4.png",
+        "res://assets/islands_v2/parts/09_frostcrown_isle/5.png"
+      ]
+    },
+    {
+      "id": "haunted_shadowlands",
+      "display_name": "Haunted Shadowlands",
+      "order": 10,
+      "playable": false,
+      "campaign_span": null,
+      "main_asset": "res://assets/islands_v2/worlds/10_haunted_shadowlands.png",
+      "parts": [
+        "res://assets/islands_v2/parts/10_haunted_shadowlands/1.png",
+        "res://assets/islands_v2/parts/10_haunted_shadowlands/2.png",
+        "res://assets/islands_v2/parts/10_haunted_shadowlands/3.png",
+        "res://assets/islands_v2/parts/10_haunted_shadowlands/4.png",
+        "res://assets/islands_v2/parts/10_haunted_shadowlands/5.png"
+      ]
+    }
+  ]
+}

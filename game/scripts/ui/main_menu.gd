@@ -19,13 +19,15 @@ const LOGO_DROP := 130.0
 var _coins_label: Label
 var _gems_label: Label
 var _settings: SettingsPanel
-var _daily_btn: Button
+var _daily_btn: BaseButton
 var _daily_dot: Control
+var _banner_btns: Array[Control] = []   # the 3 stacked utility banner buttons
 var _top_bar: PanelContainer
 var _top_bar_margin: MarginContainer
 var _action_col: VBoxContainer
-var _play_btn: Button
+var _play_btn: BaseButton
 var _version: Label
+var _dancers: DancersAnim   # the Home Screen dancing couple (keyed from source (1).mp4)
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -46,6 +48,23 @@ func _ready() -> void:
 	title.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(title)
+
+	# 2026-09-06 asset pass: the dancing couple (Jamie + Jasmine), keyed from
+	# the supplied `assets/home/dancers_source.mp4`, on the stone dais in the
+	# empty lower-middle band — centred, aspect-locked, placed in
+	# _apply_safe_area so it never clips or touches the buttons/edges. Added
+	# before the action column so the buttons always render over it (they
+	# don't overlap spatially, but this keeps z-order clean).
+	_dancers = DancersAnim.new()
+	_dancers.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_dancers)
+	visibility_changed.connect(func():
+		if _dancers == null:
+			return
+		if is_visible_in_tree():
+			_dancers.play()
+		else:
+			_dancers.stop())
 
 	# --- currency chips, no outer bar -------------------------------
 	# 2026-09-05 UI pass: the chips already carry their own frosted-glass
@@ -78,52 +97,57 @@ func _ready() -> void:
 	_action_col.add_theme_constant_override("separation", 18)
 	add_child(_action_col)
 
-	_play_btn = _make_play_button()
+	# 2026-09-06 UI asset integration: PLAY is the exact supplied artwork
+	# (assets/ui_kit/btn_play.png — green banner with Jinn peeking over the
+	# corner), used whole, aspect-locked, sized in _apply_safe_area.
+	_play_btn = _menu_banner(&"ui_btn_play", "PLAY", &"primary", _action_col)
+	_play_btn.clip_contents = false
 	_play_btn.pressed.connect(func():
 		Audio.play(&"button_tap")
 		_bounce(_play_btn)
 		play_pressed.emit()
 	)
-	_action_col.add_child(_play_btn)
+	# subtle idle breathing on the primary action
+	if _play_btn is TextureButton:
+		var bt := _play_btn.create_tween().set_loops()
+		bt.tween_property(_play_btn, "scale", Vector2(1.02, 1.02), 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		bt.tween_property(_play_btn, "scale", Vector2.ONE, 1.1).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
+	# The three utility buttons are the artist's wide banner artwork,
+	# SIDE-BY-SIDE in ONE row under PLAY (reference layout), each a third of
+	# the action-column width, aspect-locked. Falls back to text buttons if
+	# the art is missing.
 	var sub := HBoxContainer.new()
-	sub.add_theme_constant_override("separation", 16)
+	sub.add_theme_constant_override("separation", 12)
 	sub.alignment = BoxContainer.ALIGNMENT_CENTER
+	sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_action_col.add_child(sub)
 
-	_daily_btn = UiKit.button("DAILY REWARD", &"secondary", VisualTheme.FS_BUTTON)
-	_daily_btn.custom_minimum_size = Vector2(0, 82)
+	_daily_btn = _menu_banner(&"ui_btn_daily_reward", "DAILY REWARD", &"secondary", sub)
 	_daily_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_daily_btn.clip_contents = false
 	_daily_btn.pressed.connect(func():
 		Audio.play(&"button_tap")
-		daily_pressed.emit()
-	)
-	sub.add_child(_daily_btn)
+		daily_pressed.emit())
+	_daily_btn.clip_contents = false
+
 	_daily_dot = ClaimDot.new()
 	_daily_dot.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_daily_dot.position = Vector2(-18, 6)
-	_daily_dot.custom_minimum_size = Vector2(22, 22)
+	_daily_dot.position = Vector2(-14, 4)
+	_daily_dot.custom_minimum_size = Vector2(20, 20)
 	_daily_dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_daily_btn.add_child(_daily_dot)
 
-	var inv_btn := UiKit.button("INVENTORY", &"secondary", VisualTheme.FS_BUTTON)
-	inv_btn.custom_minimum_size = Vector2(0, 82)
+	var inv_btn := _menu_banner(&"ui_btn_inventory", "INVENTORY", &"secondary", sub)
 	inv_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inv_btn.pressed.connect(func():
 		Audio.play(&"button_tap")
-		inventory_pressed.emit()
-	)
-	sub.add_child(inv_btn)
+		inventory_pressed.emit())
 
-	var opt := UiKit.button("SETTINGS", &"tertiary", VisualTheme.FS_BUTTON)
-	opt.custom_minimum_size = Vector2(0, 82)
+	var opt := _menu_banner(&"ui_btn_settings", "SETTINGS", &"tertiary", sub)
 	opt.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	opt.pressed.connect(func():
 		Audio.play(&"button_tap")
-		_settings.open()
-	)
-	sub.add_child(opt)
+		_settings.open())
 
 	_version = VisualTheme.label(VERSION_TEXT, VisualTheme.FS_MICRO, VisualTheme.TEXT_DIM, 0)
 	_version.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
@@ -154,16 +178,61 @@ func _apply_safe_area() -> void:
 	_top_bar_margin.add_theme_constant_override("margin_left", 14)
 	_top_bar_margin.add_theme_constant_override("margin_right", 14)
 
-	var btn_w: float = clampf(vp.x - 90.0, 280.0, 560.0)
+	var btn_w: float = clampf(vp.x - 60.0, 300.0, 640.0)
 	_action_col.offset_left = (vp.x - btn_w) * 0.5
 	_action_col.offset_right = -(vp.x - btn_w) * 0.5
+	# PLAY spans the full action-column width; the 3 utility banners each take
+	# ~a third of it (side-by-side row). All aspect-locked, no distortion.
+	if is_instance_valid(_play_btn) and _play_btn.has_meta("aspect"):
+		var pasp: float = _play_btn.get_meta("aspect")
+		_play_btn.custom_minimum_size = Vector2(btn_w, btn_w / maxf(pasp, 0.01))
+	# 2026-09-06: the utility trio is bumped ~12% larger than the previous
+	# pass (per the new Home reference feedback) while staying one row.
+	var third_w := (btn_w - 18.0) / 3.0 * 1.12
+	for b in _banner_btns:
+		if is_instance_valid(b) and b.has_meta("aspect"):
+			var asp: float = b.get_meta("aspect")
+			b.custom_minimum_size = Vector2(third_w, third_w / maxf(asp, 0.01))
 	# PLAY centred around ~46% of the screen height — clearly the focus,
 	# well clear of the bottom stone platform in the backdrop art. Shifted
 	# down by LOGO_DROP to follow the logo and keep their gap unchanged.
 	_action_col.offset_top = clampf(vp.y * 0.40, si.position.y + 220.0, vp.y - 340.0) + LOGO_DROP
 
+	# --- the dancing couple, on the dais in the empty lower-middle band ---
+	# Centred horizontally; sized from the frame aspect; placed so the feet
+	# rest on the dais well above the bottom foliage and well below the
+	# button row, with the frame's own transparent padding guaranteeing the
+	# head / feet / cape / hair never clip.
+	if is_instance_valid(_dancers) and _dancers.has_art():
+		var dh: float = clampf(vp.y * 0.185, 320.0, 580.0)
+		var dw: float = dh * _dancers.cell_aspect()
+		_dancers.size = Vector2(dw, dh)
+		_dancers.position = Vector2((vp.x - dw) * 0.5, vp.y * 0.775 - dh * 0.5).round()
+
 	_version.offset_top = -(si.size.y + 32.0)
 	_version.offset_bottom = -(si.size.y + 10.0)
+
+## One stacked utility button, added to `parent`. Uses the supplied wide
+## banner PNG (`tex_id`) at the action-column width, aspect-locked (sized in
+## _apply_safe_area), when present; otherwise the old `kind`-coloured text
+## button. Returns the button node (for signal wiring / the claim dot).
+func _menu_banner(tex_id: StringName, text: String, kind: StringName, parent: Node) -> BaseButton:
+	var tex := AssetLibrary.ui_texture(tex_id)
+	if tex != null and tex.get_height() > 0:
+		var b := UiKit.asset_button(tex)
+		b.set_meta("aspect", float(tex.get_width()) / float(tex.get_height()))
+		b.custom_minimum_size = Vector2(0, 96)
+		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		parent.add_child(b)
+		# PLAY is sized on its own; only the utility banners go in the list.
+		if tex_id != &"ui_btn_play":
+			_banner_btns.append(b)
+		return b
+	var tb := UiKit.button(text, kind, VisualTheme.FS_BUTTON)
+	tb.custom_minimum_size = Vector2(0, 82)
+	tb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(tb)
+	return tb
 
 func _make_play_button() -> Button:
 	var b := UiKit.button("PLAY", &"primary", 44)
@@ -182,6 +251,10 @@ func refresh() -> void:
 	_gems_label.text = str(SaveService.get_int("gems", 0))
 	if _daily_dot != null:
 		_daily_dot.visible = DailyRewardsScreen.has_claimable()
+	# app.gd returns to the menu via a modulate fade (no visibility_changed),
+	# so kick the dancers loop here too — it's idempotent.
+	if is_instance_valid(_dancers) and is_visible_in_tree():
+		_dancers.play()
 
 func _bounce(node: Control) -> void:
 	if node == null:

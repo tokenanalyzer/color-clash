@@ -19,7 +19,7 @@ var _t := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	custom_minimum_size = Vector2(0, 34)
+	custom_minimum_size = Vector2(0, 46)
 	set_process(true)
 
 func set_meters(meters: Dictionary) -> void:
@@ -47,33 +47,49 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 func _draw() -> void:
+	# Three fully-rounded meter pills, each with a tinted icon chip riding the
+	# left end and a coloured fill that grows from the left INSIDE the track —
+	# matches the reference row above the board. Code-drawn (no art supplied
+	# for these meters); only the presentation is tuned here.
 	var n := _POWERS.size()
-	var gap := 10.0
+	var gap := 14.0
 	var cw := (size.x - gap * float(n - 1)) / float(n)
 	var ch := size.y
+	var rad := ch * 0.5
 	for i in n:
 		var p: StringName = _POWERS[i]
 		var x := float(i) * (cw + gap)
-		var r := Rect2(x, 0, cw, ch)
+		var r := Rect2(x, 0.0, cw, ch)
 		var tint: Color = _TINT[p]
 		var ready: bool = float(_ratio[p]) >= 0.999
-		# track
-		_round(r, 9.0, Color(0.05, 0.06, 0.12, 0.9))
-		# fill
-		var fw: float = cw * float(_shown[p])
+		# drop shadow + near-opaque dark track pill so it reads over the
+		# starfield background, then a lit rim for definition
+		_round(Rect2(x - 2.0, 2.0, cw + 4.0, ch + 2.0), rad + 2.0, Color(0, 0, 0, 0.35))
+		_round(r, rad, Color(0.07, 0.09, 0.16, 0.985))
+		_round(Rect2(x + 3.0, 3.0, cw - 6.0, ch * 0.34), rad, Color(1, 1, 1, 0.05))
+		# coloured fill, inset so it never reaches the pill edge
+		var inset := 3.5
+		var maxw := cw - inset * 2.0
+		var fw: float = maxw * float(_shown[p])
 		var fp: float = float(_flash[p])
-		if fw > 6.0:
+		if fw > 4.0:
 			var fc: Color = tint if fp <= 0.0 else tint.lerp(Color(1, 1, 1), fp)
-			_round(Rect2(x, 0, fw, ch), 9.0, fc)
-		# icon glyph at the left
-		var gc := Vector2(x + ch * 0.5, ch * 0.5)
-		_glyph(p, gc, ch * 0.32, Color(1, 1, 1, 0.92) if _shown[p] > 0.1 or ready else Color(1, 1, 1, 0.4))
-		# ready pip
+			_round(Rect2(x + inset, inset, fw, ch - inset * 2.0), rad - inset, fc)
+			_round(Rect2(x + inset, inset, fw, (ch - inset * 2.0) * 0.42), rad - inset,
+				Color(1, 1, 1, 0.20))
+		# icon chip (rounded square) at the left end
+		var chip := ch * 0.9
+		var cr := Rect2(x + (ch - chip) * 0.5, (ch - chip) * 0.5, chip, chip)
+		_round(cr, chip * 0.3, Color(tint.r, tint.g, tint.b, 1.0 if (_shown[p] > 0.02 or ready) else 0.62))
+		_round(Rect2(cr.position.x, cr.position.y, cr.size.x, cr.size.y * 0.45), chip * 0.3, Color(1, 1, 1, 0.16))
+		_round_outline(cr, chip * 0.3, Color(1, 1, 1, 0.35), 1.5)
+		_glyph(p, cr.position + cr.size * 0.5, chip * 0.3, Color(1, 1, 1, 0.97))
+		# rim: a lit pulse when full, a visible hairline otherwise
 		if ready:
-			var pulse := 0.6 + 0.4 * sin(_t * 8.0)
-			_round_outline(r.grow(-1.0), 8.0, Color(tint.r, tint.g, tint.b, pulse), 2.0)
+			var pulse := 0.55 + 0.45 * sin(_t * 8.0)
+			_round_outline(r.grow(-1.0), rad - 1.0, Color(tint.r, tint.g, tint.b, pulse), 2.5)
 		else:
-			_round_outline(r.grow(-0.5), 8.5, Color(1, 1, 1, 0.12), 1.0)
+			_round_outline(r.grow(-0.75), rad - 0.75, Color(0.62, 0.70, 0.9, 0.4), 1.5)
 
 func _glyph(power: StringName, c: Vector2, r: float, col: Color) -> void:
 	match power:

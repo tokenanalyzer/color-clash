@@ -21,9 +21,23 @@ const TRANSITION_DURATION := 0.35
 var _board: BoardView
 var _hud: HUD
 var _board_layer: Node2D
-var _map: LevelMap
+var _islands: MainIslandScreen          # PLAY -> 10-world selection (over SEA CLIP)
+var _worldmap: InternalLevelMap         # one world's infinite zig-zag level map
+var _sea_clip: SeaClipBackground        # the single shared fixed ocean video
+var _active_world_id: StringName = &""  # island whose map launched the level
+var _active_local_level: int = 1        # world-local level number being played
+# Arena/combat villain context for the CURRENT level — resolved in
+# _start_level() from (_active_world_id, _active_local_level), NOT from the
+# cycled authored level id. -1 island index = flat authored-campaign pick
+# (the _debug_start_authored_level path).
+var _arena_island_index: int = -1
+var _arena_is_finale: bool = false
+var _arena_is_first: bool = false
 var _menu: MainMenu
 var _splash: SplashScreen
+var _studio_splash: StudioSplash        # Rectangle Studio branding — first screen
+var _warm_done := false                 # background game warm-up complete
+var _headless := DisplayServer.get_name() == "headless"
 
 var _current_level: LevelConfig
 var _moves_left: int = 0
@@ -42,6 +56,11 @@ var _jasmine: JasmineActor              # Jasmine's dynamic battlefield presence
 var _jamie_rig: JamieRig               # Jamie's combat presence (Phase C)
 var _enemy_actor: EnemyActor           # active villain in the combat arena
 var _power_fired_this_move := false
+## Phase D — set when a booster (targeted themed hit, or an instant Shuffle /
+## +Moves gesture) has already driven Jamie's rig for the move in flight, so
+## `_on_jamie_attack` doesn't chain a redundant generic sword swing behind
+## it. Cleared at the top of every real match in `_on_move_resolved`.
+var _booster_anim_this_move := false
 var _story_scene: StoryScene
 var _intro_video: IntroVideoScreen
 var _combat: CombatDirector
@@ -56,6 +75,62 @@ var _fps_frames := 0
 
 func _ready() -> void:
 	randomize()
+
+	# --- The Rectangle Studio branding splash is the VERY FIRST Godot frame,
+	# built + playing before the heavy game build below. This is what
+	# collapses the OS launch screen (Android 12+ shows the app icon on its
+	# window background — platform-controlled, can't be removed without a
+	# gradle build) to its minimum: it dismisses the instant Godot draws this
+	# frame, instead of the crown-on-#fbfdff sitting there for the whole
+	# ~1-2s build. The rest of the game is built ONE frame later, under the
+	# splash. There is NO Godot-created logo/white screen — boot_splash has
+	# show_image=false and its bg_color is the splash's own near-white.
+	var studio_canvas := CanvasLayer.new()
+	studio_canvas.layer = 110
+	add_child(studio_canvas)
+	_studio_splash = StudioSplash.new()
+	studio_canvas.add_child(_studio_splash)
+	_studio_splash.finished.connect(_on_studio_splash_finished)
+	_studio_splash.play()
+	print("[startup] app._ready at %.0f ms since boot -> branding splash on screen" % (Time.get_ticks_msec()))
+
+	# The poster/loading screen NODE is cheap — create it now so it's ready the
+	# instant the branding animation ends. It stays idle+hidden until begin().
+	# Its heavy siblings (HUD/board/menu/islands/...) are built LATER, UNDER
+	# this poster (which is exactly what a loading screen is for), so the
+	# branding animation plays with nothing competing for the main thread.
+	var splash_canvas := CanvasLayer.new()
+	splash_canvas.layer = 100
+	add_child(splash_canvas)
+	_splash = SplashScreen.new()
+	# The poster holds visible until BOTH background warm-up AND the game build
+	# are done; if both were already done at hand-off it just runs a short beat.
+	_splash.loading_ready = func() -> bool: return _warm_done and _hud != null
+	splash_canvas.add_child(_splash)
+	_splash.finished.connect(_on_splash_finished)
+
+	# Headless (tests/smokes): no branding video to protect and the smokes
+	# expect a ready app, so build synchronously right now. On-device the
+	# heavy build is deferred to _on_studio_splash_finished (under the poster)
+	# so the branding animation plays uninterrupted.
+	if _headless:
+		await _build_game()
+
+	# Lightweight background warm-up (data + key textures) begins IMMEDIATELY,
+	# in parallel with the branding animation — never blocks it.
+	_warm_up_game()
+
+## One build chunk boundary: yields a frame on-device (keeps the branding
+## animation responsive) but is a no-op when headless.
+func _build_yield() -> void:
+	if not _headless:
+		await get_tree().process_frame
+
+## Builds the full game (screens, board, characters, wiring) one frame AFTER
+## the Rectangle Studio splash is already on screen, YIELDING between groups so
+## the branding animation stays responsive throughout instead of freezing on a
+## single long build hitch.
+func _build_game() -> void:
 	_fever = FeverSystem.new(GameData.fever_config)
 	if OS.is_debug_build():
 		set_process(true)
@@ -81,6 +156,7 @@ func _ready() -> void:
 	_hud.shop_use_booster.connect(_on_shop_use_booster)
 	_hud.continue_bought.connect(_on_continue_bought)
 	_hud.continue_declined.connect(_on_continue_declined)
+	await _build_yield()
 
 	_board_layer = Node2D.new()
 	_board_layer.position = Vector2(0, _hud.playfield_top())
@@ -113,14 +189,32 @@ func _ready() -> void:
 		if _board != null:
 			ScreenShake.apply(_board, mag, 0.3))
 	_relayout_arena()
+	await _build_yield()
+
+	# --- Island navigation (2026-09-08): PLAY -> MainIslandScreen (10 worlds
+	# over the shared SEA CLIP video) -> InternalLevelMap (infinite recycled
+	# zig-zag level map) -> existing gameplay. The video lives on its own
+	# layer BEHIND both island screens so it stays fixed while they scroll and
+	# is never duplicated between them. ---
+	var sea_canvas := CanvasLayer.new()
+	sea_canvas.layer = 8
+	add_child(sea_canvas)
+	_sea_clip = SeaClipBackground.new()
+	_sea_clip.visible = false
+	sea_canvas.add_child(_sea_clip)
 
 	var map_canvas := CanvasLayer.new()
 	map_canvas.layer = 10
 	add_child(map_canvas)
-	_map = LevelMap.new()
-	map_canvas.add_child(_map)
-	_map.level_selected.connect(_on_level_selected_from_map)
-	_map.home_pressed.connect(_on_home_pressed)
+	_islands = MainIslandScreen.new()
+	map_canvas.add_child(_islands)
+	_islands.world_selected.connect(_on_world_selected)
+	_islands.back_pressed.connect(_on_islands_back)
+	_worldmap = InternalLevelMap.new()
+	map_canvas.add_child(_worldmap)
+	_worldmap.level_selected.connect(_on_level_selected_from_map)
+	_worldmap.back_pressed.connect(_on_worldmap_back)
+	await _build_yield()
 
 	var menu_canvas := CanvasLayer.new()
 	menu_canvas.layer = 20
@@ -130,6 +224,7 @@ func _ready() -> void:
 	_menu.play_pressed.connect(_on_menu_play_pressed)
 	_menu.daily_pressed.connect(_on_daily_pressed)
 	_menu.inventory_pressed.connect(func(): _inventory.open())
+	await _build_yield()
 
 	var daily_canvas := CanvasLayer.new()
 	daily_canvas.layer = 30
@@ -145,6 +240,7 @@ func _ready() -> void:
 	_inventory = InventoryScreen.new()
 	inv_canvas.add_child(_inventory)
 	_inventory.closed.connect(func(): _menu.refresh())
+	await _build_yield()
 
 	var story_canvas := CanvasLayer.new()
 	story_canvas.layer = 90
@@ -154,22 +250,67 @@ func _ready() -> void:
 	_intro_video = IntroVideoScreen.new()
 	_intro_video.visible = false
 	story_canvas.add_child(_intro_video)
-
-	var splash_canvas := CanvasLayer.new()
-	splash_canvas.layer = 100
-	add_child(splash_canvas)
-	_splash = SplashScreen.new()
-	splash_canvas.add_child(_splash)
-	_splash.finished.connect(_on_splash_finished)
+	# (_splash / the poster/loading screen is created in _ready, before this
+	# heavy build, so it can be shown the instant the branding animation ends.)
 
 	_hud.visible = false
 	_board_layer.visible = false
 	_jasmine.visible = false
 	_jamie_rig.visible = false
 	_enemy_actor.visible = false
-	_map.visible = false
+	_islands.visible = false
+	_worldmap.visible = false
 	_menu.visible = true
 	_menu.modulate.a = 1.0
+
+## GENTLE background preload that runs during the Rectangle Studio branding
+## animation — ONE small texture per frame so it never janks the video.
+## Deliberately does NOT touch the big island artwork: that is loaded when
+## _build_game() creates MainIslandScreen (under the poster, where a hitch is
+## expected). The poster's gate is `_warm_done AND _hud != null`, so both this
+## and the heavy build must complete before the poster fades to the menu.
+func _warm_up_game() -> void:
+	var small: Array[StringName] = [
+		&"env_floating_particles", &"brand_splash",           # menu + poster
+		&"gem_red", &"gem_blue", &"gem_green", &"gem_yellow", &"gem_purple", &"gem_orange",
+		&"power_bomb", &"power_lightning", &"power_freeze", &"power_rainbow",
+	]
+	for id in small:
+		AssetLibrary.tex(id)
+		await get_tree().process_frame
+	WorldCatalog.board_texture()
+	SeaClipBackground._video_available()
+	_warm_done = true
+	print("[startup] background warm-up complete")
+	# menu music is started by _on_splash_finished, not during the branding beat
+
+## The Rectangle Studio animation has played out -> hand off to the EXISTING
+## poster/loading screen. No black/white frame: StudioSplash's ground and the
+## poster's ground are both painted, and we cross with a short fade.
+func _on_studio_splash_finished() -> void:
+	# Branding animation has played out (uninterrupted — nothing was competing
+	# for the main thread). Hand off to the EXISTING poster/loading screen and
+	# build the heavy game UNDER it. The poster's loading_ready gate
+	# (warm_done AND _hud built) keeps it up until the game is actually ready,
+	# then it fades to the menu on its own.
+	if _warm_done and _hud != null:
+		# The game is already fully built + warmed (fast device / headless) —
+		# the poster/loading screen is NOT needed. Straight to the menu, no
+		# unnecessary loading delay.
+		print("[startup] branding done, game already ready -> menu (poster skipped)")
+		await _fade_out(_studio_splash, 0.25)
+		_on_splash_finished()
+		return
+	# Show the EXISTING poster/loading screen and build the heavy game UNDER
+	# it (that is what a loading screen is for). Its loading_ready gate
+	# (warm_done AND _hud built) keeps it up until the game is ready, then it
+	# fades to the menu on its own.
+	print("[startup] branding done -> poster/loading (building game under it)")
+	_splash.begin()
+	await _fade_out(_studio_splash, 0.3)
+	if _hud == null:
+		await _build_game()
+		print("[startup] game built at %.0f ms since boot (under poster)" % Time.get_ticks_msec())
 
 func _process(delta: float) -> void:
 	# debug FPS sampler only (set_process is off in release builds)
@@ -218,7 +359,8 @@ func _relayout_arena() -> void:
 	var enemy_torso := Vector2(vp.x * 0.80, floor_y - enemy_h * 0.55)
 	if _enemy_actor != null:
 		enemy_torso = _enemy_actor.configure(_current_level.id if _current_level != null else 1,
-			vp.x - 12.0, floor_y, enemy_h)
+			vp.x - 12.0, floor_y, enemy_h,
+			_arena_island_index, _arena_is_finale, _arena_is_first)
 
 	if _jamie_rig != null:
 		# Jamie's portrait has his flaming sword right at the frame's left
@@ -235,19 +377,44 @@ func _relayout_arena() -> void:
 
 func _on_splash_finished() -> void:
 	# SplashScreen frees itself; the menu is already the visible screen.
+	print("[startup] poster/loading done -> menu")
 	Music.play_ambient(&"music_menu_theme")
 
 func _on_menu_play_pressed() -> void:
 	_menu.refresh()
 	await _fade_out(_menu, TRANSITION_DURATION)
-	_map.refresh()
-	await _fade_in(_map, TRANSITION_DURATION)
+	_sea_clip.visible = true
+	_sea_clip.ensure_playing()
+	_islands.refresh()
+	await _fade_in(_islands, TRANSITION_DURATION)
 
-func _on_home_pressed() -> void:
-	await _fade_out(_map, TRANSITION_DURATION)
+## MainIslandScreen -> a world's internal level map (SEA CLIP keeps running).
+func _on_world_selected(world_id: StringName) -> void:
+	_active_world_id = world_id
+	_sea_clip.ensure_playing()
+	_worldmap.open(world_id)
+	await _fade_out(_islands, TRANSITION_DURATION)
+	await _fade_in(_worldmap, TRANSITION_DURATION)
+
+## Back from a world's internal map -> the 10-world selection screen.
+func _on_worldmap_back() -> void:
+	_sea_clip.ensure_playing()
+	_islands.refresh()
+	await _fade_out(_worldmap, TRANSITION_DURATION)
+	await _fade_in(_islands, TRANSITION_DURATION)
+
+## Back from the world selection screen -> the main menu (stop the video).
+func _on_islands_back() -> void:
+	await _fade_out(_islands, TRANSITION_DURATION)
+	_sea_clip.visible = false
+	_sea_clip.pause()
 	_menu.refresh()
 	await _fade_in(_menu, TRANSITION_DURATION)
 	Music.play_ambient(&"music_menu_theme")
+
+## Legacy hook kept for the in-level map buttons (see _go_to_map).
+func _on_home_pressed() -> void:
+	await _on_islands_back()
 
 func _on_daily_pressed() -> void:
 	_daily.refresh()
@@ -261,21 +428,41 @@ func _on_daily_closed() -> void:
 func _on_map_pressed() -> void:
 	await _go_to_map()
 
-func _on_level_selected_from_map(level_id: int) -> void:
-	await _go_to_level(level_id)
+func _on_level_selected_from_map(world_id: StringName, local_level: int) -> void:
+	await _go_to_level(world_id, local_level)
 
+## Return from an in-level "Quit to Map" / no-next-level to the internal level
+## map of the ISLAND that was being played (falls back to world 1). The SEA
+## CLIP video resumes behind it.
 func _go_to_map() -> void:
 	Music.stop_ambient()
+	var wid := _active_world_id
+	if wid == &"":
+		wid = WorldCatalog.world_id_at(0)
+	_active_world_id = wid
 	await _fade_out_game(TRANSITION_DURATION)
-	_map.refresh()
-	await _fade_in(_map, TRANSITION_DURATION)
+	_sea_clip.visible = true
+	_sea_clip.ensure_playing()
+	_worldmap.open(wid)
+	await _fade_in(_worldmap, TRANSITION_DURATION)
 	Music.play_ambient(&"music_menu_theme")
 
-func _go_to_level(level_id: int) -> void:
-	await _fade_out(_map, TRANSITION_DURATION)
+## Enter a world-local level. `(world_id, local_level)` is the progression
+## identity; `WorldCatalog.authored_level_id` resolves which authored
+## LevelConfig actually supplies the board/objectives/etc. for this slot.
+func _go_to_level(world_id: StringName, local_level: int) -> void:
+	_active_world_id = world_id
+	_active_local_level = local_level
+	var authored_id := WorldCatalog.authored_level_id(world_id, local_level)
+	if _worldmap.visible:
+		await _fade_out(_worldmap, TRANSITION_DURATION)
+	if _islands.visible:
+		await _fade_out(_islands, TRANSITION_DURATION)
+	_sea_clip.visible = false
+	_sea_clip.pause()
 	Music.stop_ambient()
-	await _play_pre_level_story(level_id)
-	_start_level(level_id)
+	await _play_pre_level_story(authored_id)
+	_start_level(authored_id)
 	await _fade_in_game(TRANSITION_DURATION)
 
 ## Story beats that belong BEFORE a stage: the opening kidnapping cinematic
@@ -363,10 +550,24 @@ func _fade_in_game(duration: float) -> void:
 
 # -------------------------------------------------------- level session --
 
-func _start_level(level_id: int) -> void:
+## `use_island_context` true (the normal island-map flow) resolves the arena
+## villain / chapter-finale from the REAL progression position
+## (_active_world_id, _active_local_level). false (the _debug_start_authored_
+## level path) keeps the flat authored-campaign pick so the campaign-id
+## smokes/tests stay meaningful.
+func _start_level(level_id: int, use_island_context: bool = true) -> void:
 	_current_level = GameData.levels.get_level(level_id)
 	if _current_level == null:
 		return
+
+	if use_island_context and _active_world_id != &"":
+		_arena_island_index = int(WorldCatalog.world(_active_world_id).get("order", 1)) - 1
+		_arena_is_finale = _active_local_level >= IslandProgress.LEVELS_PER_ISLAND
+		_arena_is_first = _active_local_level == 1
+	else:
+		_arena_island_index = -1
+		_arena_is_finale = false
+		_arena_is_first = false
 
 	_score = 0
 	_moves_left = _current_level.move_limit
@@ -376,7 +577,7 @@ func _start_level(level_id: int) -> void:
 	_was_fever = false
 	_armed_booster = &""
 	_backdrop.set_accent_target(VisualTheme.ACCENT, 0.2)
-	_backdrop.set_scene_for_level(_current_level.id)
+	_backdrop.set_scene_for_level(_current_level.id, _current_level.env)
 	_music_token += 1
 	_objectives = ObjectiveTracker.new(_current_level.objectives)
 
@@ -395,6 +596,9 @@ func _start_level(level_id: int) -> void:
 
 	_hud.hide_end_panel()
 	_hud.set_level_info(_current_level)
+	# The HUD LEVEL badge shows the world-local level (Island 1 Level 47), not
+	# the authored campaign id that happens to supply this slot's board.
+	_hud.set_level_number(_active_local_level)
 	_hud.set_moves(_moves_left)
 	_hud.set_coins(Economy.coins)
 	_hud.set_score(_score)
@@ -402,21 +606,16 @@ func _start_level(level_id: int) -> void:
 	_hud.set_fever(_fever.meter, GameData.fever_config.meter_max, _fever.is_active())
 	_refresh_booster_counts()
 
-	# --- character combat: Jamie powers always; a boss on every 10th stage ---
+	# --- character combat: Jamie powers drive the arena on every stage. The
+	# chapter villain is presentation only (2026-09-07: no health bar, no
+	# boss-HP win gate). `is_boss` = "chapter finale" (every 10th stage). ---
 	_level_ended = false
-	_moves_since_boss_hit = 0
-	_combat = CombatDirector.new(_current_level.id)
+	_combat = CombatDirector.new(_current_level.id, _arena_island_index, _arena_is_finale)
 	_combat.meters_changed.connect(_hud.set_power_meters)
 	_combat.power_fired.connect(_on_power_fired)
 	_combat.jamie_attack.connect(_on_jamie_attack)
-	_combat.boss_damaged.connect(func(_amt, hp, mx): _hud.set_boss_hp(hp, mx))
-	_combat.boss_defeated.connect(_on_boss_defeated)
-	_combat.boss_attacked.connect(_on_boss_attacked)
 	_hud.set_power_meters(_combat.powers.meter)
-	if _combat.is_boss:
-		_hud.begin_boss(_combat.boss_name, _combat.boss_face(), _combat.is_final_boss())
-	else:
-		_hud.end_boss()
+	_hud.end_boss()   # the HUD boss HP bar is never shown any more
 
 	# Continuous real gameplay track (2026-09-05) replaces the old sparse
 	# synth loop. play_ambient() no-ops if it's already playing (retry /
@@ -493,7 +692,16 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	_score += gained
 	_combo.record_move(result.chain_depth)
 	var fever_activated := _fever.register_move(result.chain_depth)
-	_objectives.apply_move(result.colors_cleared, _score, result.powers_created, result.obstacles_broken)
+	var _obj_before: Array = _objectives.progress.duplicate()
+	_objectives.apply_move(result.colors_cleared, _score, result.powers_created, result.obstacles_broken, result.specials_delivered.size())
+	# One soft "goal advanced" chime per move — a non-score objective that
+	# ticked forward but isn't finished yet. (Score creep alone doesn't ping.)
+	if not _objectives.is_complete():
+		for i in _objectives.progress.size():
+			if _objectives.progress[i] > _obj_before[i] \
+					and String(_objectives.objectives[i].get("type", "")) != "reach_score":
+				Audio.play(&"objective_progress", clampf(float(_objectives.progress[i]) / maxf(float(_objectives.target_for(i)), 1.0), 0.0, 1.0))
+				break
 	_update_villain_weakened_tint()
 
 	if counts_as_move:
@@ -541,13 +749,11 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 	GameEvents.publish_all(MoveEventTranslator.events_for_move(result, {"kind": move_kind}))
 	_publish_session_state(gained, fever_activated)
 
-	# --- match-3 -> character combat: turn this move into Jamie attack
-	# energy + boss damage. boss_defeated fires _on_boss_defeated -> win. ---
+	# --- turn this move into Jamie attack energy + power fires (arena
+	# presentation only; the win is decided purely by objectives). ---
 	_power_fired_this_move = false
 	if _combat != null:
 		_combat.feed_move(result, result.chain_depth, result.cleared_cells.size(), counts_as_move, _moves_left)
-	if _combat != null and _combat.is_boss and counts_as_move:
-		_update_boss_pressure()
 	# A move that broke an obstacle but didn't otherwise trigger Jamie's rig
 	# (no power fired, no big plain hit) still gets a small villain flinch —
 	# obstacle/objective progress should read as "hurting" the villain too,
@@ -563,52 +769,29 @@ func _apply_move_result(result: ChainResolver.MoveResult, counts_as_move: bool) 
 		return
 	if _objectives.is_complete():
 		if _combat != null and _combat.is_boss:
-			_check_boss_win_or_flourish()
+			_win_finale_stage()
 		else:
 			_on_level_won()
 	elif _moves_left <= 0:
 		_offer_more_moves_or_lose()
 
-## Boss-stage pressure (2026-09-05): a boss stage isn't just a normal level
-## with a health bar — every BOSS_PRESSURE_MOVES real moves while the boss
-## is still alive, it counter-attacks the board with a temporary obstacle
-## (reuses the ordinary ice-family plumbing; never strands the player — see
-## BoardView.boss_obstruct_random_cell). A flat per-move cadence rather than
-## "moves without damage": CombatDirector's base attack damage is never
-## zero, so a no-damage trigger would in practice never fire.
-const BOSS_PRESSURE_MOVES := 4
-var _moves_since_boss_hit := 0
-
-func _update_boss_pressure() -> void:
-	if _combat.boss_hp <= 0:
-		_moves_since_boss_hit = 0
-		return
-	_moves_since_boss_hit += 1
-	if _moves_since_boss_hit < BOSS_PRESSURE_MOVES:
-		return
-	_moves_since_boss_hit = 0
-	if _board != null and _board.boss_obstruct_random_cell(&"ice", 2):
-		Audio.play(&"tension_pulse")
-		Haptics.strong(60)
-		if _jasmine != null:
-			_jasmine.set_state(&"worried")
-
-## Boss stages require BOTH the boss defeated (hp 0) AND the stage's own
-## objectives complete — previously either one alone ended the level, which
-## meant a boss fight could be skipped entirely by just hitting a score/color
-## goal. Called both right when the boss dies (objectives may already be
-## done) and from the objectives-complete check (boss may already be dead).
-func _check_boss_win_or_flourish() -> void:
+## Chapter-finale stage (every 10th) cleared: the villain is driven off with
+## the full defeat presentation (screen flourish, arena defeat pose, Jasmine
+## rescued/victory), then the normal win flow runs. No HP was ever involved —
+## completing the stage's objectives is the whole victory condition.
+func _win_finale_stage() -> void:
 	if _level_ended:
 		return
-	if _combat == null or not _combat.is_boss or _combat.boss_hp > 0:
-		return
-	if _objectives == null or not _objectives.is_complete():
-		return
+	_hud.boss_defeat_anim()
+	Audio.play(&"boss_impact", 1.0)
+	if _board != null:
+		ScreenShake.apply(_board, 18.0, 0.5)
+	if _enemy_actor != null:
+		_enemy_actor.play_defeat()
 	if _jamie_rig != null:
 		_jamie_rig.play(&"victory")
 	if _jasmine != null:
-		_jasmine.set_state(&"rescued" if _combat.is_final_boss() else &"victory")
+		_jasmine.set_state(&"rescued" if (_combat != null and _combat.is_final_boss()) else &"victory")
 	_on_level_won()
 
 ## `chain_depth` (1 = plain match, 2 = one power created+detonated, 3+ = a
@@ -645,6 +828,7 @@ func _update_music_state(chain_depth: int, cleared_count: int = 0) -> void:
 			Music.set_state(_compute_music_state(0))
 
 func _on_move_resolved(result: ChainResolver.MoveResult) -> void:
+	_booster_anim_this_move = false
 	_apply_move_result(result, true)
 
 func _on_booster_resolved(result: ChainResolver.MoveResult) -> void:
@@ -669,7 +853,8 @@ func _on_jamie_attack(kind: StringName, damage: int, big: bool) -> void:
 		Haptics.strong(80)
 	elif damage >= 4:
 		ScreenShake.apply(_board, 5.0, 0.18)
-	if _jamie_rig != null and not _power_fired_this_move and kind == &"basic" and damage >= 3:
+	if _jamie_rig != null and not _power_fired_this_move and not _booster_anim_this_move \
+			and kind == &"basic" and damage >= 3:
 		_jamie_rig.play(&"attack_sword")
 
 func _on_power_fired(power: StringName, combo: StringName) -> void:
@@ -701,79 +886,62 @@ func _rig_action_for_power(id: StringName) -> StringName:
 		"ultimate": return &"fever_ultimate"
 	return &"attack_sword"
 
-func _on_boss_attacked() -> void:
-	if _board != null:
-		ScreenShake.apply(_board, 14.0, 0.4)
-	Haptics.strong(90)
-	Audio.play(&"boss_impact")
-	if _jamie_rig != null:
-		_jamie_rig.play(&"hurt")
-	if _combat != null and _combat.is_final_boss():
-		_hud.boss_taunt()
-	if _jasmine != null:
-		_jasmine.set_state(&"scared")
-
-func _on_boss_defeated() -> void:
-	if _level_ended:
-		return
-	_hud.boss_defeat_anim()
-	Audio.play(&"boss_impact", 1.0)
-	if _board != null:
-		ScreenShake.apply(_board, 18.0, 0.5)
-	if _enemy_actor != null:
-		_enemy_actor.play_defeat()
-	# Only the actual chapter win (Jamie's victory pose, Jasmine
-	# rescued/cheering) plays here if the stage's other objectives are
-	# ALREADY done too — otherwise the board stays live (CombatDirector
-	# no-ops further boss damage once hp is 0) until they are, and
-	# _check_boss_win_or_flourish() fires the same flourish from
-	# _apply_move_result once they complete.
-	_check_boss_win_or_flourish()
-
-## Jamie's rig reports a landed hit — drive the boss reaction (boss stages)
-## from it. Damage numbers were already applied by CombatDirector; this is
-## pure presentation and cannot desync them.
+## Jamie's rig reports a landed hit — drive the villain flinch from it. Pure
+## presentation; no HP is tracked any more.
 func _on_jamie_enemy_reaction(kind: StringName, _pos: Vector2) -> void:
 	if kind == &"none":
 		return
 	if _enemy_actor != null:
 		_enemy_actor.play_hit(kind)
-	if _combat != null and _combat.is_boss and _combat.boss_hp > 0:
-		_hud.boss_hit(kind)
 
 func _on_level_won() -> void:
 	if _level_ended:
 		return
 	_level_ended = true
-	var first_clear := not Progress.is_completed(_current_level.id)
+	# Progression identity is (island, world-local level) — recorded in
+	# IslandProgress. Completing island i level N unlocks only island i level
+	# N+1; completing island i level 100 unlocks island i+1. The campaign
+	# `Progress` autoload is still dual-written for the authored level so the
+	# older story/backdrop views stay coherent, but the island map never reads
+	# it.
+	var first_clear := not IslandProgress.is_level_completed(_active_world_id, _active_local_level)
 	Economy.grant(_current_level.reward_coins)
 	# Per-level score thresholds are the primary star rule; StarRating falls
 	# back to move-efficiency when a level defines no `star_scores`.
 	var stars := StarRating.stars_for_score(_score, _current_level.star_scores, _moves_left, _current_level.move_limit)
+	IslandProgress.record_completion(_active_world_id, _active_local_level, stars, _score)
 	Progress.record_completion(_current_level.id, stars, _score)
-	var next_id := GameData.levels.next_level_id(_current_level.id)
+	var has_next := _active_local_level < IslandProgress.LEVELS_PER_ISLAND
 	GameEvents.publish_type(EngineEvent.LEVEL_COMPLETED, {
-		"level_id": _current_level.id, "score": _score, "stars": stars,
+		"level_id": _current_level.id, "world_id": String(_active_world_id),
+		"local_level": _active_local_level, "score": _score, "stars": stars,
 	})
 	Music.fade_out_and_stop(0.7)
 	Music.stop_ambient(0.7)
 	Audio.play(&"level_complete")
 	if _combat != null and _combat.is_boss:
 		Audio.play(&"boss_impact", 1.0)
-		if not _combat.is_final_boss():
-			var isl := IslandModel.island_index_for_level(_current_level.id)
-			if isl >= 0:
-				UiKit.show_toast(_hud, "CHAPTER COMPLETE — %s" % IslandModel.island_name(isl).to_upper(), VisualTheme.STAR)
+	# Clearing an island's final level (100) unlocks the next island — call it
+	# out (IslandProgress has already emitted island_unlocked).
+	if _active_local_level >= IslandProgress.LEVELS_PER_ISLAND:
+		UiKit.show_toast(_hud, "ISLAND COMPLETE — %s" %
+			String(WorldCatalog.world(_active_world_id).get("display_name", "")).to_upper(), VisualTheme.STAR)
 	Haptics.strong(60)
 	if _board != null:
 		_board.set_fever(false)
 		_board.play_win_flourish()
 	_backdrop.set_accent_target(VisualTheme.ACCENT)
-	# Boss wins already set a more specific state (rescued / victory) in
-	# _on_boss_defeated before calling this — only a plain stage clear needs
+	# Finale wins already set a more specific state (rescued / victory) in
+	# _win_finale_stage before calling this — only a plain stage clear needs
 	# it here.
 	if _jasmine != null and (_combat == null or not _combat.is_boss):
 		_jasmine.set_state(&"cheering")
+
+	# Non-finale stage clear: dismiss the chapter's minor villain so beating
+	# the level visibly drives it off. Finale stages already played
+	# play_defeat() in _win_finale_stage; a retreat here would double it.
+	if _enemy_actor != null and (_combat == null or not _combat.is_boss):
+		_enemy_actor.play_retreat()
 
 	# Boss stage (every 10th) — grant the boss's equipment drop + a shard,
 	# then let the story beat (stage_complete:N) carry the chapter transition.
@@ -782,16 +950,16 @@ func _on_level_won() -> void:
 		if new_equip != "":
 			UiKit.show_toast(_hud, "NEW EQUIPMENT — %s" % new_equip.to_upper(), VisualTheme.GEM)
 
-	# Every 5th level is a "chest" node on the map — the first time it's
+	# Every 5th world-local level is a "chest" milestone — the first time it's
 	# cleared, open a milestone chest before the normal summary.
-	if first_clear and _current_level.id % 5 == 0:
+	if first_clear and _active_local_level % 5 == 0:
 		await _present_milestone_chest()
 
 	# Story beat that belongs AFTER a stage (boss defeat, chapter close,
 	# finale) — plays once, before the win summary.
 	await _play_beat(Story.beat_for(Story.stage_complete_trigger(_current_level.id)))
 
-	_hud.show_win_panel(_score, _current_level.reward_coins, next_id != -1, stars)
+	_hud.show_win_panel(_score, _current_level.reward_coins, has_next, stars)
 
 func _present_milestone_chest() -> void:
 	var bonus_coins := _current_level.reward_coins * 2
@@ -886,17 +1054,37 @@ func _on_level_lost() -> void:
 	if _jasmine != null:
 		_jasmine.set_state(&"crying")
 
+## "Next" from the win panel advances to the NEXT LEVEL OF THE SAME ISLAND.
+## After level 100 (or if the next level somehow isn't unlocked) it drops back
+## to the island map — where the newly-unlocked next island is now visible.
 func _on_next_level_pressed() -> void:
-	var next_id := GameData.levels.next_level_id(_current_level.id)
-	if next_id != -1 and Progress.is_unlocked(next_id):
+	var next_local := _active_local_level + 1
+	if next_local <= IslandProgress.LEVELS_PER_ISLAND \
+			and IslandProgress.is_level_unlocked(_active_world_id, next_local):
 		_hud.hide_end_panel()
-		await _play_pre_level_story(next_id)
-		_start_level(next_id)
+		_active_local_level = next_local
+		var authored_id := WorldCatalog.authored_level_id(_active_world_id, next_local)
+		await _play_pre_level_story(authored_id)
+		_start_level(authored_id)
 	else:
 		await _go_to_map()
 
 func _on_retry_pressed() -> void:
-	_start_level(_current_level.id)
+	_start_level(WorldCatalog.authored_level_id(_active_world_id, _active_local_level))
+
+## Test / dev helper: start an authored campaign level directly, wiring the
+## island slot to that level's natural (island, world-local) position so the
+## win flow records progression correctly. Bypasses the island-map UI.
+func _debug_start_authored_level(level_id: int) -> void:
+	var isl := IslandModel.island_index_for_level(level_id)
+	var pool := IslandModel.level_ids_for_island(isl)
+	var pos := pool.find(level_id)
+	_active_world_id = WorldCatalog.world_id_at(clampi(isl, 0, WorldCatalog.count() - 1))
+	_active_local_level = (pos + 1) if pos >= 0 else 1
+	# flat authored-campaign villain semantics (is_boss_stage(level_id)) — this
+	# entry point deliberately plays the 1..50 campaign directly.
+	_start_level(level_id, false)
+	_hud.set_level_number(_active_local_level)
 
 func _on_pause_pressed() -> void:
 	if _board != null:
@@ -939,10 +1127,22 @@ func _on_booster_pressed(booster_id: StringName) -> void:
 		match String(def.get("effect", "")):
 			"shuffle_board":
 				_board.request_shuffle()
+				# Phase D — the Shuffle booster now reads as Jamie doing
+				# something: a battlefield sweep, not a silent board reshuffle.
+				if _jamie_rig != null and not _jamie_rig.is_busy():
+					_booster_anim_this_move = true
+					_jamie_rig.play(&"gesture_shuffle")
 			"add_moves":
 				_moves_left += int(def.get("value", 5))
 				_hud.set_moves(_moves_left)
 				_publish_session_state()
+				# Phase D — +Moves is a hopeful beat: Jamie braces for another
+				# push and Jasmine takes heart.
+				if _jamie_rig != null and not _jamie_rig.is_busy():
+					_booster_anim_this_move = true
+					_jamie_rig.play(&"brace")
+				if _jasmine != null:
+					_jasmine.set_state(&"cheering")
 		return
 
 	# Targeted: arm it.
@@ -958,6 +1158,7 @@ func _on_booster_committed(booster_id: StringName) -> void:
 	_hud.flash_booster(booster_id)
 	GameEvents.publish_type(EngineEvent.BOOSTER_USED, {"booster_id": booster_id, "targeted": true})
 	if _jamie_rig != null:
+		_booster_anim_this_move = true
 		_jamie_rig.play(_rig_action_for_booster(booster_id))
 
 ## Booster id -> the Jamie attack it reads as (Bomb -> Jamie detonates a

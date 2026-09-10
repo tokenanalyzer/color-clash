@@ -71,21 +71,33 @@ static func enemy_for_stage(level_id: int) -> StringName:
 		return &""
 	return roster[(level_id - 1) % roster.size()]
 
-static func base_hp(tier: StringName) -> int:
+## ISLAND-AWARE villain selection for the 100-level-per-island progression
+## (2026-09-10). `island_index` is 0-based (WorldCatalog world order - 1);
+## `is_finale` is true ONLY on the island's final local level. Returns
+## `{id, is_boss}`.
+##
+## Unlike is_boss_stage()/boss_for_stage()/enemy_for_stage() — which key off a
+## flat 1..50 campaign id and treat `id % 10 == 0` as a chapter finale — this
+## takes the REAL island + finale position, so:
+##   * the chapter boss (and Jinn) appear ONLY on the island finale, never on
+##     an ordinary mid-island level, no matter which authored level the slot
+##     happens to reuse;
+##   * an island with no roster entry yet (indices 5..9) gets no villain at
+##     all rather than a wrong-chapter boss (or Jinn) leaking in.
+static func island_villain(island_index: int, is_finale: bool) -> Dictionary:
 	_ensure()
-	return int(_data.get("base_hp", {}).get(String(tier), 3))
-
-## Boss HP for a stage — base HP for the boss's tier, scaled up a little by
-## which island it is so later chapters hit harder.
-static func boss_hp(level_id: int) -> int:
-	var bid := boss_for_stage(level_id)
-	if bid == &"":
-		return 0
-	if bid == &"jinn":
-		return base_hp(&"final_boss")
-	var tier := StringName(String(enemy_def(bid).get("tier", "mini_boss")))
-	var island_idx := (level_id - 1) / BOSS_EVERY
-	return base_hp(tier) + island_idx * 3
+	var isl := _island_entry(island_index)
+	if isl.is_empty():
+		return {"id": &"", "is_boss": false}
+	if is_finale:
+		var b := String(isl.get("boss", ""))
+		if b != "":
+			return {"id": StringName(b), "is_boss": true}
+	var mv := String(isl.get("minor_villain", ""))
+	if mv != "":
+		return {"id": StringName(mv), "is_boss": false}
+	var roster := roster_for_island(island_index)
+	return {"id": (roster[0] if not roster.is_empty() else &""), "is_boss": false}
 
 ## AtlasTexture for a labelled enemy on the 10-wide top row of the enemy
 ## sheet. Uses the checkerboard-KEYED copy (story_enemies_keyed) so the

@@ -1,13 +1,22 @@
 class_name SettingsPanel
 extends Control
-## Shared premium Settings dialog — a gold-framed frosted-glass panel with
-## animated open/close, used by BOTH the main menu and the in-level HUD so
-## there is one design. Every control is wired to the real AudioSettings
-## autoload; nothing here is cosmetic-only.
+## Shared premium Settings dialog, used by BOTH the main menu and the in-level
+## HUD so there is one design. Every control is wired to the real
+## AudioSettings autoload; nothing here is cosmetic-only.
+##
+## 2026-09-06 UI asset integration: the panel chrome is now the artist-
+## supplied artwork (assets/ui_kit/settings_elements.png, sliced via
+## AssetLibrary.ui_slice — source PNG untouched). The decorative frame is
+## shown at nearly the full portrait width (~10px each side), aspect-locked,
+## never stretched; the SETTINGS banner, red ✕, ON/OFF toggles, volume
+## slider, link pills and green CLOSE button are all the supplied slices.
+## Only the row labels ("Music" / "Sound Effects" / "Haptics") are live text,
+## exactly as before. If the sheet is missing every piece falls back to the
+## previous procedural UiKit widget.
 
 signal closed()
 
-var _frame: UiKit.GoldFramePanel
+var _panel: UiKit.AssetFramePanel
 var _scrim: ColorRect
 
 func _ready() -> void:
@@ -15,8 +24,6 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	z_index = 200
-	_track_size()
-	get_viewport().size_changed.connect(_track_size)
 
 	_scrim = ColorRect.new()
 	_scrim.color = Color(0, 0, 0, 0.66)
@@ -28,46 +35,29 @@ func _ready() -> void:
 	)
 	add_child(_scrim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(center)
-
-	_frame = UiKit.GoldFramePanel.new(20)
-	_frame.custom_minimum_size = Vector2(560, 0)
-	# Reference match (2026-09-05): a deep violet fill instead of the default
-	# navy — Settings' own supplied mock uses a saturated purple dialog.
-	_frame.set_bg_color(Color(0.16, 0.08, 0.28, 0.94))
-	center.add_child(_frame)
+	_panel = UiKit.AssetFramePanel.new(&"settings_frame", 10.0, 30.0)
+	add_child(_panel)
+	# SETTINGS banner across the top edge (baked gold text) + red ✕ corner.
+	_panel.set_banner(&"settings_title", 0.60)
+	_panel.set_close_x(&"settings_close_x", func():
+		Audio.play(&"button_tap")
+		close())
+	# Reference match: the Music section sits well below the SETTINGS header —
+	# drop the whole content group so it never touches the header/banner.
+	_panel.set_content_top(0.055)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 16)
-	_frame.content().add_child(col)
-
-	# --- title banner + close X ---------------------------------------
-	var title_row := Control.new()
-	title_row.custom_minimum_size = Vector2(0, 54)
-	col.add_child(title_row)
-	var title := VisualTheme.label("SETTINGS", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD)
-	title.set_anchors_preset(Control.PRESET_FULL_RECT)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title_row.add_child(title)
-	var x_btn := UiKit.icon_button(&"close", 52)
-	x_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	x_btn.position = Vector2(-4, -8)
-	var xsb := UiKit.button_face(UiKit.RED_FACE, UiKit.RED_DEEP, 26)
-	xsb.content_margin_left = 0; xsb.content_margin_right = 0
-	xsb.content_margin_top = 0; xsb.content_margin_bottom = 0
-	x_btn.add_theme_stylebox_override("normal", xsb)
-	x_btn.add_theme_stylebox_override("hover", xsb)
-	x_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		close()
-	)
-	title_row.add_child(x_btn)
+	col.add_theme_constant_override("separation", 18)
+	col.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_panel.content().add_child(col)
+	if AssetLibrary.ui_slice(&"settings_title") == null:
+		col.add_child(VisualTheme.label("SETTINGS", VisualTheme.FS_TITLE, VisualTheme.TEXT_GOLD))
 
 	col.add_child(_divider())
+	# a little more air between the header divider and the Music row
+	var lead := Control.new()
+	lead.custom_minimum_size = Vector2(0, 14)
+	col.add_child(lead)
 	col.add_child(_audio_row("Music", &"music", true))
 	col.add_child(_audio_row("Sound Effects", &"sfx", true))
 	col.add_child(_audio_row("Haptics", &"haptics", false))
@@ -75,35 +65,38 @@ func _ready() -> void:
 
 	var links := VBoxContainer.new()
 	links.add_theme_constant_override("separation", 10)
-	links.add_child(_link_button("Privacy Policy"))
-	links.add_child(_link_button("Terms of Service"))
-	links.add_child(_link_button("Restore Purchases"))
+	links.add_child(_link_button("Privacy Policy", &"settings_btn_privacy"))
+	links.add_child(_link_button("Terms of Service", &"settings_btn_terms"))
+	links.add_child(_link_button("Restore Purchases", &"settings_btn_restore"))
 	col.add_child(links)
 
-	var close_btn := UiKit.button("CLOSE", &"primary", VisualTheme.FS_BUTTON)
-	close_btn.custom_minimum_size = Vector2(0, 72)
-	close_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	close_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		close()
-	)
-	col.add_child(close_btn)
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	col.add_child(spacer)
+
+	col.add_child(_close_button())
+
+	_track_size()
+	get_viewport().size_changed.connect(_track_size)
 
 func _track_size() -> void:
 	var vp := get_viewport_rect().size
 	size = vp
 	custom_minimum_size = vp
+	if _panel != null:
+		_panel.layout(vp)
 
 func open() -> void:
 	visible = true
+	_track_size()
 	_refresh()
 	_scrim.modulate.a = 0.0
 	var st := _scrim.create_tween()
 	st.tween_property(_scrim, "modulate:a", 1.0, 0.16)
-	UiKit.pop_in(_frame)
+	UiKit.pop_in(_panel.visual())
 
 func close() -> void:
-	var t := UiKit.pop_out(_frame)
+	var t := UiKit.pop_out(_panel.visual())
 	_scrim.create_tween().tween_property(_scrim, "modulate:a", 0.0, 0.16)
 	await t.finished
 	visible = false
@@ -112,31 +105,38 @@ func close() -> void:
 func _refresh() -> void:
 	pass # rows read AudioSettings live via their own build; nothing cached
 
+## Gold ornament divider from the supplied sheet, or the old thin gold line.
 func _divider() -> Control:
-	var d := Control.new()
-	d.custom_minimum_size = Vector2(0, 2)
+	var d := UiKit.asset_rect_fw(&"settings_divider", 0.5)
+	if d != null:
+		return d
+	var line_wrap := Control.new()
+	line_wrap.custom_minimum_size = Vector2(0, 2)
 	var line := ColorRect.new()
 	line.color = Color(UiKit.GOLD.r, UiKit.GOLD.g, UiKit.GOLD.b, 0.30)
 	line.set_anchors_preset(Control.PRESET_FULL_RECT)
-	d.add_child(line)
-	return d
+	line_wrap.add_child(line)
+	return line_wrap
 
-## One audio row: icon + label + ON/OFF toggle on top, an optional full-width
-## volume slider on a second line beneath — matches the reference mock's
-## two-line layout (icon/label/toggle row, then the slider indented under
-## the label).
+## One audio row: supplied icon badge + live label + supplied ON/OFF toggle,
+## with an optional supplied volume slider on a second line (Music / SFX).
 func _audio_row(text: String, key: StringName, has_slider: bool) -> VBoxContainer:
 	var wrap := VBoxContainer.new()
-	wrap.add_theme_constant_override("separation", 6)
-	wrap.custom_minimum_size = Vector2(0, 78 if has_slider else 56)
+	wrap.add_theme_constant_override("separation", 8)
 
 	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 12)
+	top.add_theme_constant_override("separation", 14)
 	wrap.add_child(top)
 
-	var icon := _RowIcon.new()
-	icon.kind = key
-	icon.custom_minimum_size = Vector2(44, 44)
+	var icon_id := StringName("settings_icon_" + ("music" if key == &"music" else ("sfx" if key == &"sfx" else "haptics")))
+	var icon: Control = UiKit.asset_rect(icon_id)
+	if icon != null:
+		icon.custom_minimum_size = Vector2(84, 84)
+	else:
+		var ci := _RowIcon.new()
+		ci.kind = key
+		ci.custom_minimum_size = Vector2(48, 48)
+		icon = ci
 	top.add_child(icon)
 
 	var label := VisualTheme.label(text, VisualTheme.FS_BODY, VisualTheme.TEXT, 3)
@@ -144,7 +144,7 @@ func _audio_row(text: String, key: StringName, has_slider: bool) -> VBoxContaine
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top.add_child(label)
 
-	var toggle := UiKit.toggle(_enabled(key))
+	var toggle = _make_toggle(_enabled(key))
 	toggle.toggled_value.connect(func(v):
 		Audio.play(&"button_tap")
 		match key:
@@ -157,9 +157,9 @@ func _audio_row(text: String, key: StringName, has_slider: bool) -> VBoxContaine
 	if has_slider:
 		var slider_row := HBoxContainer.new()
 		var indent := Control.new()
-		indent.custom_minimum_size = Vector2(56, 0)
+		indent.custom_minimum_size = Vector2(70, 0)
 		slider_row.add_child(indent)
-		var slider := UiKit.volume_slider(AudioSettings.music_volume if key == &"music" else AudioSettings.sfx_volume)
+		var slider = _make_slider(AudioSettings.music_volume if key == &"music" else AudioSettings.sfx_volume)
 		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slider.value_changed_by_user.connect(func(v):
 			if key == &"music": AudioSettings.set_music_volume(v)
@@ -170,6 +170,25 @@ func _audio_row(text: String, key: StringName, has_slider: bool) -> VBoxContaine
 
 	return wrap
 
+## Supplied ON/OFF toggle art when present, else the procedural ToggleSwitch.
+func _make_toggle(value: bool):
+	if UiKit.AssetToggle.available():
+		var t := UiKit.AssetToggle.new()
+		t.custom_minimum_size = Vector2(168, 80)
+		t.set_state(value)
+		UiKit.attach_press_feedback(t)
+		return t
+	return UiKit.toggle(value)
+
+## Supplied slider art when present, else the procedural VolumeSlider.
+func _make_slider(value: float):
+	if UiKit.AssetSlider.available():
+		var s := UiKit.AssetSlider.new()
+		s.custom_minimum_size = Vector2(160, 46)
+		s.value = value
+		return s
+	return UiKit.volume_slider(value)
+
 func _enabled(key: StringName) -> bool:
 	match key:
 		&"music": return AudioSettings.music_enabled
@@ -177,18 +196,46 @@ func _enabled(key: StringName) -> bool:
 		&"haptics": return AudioSettings.haptics_enabled
 	return true
 
-func _link_button(text: String) -> Button:
-	var b := UiKit.button(text, &"secondary", VisualTheme.FS_BODY, 28)
-	b.custom_minimum_size = Vector2(0, 56)
-	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	b.pressed.connect(func():
+## Supplied purple pill (baked text) when present, else the old secondary
+## button. Behaviour (a "coming at launch" toast) is unchanged.
+func _link_button(text: String, slice_id: StringName) -> Control:
+	var b := UiKit.asset_button_fw(AssetLibrary.ui_slice(slice_id), 0.94)
+	if b != null:
+		b.pressed.connect(func():
+			Audio.play(&"button_tap")
+			UiKit.show_toast(self, "%s — available at launch" % text)
+		)
+		return b
+	var pb := UiKit.button(text, &"secondary", VisualTheme.FS_BODY, 28)
+	pb.custom_minimum_size = Vector2(0, 56)
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.pressed.connect(func():
 		Audio.play(&"button_tap")
 		UiKit.show_toast(self, "%s — available at launch" % text)
 	)
-	return b
+	return pb
+
+## Supplied green CLOSE button (baked text) when present, else primary button.
+func _close_button() -> Control:
+	var b := UiKit.asset_button_fw(AssetLibrary.ui_slice(&"settings_btn_close"), 0.66)
+	if b != null:
+		b.pressed.connect(func():
+			Audio.play(&"button_tap")
+			close()
+		)
+		return b
+	var cb := UiKit.button("CLOSE", &"primary", VisualTheme.FS_BUTTON)
+	cb.custom_minimum_size = Vector2(0, 72)
+	cb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cb.pressed.connect(func():
+		Audio.play(&"button_tap")
+		close()
+	)
+	return cb
 
 
-## Small code-drawn glyph for an audio setting row (note / speaker / wave).
+## Small code-drawn glyph for an audio setting row — the fallback only, used
+## when the supplied icon slices are unavailable (note / speaker / wave).
 class _RowIcon extends Control:
 	var kind: StringName = &"music"
 	func _ready() -> void:
@@ -196,7 +243,6 @@ class _RowIcon extends Control:
 	func _draw() -> void:
 		var c := size * 0.5
 		var r := minf(size.x, size.y) * 0.4
-		# Solid purple badge + white glyph (reference match, 2026-09-05).
 		draw_circle(c, r + 6.0, UiKit.PURPLE_FACE.darkened(0.1))
 		draw_arc(c, r + 5.0, 0, TAU, 24, UiKit.GOLD.lerp(UiKit.PURPLE_FACE, 0.4), 1.5, true)
 		var col := Color(1, 1, 1)

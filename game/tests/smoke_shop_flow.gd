@@ -30,15 +30,14 @@ func _initialize() -> void:
 	await process_frame
 
 	# ================= PART A — boss stage 10 =========================
-	await app._go_to_level(10)
+	app._debug_start_authored_level(10)
 	await process_frame
 	var board = app._board
 	var hud = app._hud
 	assert(board != null, "board not created")
-	assert(app._combat != null and app._combat.is_boss, "stage 10 must be a boss fight")
-	var boss_max: int = app._combat.boss_hp_max
-	assert(app._combat.boss_hp == boss_max, "boss should start at full HP")
-	print("Boss stage 10 loaded. boss_hp=%d/%d  moves=%d" % [app._combat.boss_hp, boss_max, app._moves_left])
+	assert(app._combat != null and app._combat.is_boss, "stage 10 must be a chapter finale")
+	assert(not ("boss_hp" in app._combat), "no boss HP any more (2026-09-07)")
+	print("Finale stage 10 loaded. moves=%d" % app._moves_left)
 
 	var path := _find_path(board.board)
 	assert(path.size() >= board.board.min_group_size, "no valid path")
@@ -46,7 +45,6 @@ func _initialize() -> void:
 	await process_frame
 	var score_snap: int = app._score
 	var moves_snap: int = app._moves_left
-	var boss_snap: int = app._combat.boss_hp
 	var obj_snap := _obj_sig(app)
 	var board_snap := _board_sig(board.board)
 
@@ -57,10 +55,9 @@ func _initialize() -> void:
 	assert(board._locked_input, "board must be frozen while the shop is open")
 	assert(app._score == score_snap, "score changed while shop open")
 	assert(app._moves_left == moves_snap, "moves changed while shop open")
-	assert(app._combat.boss_hp == boss_snap, "BOSS HP changed while shop open")
 	assert(_obj_sig(app) == obj_snap, "objective progress changed while shop open")
 	assert(_board_sig(board.board) == board_snap, "board changed while shop open")
-	print("Shop open on a boss stage — board/score/moves/bossHP/objectives all frozen. OK")
+	print("Shop open on a finale stage — board/score/moves/objectives all frozen. OK")
 
 	# --- buy a booster in-level ---
 	var coins_before: int = economy.coins
@@ -94,21 +91,21 @@ func _initialize() -> void:
 	hud.set_booster_armed(&"")
 	print("USE of Lightning armed the board booster. OK")
 
-	# --- a booster detonation feeds CombatDirector -> boss takes damage ---
-	var boss_pre_booster: int = app._combat.boss_hp
+	# --- a booster detonation runs the normal resolve path and scores ---
+	var score_pre_booster: int = app._score
 	boosters.purchase(&"bomb")
 	await board.apply_power_booster(&"bomb")
 	await process_frame
-	assert(app._combat.boss_hp < boss_pre_booster,
-		"a booster detonation must feed CombatDirector and damage the boss (%d -> %d)"
-		% [boss_pre_booster, app._combat.boss_hp])
-	print("Booster detonation drove CombatDirector: boss_hp %d -> %d%s. OK"
-		% [boss_pre_booster, app._combat.boss_hp, "  (boss defeated)" if app._combat.boss_hp == 0 else ""])
+	assert(app._score >= score_pre_booster,
+		"a booster detonation must resolve through the board (score %d -> %d)"
+		% [score_pre_booster, app._score])
+	print("Booster detonation resolved through the board: score %d -> %d. OK"
+		% [score_pre_booster, app._score])
 
 	# ================= PART B — 'Need More Moves?' on a normal stage ===
 	if app._level_ended:
 		app._hud.hide_end_panel()
-	await app._go_to_level(13)
+	app._debug_start_authored_level(13)
 	await process_frame
 	board = app._board
 	assert(not app._combat.is_boss, "stage 13 should be a normal stage")

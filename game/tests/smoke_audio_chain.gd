@@ -31,7 +31,7 @@ func _initialize() -> void:
 
 	var game_data := get_root().get_node("GameData")
 	await app._on_menu_play_pressed()
-	await app._go_to_level(game_data.levels.first_level_id())
+	app._debug_start_authored_level(game_data.levels.first_level_id())
 	await process_frame
 	var board = app._board
 	economy.grant(1000000)

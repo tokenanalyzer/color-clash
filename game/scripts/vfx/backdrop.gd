@@ -59,11 +59,24 @@ func set_scene(id: StringName, duration: float = 0.5) -> void:
 		_scene_b = null
 		_scene_mix = 1.0)
 
-## Pick the world scene for a 1-based campaign level id.
-func set_scene_for_level(level_id: int) -> void:
+## Pick the in-level backdrop for a 1-based campaign level id.
+## Priority: an explicit per-level `env_override` (data/levels.json `env`) ->
+## the level's ISLAND theme (data/islands.json, IslandModel.island_theme) ->
+## the old 10-band ENV_WORLD_CYCLE fallback. This is what makes each of the
+## 5 islands read as its own kingdom (Forest / Ice / Fire / Desert /
+## Crystal) instead of one static sky.
+func set_scene_for_level(level_id: int, env_override: StringName = &"") -> void:
+	if env_override != &"" and AssetLibrary.tex(env_override) != null:
+		set_scene(env_override)
+		return
+	var island_idx := int(max(level_id - 1, 0) / 10)
+	var theme := IslandModel.island_theme(island_idx)
+	if theme != &"" and AssetLibrary.tex(theme) != null:
+		set_scene(theme)
+		return
 	var tex := AssetLibrary.world_for_level(level_id)
 	if tex != null:
-		var idx := int(max(level_id - 1, 0) / 10) % AssetLibrary.ENV_WORLD_CYCLE.size()
+		var idx := island_idx % AssetLibrary.ENV_WORLD_CYCLE.size()
 		set_scene(AssetLibrary.ENV_WORLD_CYCLE[idx])
 
 ## Cover-fit rect for a texture inside `_size` (aspect kept, centre-cropped).

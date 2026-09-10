@@ -48,10 +48,12 @@ func test_one_persistent_minor_villain_per_chapter() -> void:
 		check_eq("stage %d shows stone_golem" % stage, String(EnemyModel.enemy_for_stage(stage)), "stone_golem")
 	check_eq("stage 50 is Jinn (final boss, not stone_golem)", String(EnemyModel.enemy_for_stage(50)), "jinn")
 
-func test_hp_scales_by_tier_and_chapter() -> void:
-	check_eq("normal base hp", EnemyModel.base_hp(&"normal"), 3)
-	check_eq("final boss base hp", EnemyModel.base_hp(&"final_boss"), 30)
-	check_eq("stage-50 boss hp is the final-boss hp", EnemyModel.boss_hp(50), 30)
-	check("stage-40 boss hp > stage-10 boss hp (later chapter hits harder)",
-		EnemyModel.boss_hp(40) > EnemyModel.boss_hp(10))
-	check_eq("non-boss stage boss_hp is 0", EnemyModel.boss_hp(12), 0)
+func test_boss_hp_concept_is_fully_removed() -> void:
+	# 2026-09-07: the minor-villain health bar / boss-HP mechanic is gone.
+	# EnemyModel no longer exposes any HP accessor — finale stages are won
+	# by their objectives, not by depleting a bar.
+	var em := EnemyModel.new()
+	check("EnemyModel.boss_hp() removed", not em.has_method("boss_hp"))
+	check("EnemyModel.base_hp() removed", not em.has_method("base_hp"))
+	check("but the villain roster / boss-for-stage identity still works",
+		String(EnemyModel.boss_for_stage(10)) == "poison_beast")

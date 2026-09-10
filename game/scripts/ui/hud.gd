@@ -25,10 +25,32 @@ signal continue_bought(moves_added: int)
 signal continue_declined()
 
 var _level_label: LevelBadge
-var _score_label: Label
-var _moves_value: Label
-var _moves_pill: PanelContainer
+var _score_label: UiKit.GlyphNum       # 2026-09-06: supplied gold digit glyphs
+var _moves_value: UiKit.GlyphNum
+var _moves_pill: Control
 var _objective_row: HBoxContainer
+## 2026-09-07 gameplay top-section rebuild — the individual artist-supplied
+## PNGs (assets/topbar/, `tbn_*`): crown-shield MOVES / SCORE badges, the
+## dynamically assembled GOAL panel (left cap + procedural middle + right cap
+## + GOAL header, per Goal Parts/goal part instructions..txt), the FEVER bar
+## + crown, and the SCORE shield's live star row.
+var _tb_moves_zone            # HUD.StatBadge (supplied MOVES badge art + GlyphNum)
+var _tb_goal_zone: Control    # dynamically assembled GOAL panel
+var _tb_score_zone            # HUD.StatBadge (supplied SCORE badge art + GlyphNum)
+var _tb_row1: Control
+var _tb_row2: Control
+var _goal_mid: Panel          # procedural rounded-blue middle (grows with objective count)
+var _goal_left: TextureRect   # fixed decorative left end cap (tbn_goal_left)
+var _goal_right: TextureRect  # fixed decorative right end cap (tbn_goal_right)
+var _goal_header: TextureRect # GOAL header, centred above the assembly (tbn_goal_top)
+## Fixed inner content window inside `_goal_mid`. Its rect is derived ONLY
+## from the panel geometry (never from the objectives), and `clip_contents`
+## is on, so the objective chip row can never paint past the panel border,
+## the screen edge, or up behind the GOAL header — regardless of objective
+## count / type / label length.
+var _goal_content_clip: Control
+var _tb_stars: Array = []
+var _star_scores: Array = []
 var _objective_chips: Array[Node] = []
 ## Tracks each objective's complete/incomplete state across calls to
 ## set_objectives() (called every move) so a fresh completion can fire an
@@ -36,7 +58,7 @@ var _objective_chips: Array[Node] = []
 ## Size mismatch = a new level's objectives just loaded, so no toasts fire.
 var _prev_obj_complete: Array = []
 var _coins_label: Label
-var _fever_bar: FeverArt
+var _fever_bar                 # UiKit.FeverBarArt (supplied art) or legacy FeverArt
 var _fever_label: Label
 var _power_meters: PowerMeters
 var _boss_bar: BossBar
@@ -117,7 +139,7 @@ func playfield_top() -> float:
 		var m := _top_col.get_combined_minimum_size().y
 		if m > 40.0:
 			col_h = m
-	return top + col_h + 14.0
+	return top + col_h + 40.0
 
 ## Vertical space the booster tray reserves at the very bottom (screen edge
 ## up to the top of the tray's contents).
@@ -198,6 +220,7 @@ func _track_size() -> void:
 	for overlay in [_settings_dialog, _booster_shop, _moves_prompt]:
 		if overlay != null and overlay.has_method("_track_size"):
 			overlay._track_size()
+	_layout_topbar()
 
 func _resolve_safe_area() -> void:
 	var vp := get_viewport_rect().size
@@ -232,22 +255,387 @@ func _build_top_bar() -> void:
 	add_child(margin)
 
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 12)
+	col.add_theme_constant_override("separation", 4)
+	col.clip_contents = false
 	_top_col = col
 	margin.add_child(col)
 
-	# --- row 1: pause | LEVEL + SCORE | gear ------------------------------
+	# 2026-09-07: rebuilt against the supplied gameplay reference + individual
+	# tbn_* PNGs. Falls back to the fully procedural bar if the art is absent.
+	var have_tb := AssetLibrary.ui_texture(&"tbn_moves") != null
+	if not have_tb:
+		_build_top_bar_legacy(col)
+		return
+
+	# --- row 1: pause (far left) · LEVEL badge (DEAD CENTRE) · coins(+) /
+	# cart / gear (far right). A plain Control positioned by maths in
+	# _layout_topbar() — an HBox can't screen-centre the LEVEL badge because
+	# the right-hand cluster is much heavier than the lone pause button.
+	var row1 := Control.new()
+	row1.clip_contents = false
+	row1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tb_row1 = row1
+	col.add_child(row1)
+
+	var pause_btn := _tb_circle_btn(&"tbn_pause", &"pause")
+	pause_btn.set_meta("r1", "pause")
+	pause_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		pause_pressed.emit())
+	row1.add_child(pause_btn)
+
+	_level_label = LevelBadge.new()
+	# the crowned-shield art is drawn ~2x oversize and overhangs up/down so it
+	# interleaves with row 2 exactly like the reference.
+	_level_label.custom_minimum_size = Vector2(0, 100)
+	_level_label.clip_contents = false
+	row1.add_child(_level_label)
+
+	# coin readout — dark pill (coin icon + gold count) with the supplied
+	# green "+" disc overhanging its right end (opens the shop; existing flow).
+	# No coin-icon / pill art was supplied, so those keep their current look.
+	var coin_holder := Control.new()
+	coin_holder.custom_minimum_size = Vector2(214, 66)
+	coin_holder.set_meta("r1", "coins")
+	coin_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var coin_pill := PanelContainer.new()
+	coin_pill.add_theme_stylebox_override("panel", UiKit.glass(24, true))
+	coin_pill.set_anchors_preset(Control.PRESET_FULL_RECT)
+	coin_pill.offset_right = -26.0
+	var coin_box := HBoxContainer.new()
+	coin_box.add_theme_constant_override("separation", 8)
+	coin_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	coin_pill.add_child(coin_box)
+	var coin_icon := GemIcon.new()
+	coin_icon.kind = &"coin"
+	coin_icon.custom_minimum_size = Vector2(34, 34)
+	coin_box.add_child(coin_icon)
+	_coins_label = VisualTheme.label("0", VisualTheme.FS_LABEL, VisualTheme.TEXT_GOLD)
+	coin_box.add_child(_coins_label)
+	coin_holder.add_child(coin_pill)
+	var add_btn := UiKit.asset_button(AssetLibrary.ui_texture(&"tbn_add"))
+	if add_btn != null:
+		add_btn.custom_minimum_size = Vector2(56, 56)
+		add_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+		add_btn.offset_left = -56.0
+		add_btn.offset_top = -28.0
+		add_btn.offset_right = 0.0
+		add_btn.offset_bottom = 28.0
+		add_btn.pressed.connect(func():
+			Audio.play(&"button_tap")
+			shop_pressed.emit())
+		coin_holder.add_child(add_btn)
+	row1.add_child(coin_holder)
+
+	var shop_btn := _tb_circle_btn(&"tbn_cart", &"bag")
+	shop_btn.set_meta("r1", "cart")
+	shop_btn.pressed.connect(func():
+		Audio.play(&"button_tap")
+		shop_pressed.emit())
+	row1.add_child(shop_btn)
+
+	var gear := _tb_circle_btn(&"tbn_gear", &"gear")
+	gear.set_meta("r1", "gear")
+	gear.pressed.connect(func():
+		Audio.play(&"button_tap")
+		_show_settings(true))
+	row1.add_child(gear)
+
+	# --- row 2: MOVES badge | GOAL panel | SCORE badge --------------------
+	# A plain Control — the three pieces are positioned by maths in
+	# _layout_topbar(): the supplied crown-shield badges are TALLER than the
+	# Goal panel and their crowns / ribbons overhang, which an HBox can't
+	# express. Reference-driven vertical hierarchy.
+	var row2 := Control.new()
+	row2.clip_contents = false
+	row2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tb_row2 = row2
+	col.add_child(row2)
+
+	_tb_moves_zone = StatBadge.new(&"tbn_moves")
+	row2.add_child(_tb_moves_zone)
+	_moves_value = _tb_moves_zone.num
+	_moves_value.digit_h = 54.0
+
+	_tb_goal_zone = _build_goal_zone()
+	row2.add_child(_tb_goal_zone)
+
+	_tb_score_zone = StatBadge.new(&"tbn_score")
+	row2.add_child(_tb_score_zone)
+	_score_label = _tb_score_zone.num
+	_score_label.digit_h = 44.0
+
+	# Live star row on the SCORE shield (reflective only — StarRating still
+	# owns the award). Small, tucked at the base of the shield so the badge
+	# still reads as the supplied art (the reference shows no star row).
+	var star_row := HBoxContainer.new()
+	star_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	star_row.add_theme_constant_override("separation", 4)
+	star_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for i in 3:
+		var st := TextureRect.new()
+		st.texture = AssetLibrary.tex(&"eco_star")
+		st.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		st.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		st.custom_minimum_size = Vector2(22, 22)
+		st.modulate = Color(1, 1, 1, 0.26)
+		st.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star_row.add_child(st)
+		_tb_stars.append(st)
+	star_row.set_meta("is_star_row", true)
+	_tb_score_zone.add_child(star_row)
+
+	# a dedicated gap so the FEVER section (added next by _build_fever_meter)
+	# has clear breathing room from the stat row.
+	var fever_gap := Control.new()
+	fever_gap.custom_minimum_size = Vector2(0, 4)
+	fever_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	col.add_child(fever_gap)
+
+	_layout_topbar()
+
+## The GOAL panel, assembled dynamically per
+## `Downloads/New Assets/Goal Parts/goal part instructions..txt`:
+##   [ left cap ] [ dynamic middle — one blue chip per objective ] [ right cap ]
+## with the GOAL header centred above the whole assembly. The three supplied
+## PNGs (tbn_goal_left / _right / _top) are used undistorted (aspect-fit);
+## only `_goal_mid` — a procedural rounded-blue panel, exactly as the txt
+## specifies — expands with the objective count. Nothing is flattened,
+## redrawn or stretched.
+func _build_goal_zone() -> Control:
+	var z := Control.new()
+	z.clip_contents = false
+	z.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	_goal_mid = Panel.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.106, 0.325, 0.78)
+	sb.set_corner_radius_all(18)
+	sb.border_color = Color(0.93, 0.70, 0.24)
+	sb.set_border_width_all(6)
+	sb.shadow_size = 0
+	_goal_mid.add_theme_stylebox_override("panel", sb)
+	_goal_mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	z.add_child(_goal_mid)
+
+	_goal_left = _goal_cap(&"tbn_goal_left")
+	z.add_child(_goal_left)
+	_goal_right = _goal_cap(&"tbn_goal_right")
+	z.add_child(_goal_right)
+
+	# Fixed, panel-derived clip window; the chip row lives inside it and is
+	# centred there. _layout_topbar() sizes/places this to a rect strictly
+	# inside `_goal_mid`'s gold border.
+	_goal_content_clip = Control.new()
+	_goal_content_clip.clip_contents = true
+	_goal_content_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	z.add_child(_goal_content_clip)
+
+	_objective_row = HBoxContainer.new()
+	_objective_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_objective_row.add_theme_constant_override("separation", 12)
+	_objective_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_goal_content_clip.add_child(_objective_row)
+
+	_goal_header = TextureRect.new()
+	_goal_header.texture = AssetLibrary.ui_texture(&"tbn_goal_top")
+	_goal_header.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_goal_header.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_goal_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	z.add_child(_goal_header)
+	return z
+
+func _goal_cap(tex_id: StringName) -> TextureRect:
+	var tr := TextureRect.new()
+	tr.texture = AssetLibrary.ui_texture(tex_id)
+	tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return tr
+
+## Circle button from the supplied disc art, or the old glass disc.
+func _tb_circle_btn(tex_id: StringName, fallback_glyph: StringName) -> BaseButton:
+	var tex := AssetLibrary.ui_texture(tex_id)
+	if tex != null:
+		var b := UiKit.asset_button(tex)
+		b.custom_minimum_size = Vector2(76, 76)
+		return b
+	return _icon_button(fallback_glyph, 72)
+
+## One deliberate reference-driven layout pass for the whole top section.
+## Everything is derived from `inner` (the top bar's usable width) and a
+## single badge height `bh`; no piecemeal nudging.
+func _layout_topbar() -> void:
+	if _tb_moves_zone == null or not is_instance_valid(_tb_moves_zone):
+		return
+	var vp := get_viewport_rect().size
+	var inner: float = maxf(vp.x - 44.0, 320.0)
+
+	# --- row 1: pause far-left, LEVEL badge DEAD CENTRE, coins/cart/gear
+	# far-right. Positioned by maths so the LEVEL badge always lands on the
+	# screen centre regardless of how heavy the right-hand cluster is.
+	if _tb_row1 != null:
+		var r1h := 96.0
+		_tb_row1.custom_minimum_size = Vector2(inner, r1h)
+		var btn := 76.0
+		var gap := 12.0
+		for c in _tb_row1.get_children():
+			if not (c is Control):
+				continue
+			var tagm := String((c as Control).get_meta("r1", ""))
+			match tagm:
+				"pause":
+					(c as Control).position = Vector2(0.0, (r1h - btn) * 0.5)
+					(c as Control).size = Vector2(btn, btn)
+				"gear":
+					(c as Control).position = Vector2(inner - btn, (r1h - btn) * 0.5)
+					(c as Control).size = Vector2(btn, btn)
+				"cart":
+					(c as Control).position = Vector2(inner - btn * 2.0 - gap, (r1h - btn) * 0.5)
+					(c as Control).size = Vector2(btn, btn)
+				"coins":
+					var ch := (c as Control)
+					var cw: float = ch.custom_minimum_size.x
+					ch.position = Vector2(inner - btn * 2.0 - gap * 2.0 - cw, (r1h - ch.custom_minimum_size.y) * 0.5)
+					ch.size = Vector2(cw, ch.custom_minimum_size.y)
+		if _level_label != null:
+			var lw: float = clampf(inner * 0.42, 200.0, 320.0)
+			_level_label.position = Vector2(inner * 0.5 - lw * 0.5, 0.0)
+			_level_label.size = Vector2(lw, r1h)
+
+	# MOVES / SCORE crown-shield badges sit left / right, TALLER than the GOAL
+	# panel; their crowns rise toward row 1 and their shields drop below the
+	# GOAL panel — the reference stack. Decorative art is only ever aspect-fit.
+	var bh: float = clampf(inner * 0.205, 165.0, 232.0)
+	var m_aspect: float = _tb_moves_zone.art_aspect()
+	var s_aspect: float = _tb_score_zone.art_aspect()
+	var bw_m: float = bh * m_aspect
+	var bw_s: float = bh * s_aspect
+	# The GOAL zone is EXACTLY centred: the same margin on both sides (the
+	# larger of the two badge widths), so a tiny MOVES/SCORE art-aspect
+	# difference can never drift the panel off centre.
+	var goal_margin: float = maxf(bw_m, bw_s)
+	var goal_x0: float = goal_margin
+	var goal_x1: float = inner - goal_margin
+	var goal_w: float = maxf(goal_x1 - goal_x0, 340.0)
+	var gh: float = clampf(goal_w * 0.185, 96.0, 150.0)
+	# GOAL panel body centred on the badges' blue shield field, pulled up so
+	# the "GOAL" header interleaves with the LEVEL badge above (reference),
+	# leaving no dead band between row 1 and row 2.
+	var shield_cy: float = bh * 0.52
+	var goal_top: float = shield_cy - gh * 0.5
+
+	# the badges overhang the box downward (transparent art tail); reserving
+	# only ~0.82·bh kills the empty gap before the FEVER bar.
+	_tb_row2.custom_minimum_size = Vector2(inner, bh * 0.82)
+	_tb_moves_zone.position = Vector2(0.0, 0.0)
+	_tb_moves_zone.size = Vector2(bw_m, bh)
+	_tb_score_zone.position = Vector2(inner - bw_s, 0.0)
+	_tb_score_zone.size = Vector2(bw_s, bh)
+	_tb_goal_zone.position = Vector2(goal_x0, 0.0)
+	_tb_goal_zone.size = Vector2(goal_w, bh)
+
+	# MOVES / SCORE number on the blue shield field (below the baked label)
+	if _moves_value != null:
+		_moves_value.digit_h = bh * 0.24
+		_moves_value.position = Vector2(bw_m * 0.5, bh * 0.70)
+	if _score_label != null:
+		_score_label.digit_h = bh * 0.22
+		_score_label.position = Vector2(bw_s * 0.5, bh * 0.665)
+	for c in _tb_score_zone.get_children():
+		if c is HBoxContainer and c.has_meta("is_star_row"):
+			var sr := c as HBoxContainer
+			var ss: float = bh * 0.082
+			sr.add_theme_constant_override("separation", int(ss * 0.3))
+			for st in sr.get_children():
+				(st as Control).custom_minimum_size = Vector2(ss, ss)
+			var srw: float = ss * 3.0 + ss * 0.6
+			sr.position = Vector2(bw_s * 0.5 - srw * 0.5, bh * 0.83)
+
+	# --- GOAL assembly (Goal Parts txt) — caps fixed, middle dynamic -------
+	var cap_h: float = gh
+	var cap_w_l: float = cap_h * 1.14
+	var cap_w_r: float = cap_h * 1.14
+	if _goal_left != null and _goal_left.texture != null and _goal_left.texture.get_height() > 0:
+		cap_w_l = cap_h * float(_goal_left.texture.get_width()) / float(_goal_left.texture.get_height())
+	if _goal_right != null and _goal_right.texture != null and _goal_right.texture.get_height() > 0:
+		cap_w_r = cap_h * float(_goal_right.texture.get_width()) / float(_goal_right.texture.get_height())
+	if _goal_left != null:
+		_goal_left.position = Vector2(0.0, goal_top)
+		_goal_left.size = Vector2(cap_w_l, cap_h)
+	if _goal_right != null:
+		_goal_right.position = Vector2(goal_w - cap_w_r, goal_top)
+		_goal_right.size = Vector2(cap_w_r, cap_h)
+	if _goal_mid != null:
+		# the middle spans right under the caps (their opaque gold frame hides
+		# its rounded corners → a clean join) and matches their height so the
+		# gold rail reads as continuous, exactly like the reference.
+		var mx0: float = cap_w_l * 0.24
+		var mx1: float = goal_w - cap_w_r * 0.24
+		_goal_mid.position = Vector2(mx0, goal_top)
+		_goal_mid.size = Vector2(maxf(mx1 - mx0, 40.0), cap_h)
+	if _goal_header != null and _goal_header.texture != null and _goal_header.texture.get_height() > 0:
+		var ha: float = float(_goal_header.texture.get_width()) / float(_goal_header.texture.get_height())
+		var hw: float = clampf(goal_w * 0.52, 220.0, 560.0)
+		var hh: float = hw / ha
+		# the "GOAL" header sits ABOVE the panel — centred on the whole
+		# assembly, only its bottom decorative lip dips into the panel's top
+		# gold border, well clear of the objective chips below.
+		_goal_header.position = Vector2(goal_w * 0.5 - hw * 0.5, goal_top - hh * 0.78)
+		_goal_header.size = Vector2(hw, hh)
+	# --- UI FIX #1 (revised 2026-09-10): the objective chips live in a FIXED
+	# inner content rectangle inside `_goal_mid`. That rect is a pure function
+	# of the panel geometry (screen width + badge art) — it does NOT depend on
+	# the objectives — so it never moves between stages. The chip row fills
+	# that rect and centres its chips inside it natively (H via the HBox's
+	# CENTER alignment, V via SHRINK_CENTER on each chip). If the row's
+	# natural size exceeds the rect it is scaled down uniformly ABOUT THE RECT
+	# CENTRE, so it shrinks in place instead of drifting. `_goal_content_clip`
+	# has clip_contents on, so even a pathological case can't paint past the
+	# panel border, the screen edge, or up behind the GOAL header. The GOAL
+	# panel art itself is never stretched.
+	if _objective_row != null and _goal_mid != null and _goal_content_clip != null:
+		var pad_x := 16.0
+		var pad_y := 12.0
+		var rect_w: float = maxf(_goal_mid.size.x - pad_x * 2.0, 30.0)
+		var rect_h: float = maxf(_goal_mid.size.y - pad_y * 2.0, 20.0)
+		_goal_content_clip.position = Vector2(_goal_mid.position.x + pad_x, _goal_mid.position.y + pad_y)
+		_goal_content_clip.size = Vector2(rect_w, rect_h)
+
+		# the row fills the fixed rect; the HBox centres the chip block inside
+		# it, and each chip keeps its natural size (no stretch) centred on the
+		# row's vertical axis.
+		for ch in _objective_row.get_children():
+			if ch is Control:
+				(ch as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+				(ch as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_objective_row.position = Vector2.ZERO
+		_objective_row.size = Vector2(rect_w, rect_h)
+		_objective_row.queue_sort()
+
+		var cmin: Vector2 = _objective_row.get_combined_minimum_size()
+		var sc := 1.0
+		if cmin.x > 1.0 and cmin.y > 1.0:
+			sc = clampf(minf(rect_w / cmin.x, rect_h / cmin.y), 0.30, 1.0)
+		_objective_row.pivot_offset = Vector2(rect_w, rect_h) * 0.5
+		_objective_row.scale = Vector2(sc, sc)
+
+	# --- FEVER — clear breathing room + the supplied bar's true aspect -----
+	if _fever_wrap != null:
+		_fever_wrap.custom_minimum_size = Vector2(0, clampf(inner / 6.56 + 6.0, 78.0, 205.0))
+	if is_instance_valid(_top_col):
+		_top_col.add_theme_constant_override("separation", 4)
+	_moves_pill = _tb_moves_zone
+
+## The pre-2026-09-06 procedural top bar — kept as the fallback when the
+## supplied topbar sheet is unavailable.
+func _build_top_bar_legacy(col: VBoxContainer) -> void:
 	var row1 := HBoxContainer.new()
 	row1.add_theme_constant_override("separation", 12)
 	col.add_child(row1)
-
 	var pause_btn := _icon_button(&"pause", 68)
-	pause_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		pause_pressed.emit()
-	)
+	pause_btn.pressed.connect(func(): Audio.play(&"button_tap"); pause_pressed.emit())
 	row1.add_child(pause_btn)
-
 	var title_box := VBoxContainer.new()
 	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -258,45 +646,31 @@ func _build_top_bar() -> void:
 	var score_cap := VisualTheme.label("SCORE", VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 0)
 	score_cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_box.add_child(score_cap)
-	_score_label = VisualTheme.label("0", VisualTheme.FS_DISPLAY, VisualTheme.TEXT, 6)
-	_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_label = UiKit.GlyphNum.new()
+	_score_label.digit_h = 36.0
 	title_box.add_child(_score_label)
 	row1.add_child(title_box)
-
 	var shop_btn := UiKit.icon_button(&"bag", 68)
-	shop_btn.pressed.connect(func():
-		Audio.play(&"button_tap")
-		shop_pressed.emit()
-	)
+	shop_btn.pressed.connect(func(): Audio.play(&"button_tap"); shop_pressed.emit())
 	row1.add_child(shop_btn)
-
 	var gear := _icon_button(&"gear", 68)
-	gear.pressed.connect(func():
-		Audio.play(&"button_tap")
-		_show_settings(true)
-	)
+	gear.pressed.connect(func(): Audio.play(&"button_tap"); _show_settings(true))
 	row1.add_child(gear)
-
-	# --- row 2: MOVES pill | objectives pill | COINS pill ----------------
 	var row2 := HBoxContainer.new()
 	row2.add_theme_constant_override("separation", 12)
 	col.add_child(row2)
-
 	var moves_box := VBoxContainer.new()
 	moves_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	moves_box.add_theme_constant_override("separation", 0)
 	var moves_cap := VisualTheme.label("MOVES", VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 0)
 	moves_cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	moves_box.add_child(moves_cap)
-	_moves_value = VisualTheme.label("20", VisualTheme.FS_HERO_NUM, VisualTheme.TEXT)
-	_moves_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_moves_value = UiKit.GlyphNum.new()
+	_moves_value.digit_h = 48.0
 	moves_box.add_child(_moves_value)
 	_moves_pill = _pill(moves_box, 120)
 	row2.add_child(_moves_pill)
-
 	var tgt_box := VBoxContainer.new()
 	tgt_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tgt_box.add_theme_constant_override("separation", 3)
 	var tgt_cap := VisualTheme.label("GOAL", VisualTheme.FS_CAPTION, VisualTheme.TEXT_DIM, 0)
 	tgt_cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tgt_box.add_child(tgt_cap)
@@ -307,7 +681,6 @@ func _build_top_bar() -> void:
 	var tgt_pill := _pill(tgt_box)
 	tgt_pill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row2.add_child(tgt_pill)
-
 	var coin_box := HBoxContainer.new()
 	coin_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	coin_box.add_theme_constant_override("separation", 8)
@@ -323,31 +696,44 @@ func _build_top_bar() -> void:
 
 func _build_fever_meter() -> void:
 	_fever_wrap = Control.new()
-	_fever_wrap.custom_minimum_size = Vector2(0, 72)
+	_fever_wrap.custom_minimum_size = Vector2(0, 66)
+	_fever_wrap.clip_contents = false
 	_top_col.add_child(_fever_wrap)
 
-	# The full golden Fever bar (see FeverArt below): an ornate gold double
-	# frame with a crown motif on the left, a golden energy fill with premium
-	# glow, the Fever Crystal (#52) riding the fill edge, and the x1.5 reward
-	# in a gold badge on the right. All drawn in FeverArt so it stays one node.
-	_fever_bar = FeverArt.new()
+	# 2026-09-07: the supplied FEVER bar art (tbn_fever_bar + tbn_fever_crown)
+	# with a gold fill clipped to `ratio`. Same `ratio`/`active`/`flash`/
+	# `mult_text` surface as the old procedural FeverArt, so set_fever() /
+	# flash_fever() are untouched. Falls back to the legacy FeverArt.
+	if AssetLibrary.ui_texture(&"tbn_fever_bar") != null:
+		_fever_bar = UiKit.FeverBarArt.new()
+	else:
+		_fever_bar = FeverArt.new()
 	_fever_bar.mult_text = "x%.1f" % GameData.fever_config.score_multiplier
 	_fever_bar.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fever_wrap.add_child(_fever_bar)
 
-	# "FEVER" caption sits in the clear strip above the fill track.
+	# "FEVER" caption — the supplied bar art has it baked in, so this live
+	# label is kept only so set_fever()'s _fever_label writes stay valid; it
+	# is shown only under the legacy FeverArt path.
 	_fever_label = VisualTheme.label("FEVER", VisualTheme.FS_CAPTION, VisualTheme.TEXT_GOLD, 4)
 	_fever_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
 	_fever_label.offset_left = 46
 	_fever_label.offset_top = 1
 	_fever_label.offset_bottom = 21
 	_fever_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fever_label.visible = _fever_bar is FeverArt
 	_fever_wrap.add_child(_fever_label)
 
-	# --- combat: Jamie power meters + (boss stages only) a boss HP bar ---
+	# --- combat: Jamie power meters. The boss HP bar node is kept in the
+	# tree for API compat but is NEVER shown (2026-09-07: minor-villain
+	# health bar removed — finale stages are won by objectives). ---
+	var pm_gap := Control.new()
+	pm_gap.custom_minimum_size = Vector2(0, 6)
+	pm_gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_top_col.add_child(pm_gap)
 	_power_meters = PowerMeters.new()
-	_power_meters.custom_minimum_size = Vector2(0, 30)
+	_power_meters.custom_minimum_size = Vector2(0, 46)
 	_top_col.add_child(_power_meters)
 	_boss_bar = BossBar.new()
 	_boss_bar.visible = false
@@ -355,14 +741,17 @@ func _build_fever_meter() -> void:
 
 # ------------------------------------------------------------ combat --
 
-func begin_boss(boss_name: String, face: Texture2D, is_final: bool) -> void:
-	_boss_bar.configure(boss_name, face, is_final)
+## 2026-09-07: no-op. The minor-villain health bar was removed from the
+## gameplay design; a chapter finale is won by completing its objectives.
+func begin_boss(_boss_name: String, _face: Texture2D, _is_final: bool) -> void:
+	_boss_bar.visible = false
 
 func end_boss() -> void:
 	_boss_bar.visible = false
 
-func set_boss_hp(hp: int, hp_max: int) -> void:
-	_boss_bar.set_hp(hp, hp_max)
+## No-op — kept so any older caller still links.
+func set_boss_hp(_hp: int, _hp_max: int) -> void:
+	pass
 
 func boss_defeat_anim() -> void:
 	_boss_bar.play_defeat()
@@ -672,18 +1061,37 @@ func any_modal_open() -> bool:
 
 func set_level_info(level: LevelConfig) -> void:
 	_level_label.text = level.level_name.to_upper()
+	_star_scores = level.star_scores if level != null else []
 	set_booster_armed(&"")
 	_prev_obj_complete = []  # fresh level: no "objective complete" toasts from stale state
+	_update_score_stars(_shown_score)
+
+## Override the LEVEL badge to show the ISLAND-local level number (call after
+## set_level_info). The badge itself renders only the digits.
+func set_level_number(n: int) -> void:
+	_level_label.text = "LEVEL %d" % n
 
 var _shown_score := 0
 func set_score(v: int) -> void:
 	if v == _shown_score:
 		_score_label.text = _fmt(v)
+		_update_score_stars(v)
 		return
 	var from := _shown_score
 	_shown_score = v
 	var t := create_tween()
 	t.tween_method(func(x: float): _score_label.text = _fmt(int(round(x))), float(from), float(v), 0.35)
+	_update_score_stars(v)
+
+## Live-light the SCORE crest's 3 stars from the running score against the
+## level's star_scores thresholds (purely reflective — the authoritative
+## star award still happens at level end in StarRating).
+func _update_score_stars(score: int) -> void:
+	if _tb_stars.is_empty():
+		return
+	for i in _tb_stars.size():
+		var earned := i < _star_scores.size() and score >= int(_star_scores[i])
+		(_tb_stars[i] as TextureRect).modulate = Color(1, 1, 1, 1) if earned else Color(1, 1, 1, 0.28)
 
 func _fmt(n: int) -> String:
 	var s := str(n)
@@ -699,7 +1107,7 @@ func _fmt(n: int) -> String:
 func set_moves(remaining: int) -> void:
 	var r := maxi(remaining, 0)
 	_moves_value.text = str(r)
-	_moves_value.add_theme_color_override("font_color", VisualTheme.ACCENT_HOT if r <= 3 else VisualTheme.TEXT)
+	_moves_value.warn = r <= 3
 	_pulse(_moves_pill)
 
 func set_coins(amount: int) -> void:
@@ -726,52 +1134,46 @@ func set_objectives(tracker: ObjectiveTracker, level: LevelConfig) -> void:
 		if complete and not is_new_level and not bool(_prev_obj_complete[i]):
 			UiKit.show_toast(self, "OBJECTIVE COMPLETE", VisualTheme.GOOD)
 
-		# One objective "card": icon + count over a slim progress bar, on a
-		# rounded inset so each goal reads as a distinct tracked task.
+		# One objective chip: a compact horizontal blue pill (icon + count).
+		# Kept small on purpose so multiple chips always fit INSIDE the supplied
+		# GOAL panel art (_layout_topbar then scales the whole row to guarantee
+		# containment). No per-goal progress bar, matching the reference.
 		var card := PanelContainer.new()
-		var csb := UiKit.glass(14, true)
-		csb.border_color = VisualTheme.GOOD if complete else UiKit.GLASS_BORDER
-		csb.set_border_width_all(2 if complete else 1)
-		csb.content_margin_left = 12
-		csb.content_margin_right = 12
-		csb.content_margin_top = 8
-		csb.content_margin_bottom = 8
+		# keep each chip at its natural size and centred in the row — the row
+		# fills a fixed rect, so FILL flags here would stretch chips wide.
+		card.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var csb := StyleBoxFlat.new()
+		csb.bg_color = Color(0.03, 0.09, 0.30, 0.62)
+		csb.set_corner_radius_all(12)
+		csb.border_color = VisualTheme.GOOD if complete else Color(0.42, 0.60, 0.98, 0.7)
+		csb.set_border_width_all(2)
+		csb.content_margin_left = 9
+		csb.content_margin_right = 10
+		csb.content_margin_top = 5
+		csb.content_margin_bottom = 5
 		csb.shadow_size = 0
 		card.add_theme_stylebox_override("panel", csb)
 
-		var box := VBoxContainer.new()
-		box.add_theme_constant_override("separation", 4)
-		card.add_child(box)
-
-		var top := HBoxContainer.new()
-		top.alignment = BoxContainer.ALIGNMENT_CENTER
-		top.add_theme_constant_override("separation", 7)
+		var rowb := HBoxContainer.new()
+		rowb.alignment = BoxContainer.ALIGNMENT_CENTER
+		rowb.add_theme_constant_override("separation", 6)
+		card.add_child(rowb)
 		var icon := GemIcon.new()
-		icon.custom_minimum_size = Vector2(38, 38)
+		icon.custom_minimum_size = Vector2(30, 30)
 		_style_obj_icon(icon, obj)
-		top.add_child(icon)
-		var txt := VisualTheme.label("%d/%d" % [mini(done, tgt), tgt], VisualTheme.FS_HEADING,
-			VisualTheme.GOOD if complete else VisualTheme.TEXT)
-		top.add_child(txt)
-		box.add_child(top)
-
-		var bar := ProgressBar.new()
-		bar.show_percentage = false
-		bar.min_value = 0.0
-		bar.max_value = 1.0
-		bar.value = clampf(float(done) / float(tgt), 0.0, 1.0)
-		bar.custom_minimum_size = Vector2(120, 10)
-		var bg := _bar_style(Color(0.0, 0.0, 0.02, 0.7))
-		bg.set_corner_radius_all(5)
-		var fg := _bar_style(VisualTheme.GOOD if complete else _obj_bar_color(obj))
-		fg.set_corner_radius_all(5)
-		bar.add_theme_stylebox_override("background", bg)
-		bar.add_theme_stylebox_override("fill", fg)
-		box.add_child(bar)
+		rowb.add_child(icon)
+		var txt := VisualTheme.label("%d/%d" % [mini(done, tgt), tgt], VisualTheme.FS_BODY,
+			VisualTheme.GOOD if complete else Color(0.97, 0.98, 1.0))
+		rowb.add_child(txt)
 
 		_objective_row.add_child(card)
 		_objective_chips.append(card)
 	_prev_obj_complete = new_complete
+	# re-fit the objective row into the GOAL panel art once the HBox has
+	# sized itself to the new chips.
+	if _tb_goal_zone != null:
+		_layout_topbar.call_deferred()
 
 func _obj_bar_color(obj: Dictionary) -> Color:
 	match String(obj.get("type", "")):
@@ -783,6 +1185,8 @@ func _obj_bar_color(obj: Dictionary) -> Color:
 			return Color(1.0, 0.7, 0.3)
 		"break_obstacles":
 			return Color(0.7, 0.75, 0.82)
+		"deliver":
+			return Color(1.0, 0.55, 0.75)
 		_:
 			return VisualTheme.ACCENT
 
@@ -797,6 +1201,9 @@ func _style_obj_icon(icon: GemIcon, obj: Dictionary) -> void:
 			icon.kind = &"power"
 		"break_obstacles":
 			icon.kind = &"obstacle"
+		"deliver":
+			icon.kind = &"crystal"
+			icon.tint = Color(1.0, 0.6, 0.78)
 		_:
 			icon.kind = &"gem"
 
@@ -1298,28 +1705,65 @@ class LevelBadge extends Control:
 
 	func _draw() -> void:
 		var font := ThemeDB.fallback_font
-		var tex := AssetLibrary.tex(&"ui_level_badge")
+		# 2026-09-07: prefer the supplied standalone Level Badge PNG.
+		var tex := AssetLibrary.ui_texture(&"tbn_level")
 		if tex == null:
-			var fs := VisualTheme.FS_LABEL
-			var ts := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-			draw_string_outline(font, Vector2((size.x - ts.x) * 0.5, size.y * 0.5 + fs * 0.34), text,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, VisualTheme.OUTLINE)
-			draw_string(font, Vector2((size.x - ts.x) * 0.5, size.y * 0.5 + fs * 0.34), text,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, fs, VisualTheme.TEXT_GOLD)
+			tex = AssetLibrary.tex(&"ui_level_badge")
+		if tex == null:
+			var fs0 := VisualTheme.FS_LABEL
+			var ts0 := font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, fs0)
+			draw_string_outline(font, Vector2((size.x - ts0.x) * 0.5, size.y * 0.5 + fs0 * 0.34), text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fs0, 4, VisualTheme.OUTLINE)
+			draw_string(font, Vector2((size.x - ts0.x) * 0.5, size.y * 0.5 + fs0 * 0.34), text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, fs0, VisualTheme.TEXT_GOLD)
 			return
-		# badge fit to the row height (aspect kept), centred
-		var bh := size.y * 1.34
+		# badge fit to the row height (aspect kept), centred; crown / ribbons
+		# overhang the row (clip_contents is off on the row) so the LEVEL badge
+		# reads as large as MOVES / SCORE and interleaves with row 2.
+		var bh := size.y * 2.15
 		var bw := bh * float(tex.get_width()) / float(tex.get_height())
 		var bx := (size.x - bw) * 0.5
 		draw_texture_rect(tex, Rect2(Vector2(bx, (size.y - bh) * 0.5), Vector2(bw, bh)), false)
-		# level number/text on the shield field (lower ~62% of the badge)
+		# level number on the blue shield field, gold like the reference
 		var digits := ""
 		for ch in text:
 			if ch >= "0" and ch <= "9":
 				digits += ch
 		var label := digits if digits != "" else text
-		var fs := VisualTheme.FS_LABEL
+		var fs := int(bh * 0.21)
 		var ts := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
-		var pos := Vector2(size.x * 0.5 - ts.x * 0.5, size.y * 0.5 + bh * 0.22 + fs * 0.34)
-		draw_string_outline(font, pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 5, Color(0, 0, 0, 0.8))
-		draw_string(font, pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1))
+		var pos := Vector2(size.x * 0.5 - ts.x * 0.5, size.y * 0.5 + bh * 0.16 + fs * 0.34)
+		draw_string_outline(font, pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(0.20, 0.09, 0.0, 0.92))
+		draw_string(font, pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, VisualTheme.TEXT_GOLD)
+
+
+## A crowned MOVES / SCORE badge rendered from the supplied standalone art
+## (tbn_moves / tbn_score), undistorted (aspect-fit), with the live value
+## drawn on the blue shield field via a UiKit.GlyphNum (the supplied gold
+## digit glyphs). `HUD._layout_topbar()` positions `num` and the star row.
+class StatBadge extends Control:
+	var _tex_id: StringName
+	var _bg: TextureRect
+	var num: UiKit.GlyphNum
+	var _aspect := 1.09
+
+	func _init(tex_id: StringName) -> void:
+		_tex_id = tex_id
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		clip_contents = false
+		_bg = TextureRect.new()
+		_bg.texture = AssetLibrary.ui_texture(_tex_id)
+		_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_bg)
+		if _bg.texture != null and _bg.texture.get_height() > 0:
+			_aspect = float(_bg.texture.get_width()) / float(_bg.texture.get_height())
+		num = UiKit.GlyphNum.new()
+		add_child(num)
+
+	func art_aspect() -> float:
+		return _aspect

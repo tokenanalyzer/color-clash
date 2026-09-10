@@ -33,8 +33,24 @@ func _capture(c: JamieActionController) -> Array:
 func test_all_required_actions_exist() -> void:
 	var a: Dictionary = _cfg().get("actions", {})
 	for id in ["attack_sword", "attack_lightning", "attack_dash", "attack_bomb",
-			"attack_blast", "attack_mega_blast", "fever_ultimate", "hurt", "victory"]:
+			"attack_blast", "attack_mega_blast", "fever_ultimate", "hurt", "victory",
+			"gesture_shuffle", "brace"]:
 		check("action '%s' defined" % id, a.has(id))
+
+## Phase D — the instant-booster beats (Shuffle / +Moves) are cosmetic
+## flourishes: they must never carry an offence payload, or a booster that
+## doesn't touch the board could still "hit" the villain.
+func test_instant_booster_beats_carry_no_offence_payload() -> void:
+	var a: Dictionary = _cfg().get("actions", {})
+	for id in ["gesture_shuffle", "brace"]:
+		var d: Dictionary = a.get(id, {})
+		check_eq("%s enemy_reaction is none" % id, String(d.get("enemy_reaction", "none")), "none")
+		check("%s has no projectile" % id, not d.has("projectile"))
+		check("%s has no impact vfx" % id, not d.has("impact"))
+		check("%s has no lunge toward the enemy" % id, float(d.get("lunge", 0.0)) <= 0.0)
+		var c := _controller()
+		check("%s is a real, runnable action" % id, c.request(StringName(id)))
+		check("%s has a non-zero presentation duration" % id, c.action_duration(StringName(id)) > 0.0)
 
 func test_action_timings_are_within_the_brief_ranges() -> void:
 	var c := _controller()
@@ -180,6 +196,20 @@ func test_jamie_rig_runs_an_action_and_reports_an_enemy_reaction() -> void:
 	check("rig returned to idle", not rig.is_busy())
 	rig.queue_free()
 
+func test_jamie_rig_gesture_shuffle_never_reports_an_enemy_hit() -> void:
+	# Phase D: the Shuffle beat short-circuits its strike phase to a self-only
+	# flourish — the rig must not emit any enemy_reaction (not even "none").
+	var rig := JamieRig.new()
+	Engine.get_main_loop().root.add_child(rig)
+	rig.configure(14.0, 900.0, 320.0, Vector2(700.0, 760.0))
+	var got := [StringName("<unset>")]
+	rig.enemy_reaction.connect(func(kind, _p): got[0] = kind)
+	rig.play(&"gesture_shuffle")
+	rig._process(10.0)
+	check_eq("no enemy reaction emitted at all", got[0], StringName("<unset>"))
+	check("rig returned to idle", not rig.is_busy())
+	rig.queue_free()
+
 func test_jamie_rig_sizes_from_the_real_portrait_aspect() -> void:
 	var rig := JamieRig.new()
 	Engine.get_main_loop().root.add_child(rig)
@@ -204,6 +234,23 @@ func test_enemy_actor_picks_villain_vs_boss_by_stage() -> void:
 	ea.play_hit(&"stun")
 	ea.play_defeat()
 	check("still alive as a node after defeat anim starts", is_instance_valid(ea))
+	ea.queue_free()
+
+func test_enemy_actor_retreat_dismisses_the_minor_villain_once() -> void:
+	# Phase D: a non-boss stage clear retreats the villain (it isn't killed —
+	# it recurs per chapter). Retreat marks it defeated so a late hit is a
+	# no-op, and calling retreat twice is harmless.
+	var ea := EnemyActor.new()
+	Engine.get_main_loop().root.add_child(ea)
+	ea.configure(3, 1000.0, 900.0, 260.0)
+	check("visible before retreat", ea.visible)
+	check("not defeated before retreat", not ea._defeated)
+	ea.play_retreat()
+	check("marked defeated by retreat", ea._defeated)
+	ea.play_retreat()                       # idempotent
+	ea.play_hit(&"heavy_hit")               # late hit after retreat must no-op / not crash
+	ea.play_defeat()                        # also a no-op now
+	check("still a valid node", is_instance_valid(ea))
 	ea.queue_free()
 
 func test_enemy_actor_never_mirrors_dedicated_art() -> void:

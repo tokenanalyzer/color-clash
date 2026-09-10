@@ -53,6 +53,9 @@ func setup(level: LevelConfig, p_palette: PieceColorPalette, p_power_config: Pow
 	for obstacle in level.obstacles:
 		var pos := Vector2i(int(obstacle.get("x", 0)), int(obstacle.get("y", 0)))
 		board.set_obstacle(pos, StringName(String(obstacle.get("type", "none"))), int(obstacle.get("hp", 0)))
+	for sp in level.specials:
+		board.set_special(Vector2i(int(sp.get("x", 0)), int(sp.get("y", 0))),
+			StringName(String(sp.get("type", "relic"))))
 	_generate_playable_board()
 
 	_fit_layout(viewport_rect, level.width, level.height)
@@ -290,7 +293,7 @@ func _resync_all_from_board() -> void:
 			var node := _node_at(pos)
 			node.scale = Vector2.ONE
 			node.modulate.a = 1.0
-			node.configure(cell.color_id, cell.power_id, cell.obstacle_id, cell.obstacle_hp, _cell_size, palette)
+			node.configure(cell.color_id, cell.power_id, cell.obstacle_id, cell.obstacle_hp, _cell_size, palette, cell.special_id)
 
 func _draw() -> void:
 	if board == null:
@@ -516,7 +519,13 @@ func _update_drag(screen_pos: Vector2) -> void:
 			return
 	_current_path.append(cell)
 	_refresh_selection_visual()
-	Audio.play(&"select", clampf(float(_current_path.size()) / 10.0, 0.0, 1.0))
+	# Controlled feedback: a soft rising chime only at connection MILESTONES
+	# (3 = it's now a valid match, then every 2 after) — not a tick on every
+	# single cell. The pitch climbs with the milestone so a long connection
+	# builds a little arpeggio instead of a machine-gun rattle.
+	var n := _current_path.size()
+	if n >= 3 and n % 2 == 1:
+		Audio.play(&"select", clampf(float(n - 3) / 8.0, 0.0, 1.0), (n - 3) / 2)
 
 func _end_drag(screen_pos: Vector2 = Vector2.ZERO) -> void:
 	# Armed-booster tap.
@@ -839,6 +848,17 @@ static func _power_sfx_id(power_id: StringName) -> StringName:
 ## one flat explosion. `group_size` is the player's drawn path length (0 for
 ## booster-triggered detonations, which skip the "match" sfx since nothing
 ## was connected).
+
+## Awaits a tween's completion ONLY while it is still actually running.
+## A short tween created before an intervening `await` (e.g. a create_timer
+## yield) can finish inside that yield; `await <done tween>.finished` then
+## waits on a signal that will never fire again, parking the caller's
+## coroutine forever (this is what left `_play_move()` stuck and the board
+## silently unresponsive on lower-FPS devices during a cascade).
+func _await_tween(t: Tween) -> void:
+	if t != null and t.is_valid() and t.is_running():
+		await t.finished
+
 func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> void:
 	var chain_depth := result.chain_depth
 	var animated: Dictionary = {}
@@ -957,19 +977,26 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 			await get_tree().create_timer(_WAVE_STAGGER * _cascade_scale).timeout
 
 	if not pop_tweens.is_empty():
-		await pop_tweens[pop_tweens.size() - 1].finished
+		await _await_tween(pop_tweens[pop_tweens.size() - 1])
 	for pos in animated.keys():
 		var node := _node_at(pos)
 		if node == null:
 			continue
 		node.scale = Vector2.ONE
-		node.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, node.obstacle_id, node.obstacle_hp, _cell_size, palette)
+		var _bc := board.get_cell(pos)
+		node.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, node.obstacle_id, node.obstacle_hp, _cell_size, palette,
+			_bc.special_id if _bc != null else CellData.SPECIAL_NONE)
 
-	# shattered obstacles throw a burst of prepared crystal shards
-	for ob in result.obstacles_broken:
-		var opos: Vector2i = ob.get("pos", Vector2i.ZERO)
+	# shattered obstacles: one shard burst + one controlled break sound for
+	# the move (not one per obstacle), flavoured by the family that broke.
+	if not result.obstacles_broken.is_empty():
+		var ob0: Dictionary = result.obstacles_broken[0]
+		var opos: Vector2i = ob0.get("pos", Vector2i.ZERO)
 		sfx.play(&"vfx_crystal_shards", to_global(_slot_center(opos)), _cell_size * 2.4, Color(1, 1, 1), 0.5, false, 1.6, 1.7)
-		break
+		var fam := CellData.family_of(StringName(String(ob0.get("obstacle_id", "ice"))))
+		var fam_map := {&"ice": 0, &"stone": 1, &"lock": 2, &"timebomb": 3}
+		var fam_idx: int = fam_map.get(fam, 0)
+		Audio.play(&"blocker_break", clampf(float(result.obstacles_broken.size()) / 4.0, 0.0, 1.0), fam_idx)
 
 	if chain_depth >= 3:
 		ScreenShake.apply(self, 6.0 + float(chain_depth), 0.28)
@@ -980,6 +1007,9 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 	var ghosts: Array[PieceView] = []
 	var fly_tween: Tween = null
 	for move in result.gravity_moves:
+		if move.get("delivered", false):
+			_animate_special_delivery(move["from"])
+			continue
 		var from_pos: Vector2i = move["from"]
 		var to_pos: Vector2i = move["to"]
 		var cell := board.get_cell(to_pos)
@@ -1004,7 +1034,7 @@ func _animate_result(result: ChainResolver.MoveResult, group_size: int = 0) -> v
 		fly_tween.tween_property(ghost, "position", _slot_center(pos), (0.24 + float(idx) * 0.03) * _cascade_scale).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
 
 	if fly_tween != null:
-		await fly_tween.finished
+		await _await_tween(fly_tween)
 	for g in ghosts:
 		g.queue_free()
 
@@ -1067,7 +1097,7 @@ func _animate_powers_formed(result: ChainResolver.MoveResult) -> void:
 	Haptics.light()
 	ScreenShake.apply(self, 3.0, 0.16)
 	if last_tween != null:
-		await last_tween.finished
+		await _await_tween(last_tween)
 
 	# Teach the name + "connect it to fire" the first two times per type.
 	var shown := int(seen.get(String(first_pid), 0))
@@ -1188,10 +1218,31 @@ func boss_obstruct_random_cell(obstacle_id: StringName, hp: int) -> bool:
 
 func _spawn_ghost(cell: CellData, pos: Vector2) -> PieceView:
 	var ghost := PieceView.new()
-	ghost.configure(cell.color_id, cell.power_id, CellData.OBSTACLE_NONE, 0, _cell_size, palette)
+	ghost.configure(cell.color_id, cell.power_id, CellData.OBSTACLE_NONE, 0, _cell_size, palette, cell.special_id)
 	ghost.position = pos
 	add_child(ghost)
 	return ghost
+
+## The Love Crystal reached the bottom row — drop it out of the board with a
+## bright rescue flourish. `bottom_pos` is the bottom-row cell it left from.
+func _animate_special_delivery(bottom_pos: Vector2i) -> void:
+	var start := _slot_center(bottom_pos)
+	var ghost := PieceView.new()
+	ghost.configure(CellData.COLOR_EMPTY, CellData.POWER_NONE, CellData.OBSTACLE_NONE, 0, _cell_size, palette, &"relic")
+	ghost.position = start
+	ghost.z_index = 60
+	add_child(ghost)
+	var t := create_tween()
+	t.set_parallel(true)
+	t.tween_property(ghost, "position:y", start.y + _cell_size * 2.2, 0.42).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	t.tween_property(ghost, "scale", Vector2(1.3, 1.3), 0.16).set_trans(Tween.TRANS_BACK)
+	t.chain().tween_property(ghost, "modulate:a", 0.0, 0.26)
+	t.chain().tween_callback(ghost.queue_free)
+	Audio.play(&"special_deliver", 0.0, 0)
+	Haptics.medium()
+	particles.flash(to_global(start), Color(1.0, 0.55, 0.72), _cell_size * 4.0)
+	ScreenShake.apply(self, 5.0, 0.22)
+	ComboPopup.spawn(self, start - Vector2(0, _cell_size * 1.1), "SAVED!", Color(1.0, 0.6, 0.78), 46, "LOVE CRYSTAL")
 
 func _burst_color_for(node: PieceView) -> Color:
 	if node.color_id == BoardModel.RAINBOW_COLOR_ID:
