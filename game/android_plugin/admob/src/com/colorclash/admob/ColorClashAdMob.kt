@@ -68,7 +68,7 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
             return
         }
         ui {
-            val ctx = activity?.applicationContext ?: godot.getContext()
+            val ctx = activity?.applicationContext
             if (ctx == null) {
                 send("init_failed", "no_context")
                 return@ui
@@ -100,7 +100,7 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
     fun loadRewarded(adUnitId: String) {
         lastRewardedUnitId = adUnitId
         ui {
-            val ctx = activity?.applicationContext ?: godot.getContext()
+            val ctx = activity?.applicationContext
             if (ctx == null || !initialized) {
                 send("rewarded_load_failed", "not_ready")
                 return@ui
@@ -160,7 +160,7 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
     fun loadInterstitial(adUnitId: String) {
         lastInterstitialUnitId = adUnitId
         ui {
-            val ctx = activity?.applicationContext ?: godot.getContext()
+            val ctx = activity?.applicationContext
             if (ctx == null || !initialized) {
                 send("interstitial_load_failed", "not_ready")
                 return@ui
