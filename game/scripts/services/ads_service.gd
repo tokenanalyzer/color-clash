@@ -255,6 +255,7 @@ const _LOAD_TIMEOUT_MS := 12_000     ## give up waiting for a rewarded load afte
 var _native_initialized := false
 var _rewarded_wants_show := false    ## a show_rewarded() is waiting on a load
 var _rewarded_load_deadline_ms := 0
+var _signal_wired := false           ## ad_event connected (JNISingleton has_signal() is unreliable)
 
 func _detect_plugin() -> void:
 	if _debug_backend:
@@ -270,10 +271,14 @@ func _detect_plugin() -> void:
 func _wire_plugin() -> void:
 	if _plugin == null:
 		return
-	if _plugin.has_signal("ad_event") and not _plugin.is_connected("ad_event", _on_native_ad_event):
+	# GodotPlugin / JNISingleton singletons do NOT reliably answer
+	# has_signal() / has_method(), so connect the signal and call initialize()
+	# directly. The GDScript test stub (a RefCounted with a real `ad_event`
+	# signal and the same methods) works exactly the same way.
+	if not _signal_wired:
 		_plugin.connect("ad_event", _on_native_ad_event)
-	if _plugin.has_method("initialize"):
-		_plugin.call("initialize", OS.is_debug_build() or _test)
+		_signal_wired = true
+	_plugin.call("initialize", OS.is_debug_build() or _test)
 	set_process(true)   # drives the rewarded load-timeout watchdog
 
 ## Single dispatcher for every native lifecycle event.
@@ -318,13 +323,15 @@ func _process(_delta: float) -> void:
 		_on_native_rewarded_failed("load_timeout")
 
 func _preload_rewarded() -> void:
-	if _plugin != null and _native_initialized and _plugin.has_method("loadRewarded") \
-			and not bool(_plugin.call("isRewardedReady")):
+	if _plugin == null or not _native_initialized:
+		return
+	if not bool(_plugin.call("isRewardedReady")):
 		_plugin.call("loadRewarded", unit_id("rewarded"))
 
 func _preload_interstitial() -> void:
-	if _plugin != null and _native_initialized and _plugin.has_method("loadInterstitial") \
-			and not bool(_plugin.call("isInterstitialReady")):
+	if _plugin == null or not _native_initialized:
+		return
+	if not bool(_plugin.call("isInterstitialReady")):
 		_plugin.call("loadInterstitial", unit_id("interstitial"))
 
 func _plugin_show_rewarded() -> void:
@@ -373,6 +380,7 @@ func debug_disable_fake_backend() -> void:
 	available = false
 	_native_initialized = false
 	_rewarded_wants_show = false
+	_signal_wired = false
 	_clear_rewarded()
 
 ## Simulate the end of an in-flight rewarded ad: "earned" | "closed" | "failed".
@@ -394,6 +402,7 @@ func debug_install_native_stub(stub: Object) -> void:
 	_debug_backend = false
 	_native_initialized = false
 	_rewarded_wants_show = false
+	_signal_wired = false
 	_clear_rewarded()
 	_plugin = stub
 	available = stub != null
