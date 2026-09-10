@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b4xljt34216qc"
-path="res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.ctex"
+path.s3tc="res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.s3tc.ctex"
+path.etc2="res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/powers/chain.png"
-dest_files=["res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.ctex"]
+dest_files=["res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.s3tc.ctex", "res://.godot/imported/chain.png-915c33179e2eeb5ebf2a3174f7fdf4bb.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

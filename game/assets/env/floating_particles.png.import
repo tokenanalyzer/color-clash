@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c04pcwqx4awu8"
-path="res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.ctex"
+path.s3tc="res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.s3tc.ctex"
+path.etc2="res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/env/floating_particles.png"
-dest_files=["res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.ctex"]
+dest_files=["res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.s3tc.ctex", "res://.godot/imported/floating_particles.png-907ae5fefedf153bdfe0b0e4716cac4d.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

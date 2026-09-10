@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://csp4hr3gxx0pn"
-path="res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.ctex"
+path.s3tc="res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.s3tc.ctex"
+path.etc2="res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/map/level_node.png"
-dest_files=["res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.ctex"]
+dest_files=["res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.s3tc.ctex", "res://.godot/imported/level_node.png-0e6481841ca9f98a732dbaec67beb1dc.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

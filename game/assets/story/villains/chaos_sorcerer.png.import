@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://yl03ufbnx8vt"
-path="res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.ctex"
+path.s3tc="res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.s3tc.ctex"
+path.etc2="res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/story/villains/chaos_sorcerer.png"
-dest_files=["res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.ctex"]
+dest_files=["res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.s3tc.ctex", "res://.godot/imported/chaos_sorcerer.png-cda708bae5b1fa0279b9217dcdf5db34.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

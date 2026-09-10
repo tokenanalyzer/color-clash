@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cs2b5rumebw8q"
-path="res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.ctex"
+path.s3tc="res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.s3tc.ctex"
+path.etc2="res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/celebration/firework_burst.png"
-dest_files=["res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.ctex"]
+dest_files=["res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.s3tc.ctex", "res://.godot/imported/firework_burst.png-9f2ef2eb5770a7c312e71480f4b27c9c.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

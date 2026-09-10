@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfikreekyx2fi"
-path="res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.ctex"
+path.s3tc="res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.s3tc.ctex"
+path.etc2="res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/obstacles/stone_block.png"
-dest_files=["res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.ctex"]
+dest_files=["res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.s3tc.ctex", "res://.godot/imported/stone_block.png-f947079a4b654b3211af56a283cf555d.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

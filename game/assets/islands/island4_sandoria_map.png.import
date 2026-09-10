@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bf0csikig6sw1"
-path="res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.ctex"
+path.s3tc="res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.s3tc.ctex"
+path.etc2="res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/islands/island4_sandoria_map.png"
-dest_files=["res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.ctex"]
+dest_files=["res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.s3tc.ctex", "res://.godot/imported/island4_sandoria_map.png-923810d91868f87392e1b9f9e7d8df08.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

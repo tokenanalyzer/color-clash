@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cy6adohk43h83"
-path="res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.ctex"
+path.s3tc="res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.s3tc.ctex"
+path.etc2="res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/obstacles/frozen_gem.png"
-dest_files=["res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.ctex"]
+dest_files=["res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.s3tc.ctex", "res://.godot/imported/frozen_gem.png-8daec6cf3d42c96b7974fbba565f53bd.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

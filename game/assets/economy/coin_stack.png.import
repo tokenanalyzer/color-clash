@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://61aue2520dwx"
-path="res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.ctex"
+path.s3tc="res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.s3tc.ctex"
+path.etc2="res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/economy/coin_stack.png"
-dest_files=["res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.ctex"]
+dest_files=["res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.s3tc.ctex", "res://.godot/imported/coin_stack.png-c33a148ad8b288a9f85c7f7bf64f8f4d.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

@@ -13,8 +13,8 @@ Thumbs.db
 !.vscode/settings.json
 
 # Build outputs
-build/
-exports/
+/build/
+/exports/
 *.apk
 *.aab
 *.keystore
@@ -33,3 +33,9 @@ backend/node_modules/
 # Python
 __pycache__/
 *.pyc
+
+# Godot Android custom build template (game/android/) is NOT vendored — it is
+# ~580 MB of regenerable binaries. Recreate it with:
+#   godot4 --headless --path game --install-android-build-template --export-release "Android Release"
+# then re-apply the SDK-35 patch documented in docs/ANDROID_RELEASE.md.
+/game/android/

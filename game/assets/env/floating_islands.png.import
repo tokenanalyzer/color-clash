@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://w2fvdl2ghtjx"
-path="res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.ctex"
+path.s3tc="res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.s3tc.ctex"
+path.etc2="res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/env/floating_islands.png"
-dest_files=["res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.ctex"]
+dest_files=["res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.s3tc.ctex", "res://.godot/imported/floating_islands.png-95de555dccdbb50353f4e4b0a79f9304.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

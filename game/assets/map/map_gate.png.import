@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bs3g2smt06k0f"
-path="res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.ctex"
+path.s3tc="res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.s3tc.ctex"
+path.etc2="res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/map/map_gate.png"
-dest_files=["res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.ctex"]
+dest_files=["res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.s3tc.ctex", "res://.godot/imported/map_gate.png-5b826cafd0c3f83f94c5e3aa5d37fe5b.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

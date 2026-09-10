@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bp6edlv7via48"
-path="res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.ctex"
+path.s3tc="res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.s3tc.ctex"
+path.etc2="res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/story/enemies_and_bosses.png"
-dest_files=["res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.ctex"]
+dest_files=["res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.s3tc.ctex", "res://.godot/imported/enemies_and_bosses.png-574a38ab14b64ab4ad5c3f134eea3958.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

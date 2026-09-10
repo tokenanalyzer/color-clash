@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2wf1aqhgogik"
-path="res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.ctex"
+path.s3tc="res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.s3tc.ctex"
+path.etc2="res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/story/cast_atlas_transparent.png"
-dest_files=["res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.ctex"]
+dest_files=["res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.s3tc.ctex", "res://.godot/imported/cast_atlas_transparent.png-53936c27b0bb353e63a9e5677aa02ee3.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1

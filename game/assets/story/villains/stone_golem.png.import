@@ -3,19 +3,21 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dq1th3280l0tp"
-path="res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.ctex"
+path.s3tc="res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.s3tc.ctex"
+path.etc2="res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/story/villains/stone_golem.png"
-dest_files=["res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.ctex"]
+dest_files=["res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.s3tc.ctex", "res://.godot/imported/stone_golem.png-e23481a75a20b657c28d2cf766facf25.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/hdr_compression=1
