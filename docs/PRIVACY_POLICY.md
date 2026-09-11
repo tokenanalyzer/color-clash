@@ -4,8 +4,8 @@ _Last updated: 2026-09-11 · Draft — not yet published. Replace the bracketed
 fields and host at a public URL before Play Store submission._
 
 **App:** War of Love (`com.colorclash.game`)
-**Developer:** [Rectangle Studio / your legal name]
-**Contact:** [your support email]
+**Developer:** RECTANGLE CONSULTANCY AND SERVICES PRIVATE LIMITED
+**Contact:** z31761990@gmail.com
 
 ## Summary
 
@@ -142,4 +142,4 @@ described here before that version is released.
 
 ## Contact
 
-Questions about this policy: [your support email].
+Questions about this policy: z31761990@gmail.com.
