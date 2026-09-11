@@ -91,20 +91,21 @@ phone permissions.
 
 ## Children's privacy
 
-War of Love is not directed to children, and — as described above — the
-app itself does not knowingly collect personal information from anyone,
-including children. The app currently applies the **same** advertising
-behaviour to every player regardless of age: the same Google AdMob request
-path, gated by the same GDPR/UK/Switzerland consent flow described above.
-It does not implement a neutral age screen, child-directed ad tagging
-(`TagForChildDirectedTreatment`), or any other Google Play Families
-safeguard, and it is not declared, marketed, or configured as an app whose
-target audience includes children.
+War of Love is a general-audience puzzle game and is not primarily
+directed to children. The game is not designed or marketed specifically
+for children, and we do not knowingly target children as a distinct
+audience. The app has **no age gate, no child-directed advertising branch**
+(e.g. `TagForChildDirectedTreatment`), and no other Google Play Families /
+mixed-audience safeguard — every player currently receives the same Google
+AdMob request path, gated by the same GDPR/UK/Switzerland consent flow
+described above. Because the game is not directed to children, it is not
+currently enrolled in, or presented as, a child-directed or "Designed for
+Families" app.
 
-If a future version is ever submitted to Google Play with a target
-audience that includes children, this section — and the underlying
-ad-request code — will be updated first to add those safeguards before
-that version ships, per Google Play Families policy.
+If the target audience or advertising treatment changes in the future, the
+game's privacy practices and advertising configuration — including the
+safeguards above — will be reviewed and updated before that change is
+made.
 
 ## Your choices
 
