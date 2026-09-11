@@ -1,0 +1,1025 @@
+{
+  "_comment": "Every id here is synthesized at runtime by Synth (see scripts/audio/synth.gd) \u00e2\u20ac\u201d no sampled audio. `layers` are mixed together at their `start` offset (seconds). freq_mode 'absolute' uses base_freq + intensity*freq_range; 'scale' uses Synth.note_freq(scale_root, scale_degree + round(intensity_degree_span*intensity) + event_index). intensity/event_index are supplied at play() time by gameplay code (e.g. group size, chain wave index, combo tier) so pitch/energy scales with what's happening on screen. | 2026-09-07 gameplay-overhaul: connection/clear/combo/power/blocker sounds retuned toward a warmer crystalline palette (bell partials + shimmer tails, not bare sine beeps); select fires only at connection MILESTONES (no per-cell tick); new ids blocker_break / objective_progress / special_deliver.",
+  "sfx": {
+    "select": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 720,
+          "scale_degree": 0,
+          "intensity_degree_span": 7,
+          "duration": 0.09,
+          "attack": 0.002,
+          "decay_curve": 3.0,
+          "volume": 0.22
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 1440,
+          "scale_degree": 4,
+          "intensity_degree_span": 7,
+          "start": 0.012,
+          "duration": 0.06,
+          "attack": 0.002,
+          "decay_curve": 3.6,
+          "volume": 0.08
+        }
+      ]
+    },
+    "match": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 523,
+          "freq_range": 180,
+          "duration": 0.28,
+          "attack": 0.003,
+          "decay_curve": 1.9,
+          "volume": 0.42
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 784,
+          "freq_range": 260,
+          "duration": 0.22,
+          "attack": 0.003,
+          "decay_curve": 2.4,
+          "volume": 0.2
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 1568,
+          "freq_range": 520,
+          "duration": 0.12,
+          "attack": 0.002,
+          "decay_curve": 3.4,
+          "volume": 0.1
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.06,
+          "attack": 0.001,
+          "decay_curve": 4.0,
+          "brightness": 0.9,
+          "volume": 0.06
+        }
+      ]
+    },
+    "blast": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 110,
+          "freq_range": 50,
+          "end_freq_ratio": 0.6,
+          "duration": 0.26,
+          "attack": 0.001,
+          "decay_curve": 1.9,
+          "volume": 0.5
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 3.0,
+          "brightness": 0.35,
+          "volume": 0.26
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 880,
+          "freq_range": 700,
+          "end_freq_ratio": 1.8,
+          "start": 0.02,
+          "duration": 0.22,
+          "attack": 0.004,
+          "decay_curve": 2.2,
+          "volume": 0.12
+        }
+      ]
+    },
+    "chain_step": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 2,
+          "intensity_degree_span": 2,
+          "duration": 0.12,
+          "attack": 0.003,
+          "decay_curve": 2.8,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 1046,
+          "scale_degree": 2,
+          "intensity_degree_span": 2,
+          "start": 0.01,
+          "duration": 0.09,
+          "attack": 0.002,
+          "decay_curve": 3.4,
+          "volume": 0.1
+        }
+      ]
+    },
+    "power_bomb": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 70,
+          "freq_range": 0,
+          "end_freq_ratio": 0.55,
+          "duration": 0.34,
+          "attack": 0.001,
+          "decay_curve": 1.5,
+          "volume": 0.62
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.24,
+          "attack": 0.001,
+          "decay_curve": 2.0,
+          "brightness": 0.2,
+          "volume": 0.32
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 520,
+          "freq_range": 300,
+          "end_freq_ratio": 0.4,
+          "start": 0.03,
+          "duration": 0.3,
+          "attack": 0.004,
+          "decay_curve": 1.8,
+          "volume": 0.12
+        }
+      ]
+    },
+    "power_lightning": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "saw",
+          "freq_mode": "absolute",
+          "base_freq": 340,
+          "freq_range": 60,
+          "end_freq_ratio": 5.0,
+          "duration": 0.14,
+          "attack": 0.001,
+          "decay_curve": 1.6,
+          "volume": 0.4
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.18,
+          "attack": 0.001,
+          "decay_curve": 2.6,
+          "brightness": 0.8,
+          "volume": 0.15
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 2400,
+          "freq_range": 600,
+          "end_freq_ratio": 0.5,
+          "start": 0.01,
+          "duration": 0.1,
+          "attack": 0.001,
+          "decay_curve": 3.2,
+          "volume": 0.12
+        }
+      ]
+    },
+    "power_chain": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "scale",
+          "scale_root": 392,
+          "scale_degree": 0,
+          "start": 0.0,
+          "duration": 0.11,
+          "attack": 0.002,
+          "decay_curve": 2.8,
+          "volume": 0.32
+        },
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "scale",
+          "scale_root": 392,
+          "scale_degree": 4,
+          "start": 0.09,
+          "duration": 0.16,
+          "attack": 0.002,
+          "decay_curve": 2.4,
+          "volume": 0.36
+        }
+      ]
+    },
+    "power_rainbow": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 0,
+          "start": 0.0,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 2.6,
+          "volume": 0.28
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 2,
+          "start": 0.05,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 2.6,
+          "volume": 0.28
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 4,
+          "start": 0.1,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 2.6,
+          "volume": 0.28
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 7,
+          "start": 0.15,
+          "duration": 0.32,
+          "attack": 0.003,
+          "decay_curve": 1.5,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 1046,
+          "scale_degree": 11,
+          "start": 0.15,
+          "duration": 0.4,
+          "attack": 0.004,
+          "decay_curve": 1.2,
+          "volume": 0.12
+        }
+      ]
+    },
+    "combo_ding": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 0,
+          "intensity_degree_span": 4,
+          "duration": 0.14,
+          "attack": 0.003,
+          "decay_curve": 2.4,
+          "volume": 0.32
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 2,
+          "intensity_degree_span": 4,
+          "start": 0.06,
+          "duration": 0.14,
+          "attack": 0.003,
+          "decay_curve": 2.4,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 4,
+          "intensity_degree_span": 4,
+          "start": 0.12,
+          "duration": 0.2,
+          "attack": 0.003,
+          "decay_curve": 1.8,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 1046,
+          "scale_degree": 7,
+          "intensity_degree_span": 4,
+          "start": 0.12,
+          "duration": 0.28,
+          "attack": 0.004,
+          "decay_curve": 1.4,
+          "volume": 0.12
+        }
+      ]
+    },
+    "fever_activate": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 0,
+          "start": 0.0,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 2.4,
+          "volume": 0.4
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 2,
+          "start": 0.11,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 2.4,
+          "volume": 0.42
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 4,
+          "start": 0.22,
+          "duration": 0.16,
+          "attack": 0.002,
+          "decay_curve": 2.2,
+          "volume": 0.44
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 7,
+          "start": 0.35,
+          "duration": 0.5,
+          "attack": 0.004,
+          "decay_curve": 1.3,
+          "volume": 0.5
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 9,
+          "start": 0.35,
+          "duration": 0.5,
+          "attack": 0.004,
+          "decay_curve": 1.3,
+          "volume": 0.34
+        },
+        {
+          "kind": "noise",
+          "start": 0.35,
+          "duration": 0.3,
+          "attack": 0.01,
+          "decay_curve": 1.8,
+          "brightness": 0.6,
+          "volume": 0.14
+        }
+      ]
+    },
+    "level_complete": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 0,
+          "start": 0.0,
+          "duration": 0.16,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.42
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 2,
+          "start": 0.14,
+          "duration": 0.16,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.44
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 4,
+          "start": 0.28,
+          "duration": 0.16,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.46
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 7,
+          "start": 0.42,
+          "duration": 0.8,
+          "attack": 0.004,
+          "decay_curve": 1.0,
+          "volume": 0.52
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 9,
+          "start": 0.42,
+          "duration": 0.8,
+          "attack": 0.004,
+          "decay_curve": 1.0,
+          "volume": 0.34
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 12,
+          "start": 0.42,
+          "duration": 0.8,
+          "attack": 0.004,
+          "decay_curve": 1.0,
+          "volume": 0.26
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 261,
+          "scale_degree": 0,
+          "start": 0.42,
+          "duration": 0.9,
+          "attack": 0.006,
+          "decay_curve": 0.9,
+          "volume": 0.22
+        },
+        {
+          "kind": "noise",
+          "start": 0.42,
+          "duration": 0.5,
+          "attack": 0.02,
+          "decay_curve": 1.6,
+          "brightness": 0.85,
+          "volume": 0.05
+        }
+      ]
+    },
+    "level_failed": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 4,
+          "start": 0.0,
+          "duration": 0.26,
+          "attack": 0.01,
+          "decay_curve": 1.6,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 2,
+          "start": 0.2,
+          "duration": 0.28,
+          "attack": 0.012,
+          "decay_curve": 1.6,
+          "volume": 0.28
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 440,
+          "scale_degree": 0,
+          "start": 0.42,
+          "duration": 0.45,
+          "attack": 0.015,
+          "decay_curve": 1.3,
+          "volume": 0.26
+        }
+      ]
+    },
+    "shuffle": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 300,
+          "freq_range": 0,
+          "end_freq_ratio": 3.2,
+          "duration": 0.34,
+          "attack": 0.02,
+          "decay_curve": 1.3,
+          "volume": 0.2
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 900,
+          "freq_range": 0,
+          "end_freq_ratio": 2.4,
+          "start": 0.04,
+          "duration": 0.3,
+          "attack": 0.02,
+          "decay_curve": 1.5,
+          "volume": 0.12
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.36,
+          "attack": 0.03,
+          "decay_curve": 1.4,
+          "brightness": 0.6,
+          "volume": 0.1
+        }
+      ]
+    },
+    "button_tap": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 880,
+          "freq_range": 0,
+          "duration": 0.045,
+          "attack": 0.001,
+          "decay_curve": 4.0,
+          "volume": 0.28
+        }
+      ]
+    },
+    "tension_pulse": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 220,
+          "freq_range": 0,
+          "duration": 0.32,
+          "attack": 0.05,
+          "decay_curve": 1.4,
+          "volume": 0.2
+        }
+      ]
+    },
+    "power_freeze": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 1400,
+          "freq_range": 200,
+          "end_freq_ratio": 0.45,
+          "duration": 0.32,
+          "attack": 0.002,
+          "decay_curve": 1.8,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 880,
+          "scale_degree": 7,
+          "start": 0.04,
+          "duration": 0.26,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.24
+        },
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.36,
+          "attack": 0.004,
+          "decay_curve": 1.5,
+          "brightness": 0.85,
+          "volume": 0.12
+        }
+      ]
+    },
+    "timebomb_explode": {
+      "layers": [
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.42,
+          "attack": 0.002,
+          "decay_curve": 2.4,
+          "brightness": 0.2,
+          "volume": 0.5
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 62,
+          "freq_range": 10,
+          "end_freq_ratio": 0.5,
+          "duration": 0.46,
+          "attack": 0.001,
+          "decay_curve": 1.8,
+          "volume": 0.7
+        },
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "absolute",
+          "base_freq": 150,
+          "freq_range": 20,
+          "end_freq_ratio": 0.4,
+          "duration": 0.2,
+          "attack": 0.001,
+          "decay_curve": 2.6,
+          "volume": 0.22
+        }
+      ]
+    },
+    "timebomb_tick": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "absolute",
+          "base_freq": 1200,
+          "freq_range": 0,
+          "duration": 0.03,
+          "attack": 0.001,
+          "decay_curve": 3.5,
+          "volume": 0.16
+        }
+      ]
+    },
+    "sword_attack": {
+      "layers": [
+        {
+          "kind": "noise",
+          "freq_mode": "absolute",
+          "base_freq": 1,
+          "freq_range": 0,
+          "duration": 0.14,
+          "attack": 0.002,
+          "decay_curve": 4.0,
+          "volume": 0.4,
+          "brightness": 0.7
+        },
+        {
+          "kind": "tone",
+          "wave": "saw",
+          "freq_mode": "absolute",
+          "base_freq": 420,
+          "freq_range": 180,
+          "duration": 0.16,
+          "attack": 0.002,
+          "decay_curve": 3.6,
+          "volume": 0.32,
+          "end_freq_ratio": 0.45
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 1400,
+          "freq_range": 400,
+          "duration": 0.09,
+          "attack": 0.001,
+          "decay_curve": 4.2,
+          "volume": 0.16,
+          "end_freq_ratio": 0.6
+        }
+      ]
+    },
+    "lightning": {
+      "layers": [
+        {
+          "kind": "noise",
+          "freq_mode": "absolute",
+          "base_freq": 1,
+          "freq_range": 0,
+          "duration": 0.2,
+          "attack": 0.001,
+          "decay_curve": 3.0,
+          "volume": 0.34,
+          "brightness": 1.0
+        },
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "absolute",
+          "base_freq": 900,
+          "freq_range": 500,
+          "duration": 0.13,
+          "attack": 0.001,
+          "decay_curve": 3.4,
+          "volume": 0.22,
+          "end_freq_ratio": 2.0
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 2200,
+          "freq_range": 800,
+          "duration": 0.07,
+          "attack": 0.001,
+          "decay_curve": 5.0,
+          "volume": 0.12,
+          "end_freq_ratio": 0.5
+        }
+      ]
+    },
+    "power_up": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 300,
+          "freq_range": 500,
+          "duration": 0.42,
+          "attack": 0.01,
+          "decay_curve": 1.6,
+          "volume": 0.42,
+          "end_freq_ratio": 3.0
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "absolute",
+          "base_freq": 600,
+          "freq_range": 900,
+          "duration": 0.4,
+          "attack": 0.01,
+          "decay_curve": 1.8,
+          "volume": 0.26,
+          "end_freq_ratio": 2.6
+        },
+        {
+          "kind": "noise",
+          "freq_mode": "absolute",
+          "base_freq": 1,
+          "freq_range": 0,
+          "duration": 0.3,
+          "attack": 0.02,
+          "decay_curve": 2.0,
+          "volume": 0.14,
+          "brightness": 0.9,
+          "start": 0.05
+        }
+      ]
+    },
+    "boss_impact": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 70,
+          "freq_range": 40,
+          "duration": 0.5,
+          "attack": 0.002,
+          "decay_curve": 2.0,
+          "volume": 0.5,
+          "end_freq_ratio": 0.5
+        },
+        {
+          "kind": "noise",
+          "freq_mode": "absolute",
+          "base_freq": 1,
+          "freq_range": 0,
+          "duration": 0.34,
+          "attack": 0.001,
+          "decay_curve": 2.6,
+          "volume": 0.34,
+          "brightness": 0.4
+        },
+        {
+          "kind": "tone",
+          "wave": "square",
+          "freq_mode": "absolute",
+          "base_freq": 160,
+          "freq_range": 120,
+          "duration": 0.28,
+          "attack": 0.001,
+          "decay_curve": 3.0,
+          "volume": 0.2,
+          "end_freq_ratio": 0.6
+        }
+      ]
+    },
+    "blocker_break": {
+      "layers": [
+        {
+          "kind": "noise",
+          "start": 0.0,
+          "duration": 0.16,
+          "attack": 0.001,
+          "decay_curve": 3.0,
+          "brightness": 0.55,
+          "volume": 0.3
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 392,
+          "scale_degree": 0,
+          "intensity_degree_span": 3,
+          "duration": 0.18,
+          "attack": 0.002,
+          "decay_curve": 2.6,
+          "volume": 0.32
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 1600,
+          "freq_range": 300,
+          "end_freq_ratio": 0.4,
+          "start": 0.0,
+          "duration": 0.12,
+          "attack": 0.001,
+          "decay_curve": 3.6,
+          "volume": 0.12
+        }
+      ]
+    },
+    "objective_progress": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 880,
+          "scale_degree": 0,
+          "intensity_degree_span": 4,
+          "duration": 0.08,
+          "attack": 0.003,
+          "decay_curve": 3.0,
+          "volume": 0.18
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 880,
+          "scale_degree": 2,
+          "intensity_degree_span": 4,
+          "start": 0.06,
+          "duration": 0.12,
+          "attack": 0.003,
+          "decay_curve": 2.6,
+          "volume": 0.16
+        }
+      ]
+    },
+    "special_deliver": {
+      "layers": [
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 0,
+          "start": 0.0,
+          "duration": 0.16,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.34
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 3,
+          "start": 0.1,
+          "duration": 0.16,
+          "attack": 0.003,
+          "decay_curve": 2.2,
+          "volume": 0.34
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "scale",
+          "scale_root": 523,
+          "scale_degree": 7,
+          "start": 0.2,
+          "duration": 0.5,
+          "attack": 0.004,
+          "decay_curve": 1.2,
+          "volume": 0.38
+        },
+        {
+          "kind": "tone",
+          "wave": "triangle",
+          "freq_mode": "scale",
+          "scale_root": 1046,
+          "scale_degree": 10,
+          "start": 0.2,
+          "duration": 0.5,
+          "attack": 0.005,
+          "decay_curve": 1.1,
+          "volume": 0.14
+        },
+        {
+          "kind": "tone",
+          "wave": "sine",
+          "freq_mode": "absolute",
+          "base_freq": 160,
+          "freq_range": 0,
+          "start": 0.2,
+          "duration": 0.4,
+          "attack": 0.008,
+          "decay_curve": 1.3,
+          "volume": 0.18
+        }
+      ]
+    }
+  }
+}

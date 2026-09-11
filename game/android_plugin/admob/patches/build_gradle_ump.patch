@@ -1,0 +1,13 @@
+--- build.gradle	2026-09-11 00:00:00.000000000 +0530
++++ build.gradle	2026-09-11 00:00:10.000000000 +0530
+@@ -36,6 +36,10 @@
+     // War of Love — native AdMob (see src/com/colorclash/admob/ColorClashAdMob.kt).
+     // Bump before a production release; kept at a version proven with AGP 8.2.
+     implementation "com.google.android.gms:play-services-ads:23.6.0"
++
++    // War of Love — Google User Messaging Platform (UMP) SDK: EEA/UK/Switzerland
++    // consent gating for AdMob requests. See ColorClashAdMob.kt's initialize().
++    implementation "com.google.android.ump:user-messaging-platform:4.0.0"
+
+     implementation "androidx.fragment:fragment:$versions.fragmentVersion"
+     implementation "androidx.core:core-splashscreen:$versions.splashscreenVersion"

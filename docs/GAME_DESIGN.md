@@ -6,22 +6,128 @@ Build a globally understandable, highly polished 2D puzzle game with a satisfyin
 
 ## Core interaction
 
-1. Player selects/connects 3+ adjacent matching-color nodes by touch.
-2. On release, the connected group resolves.
-3. Larger groups create special powers.
-4. Powers can trigger chain reactions.
-5. The board resolves completely before the next input is accepted.
-6. Player earns score, coins, and level progress.
+1. Player connects 3+ adjacent matching-colour jewels by touch; on release
+   the group resolves.
+2. A big enough connection **leaves a power tile on the board** (it is not
+   auto-detonated). The player then activates it later.
+3. Activating a power = threading it into another connection (power tiles
+   connect to any colour) or tapping it. That is when it detonates and can
+   chain into other powers / expose fresh clusters.
+4. The board resolves completely before the next input is accepted.
+5. Player earns score, coins, Fever and level progress.
 
-## Core powers
+## Core powers (match size -> tile left on the board)
 
-- 3 colors: standard clear.
-- 4 colors: Bomb.
-- 5 colors: Lightning.
-- 6+ colors: stronger chain power.
-- Rainbow: wildcard / color conversion power.
+- 3: standard clear, no power.
+- 4: **Bomb** — 3x3 blast.
+- 5: **Lightning** — full row + column.
+- 6: **Freeze** — shatters a small diamond and encases the ring in ice.
+- 7: **Chain** — colour-wide / connected-group clear.
+- 8+: **Rainbow** — clears an entire colour (x2 at 10, x3 at 13).
 
-These values are design starting points and must be data-driven for balancing.
+Data-driven (data/powers.json) for balancing.
+
+## Boosters (in-level tray)
+
+Bomb / Lightning / Freeze / Rainbow / Shuffle / +5 Moves. Bomb, Lightning,
+Freeze and Rainbow **arm** — the player then taps a jewel to fire that
+power there; the charge is spent on commit. Shuffle and +Moves fire
+instantly. All icons are code-drawn (no emoji — Android dropped the legacy
+emoji font).
+
+## Implementation decisions (Phase 1 core)
+
+These clarify ambiguities in the design above, made while implementing the
+first playable core. They are product decisions, not incidental code
+details — revisit them here if they need to change.
+
+- **Grid & adjacency.** A HONEYCOMB — odd-r offset hex layout, stored on a
+  rectangular `[x][y]` array but with **6-neighbour** adjacency (E, W and
+  two cells on the rows above and below). Matches the reference's
+  interlocking-jewel look. It is a free-form "connect" game, not
+  swap-based. Straight left/right still works so a "row" is a clean line;
+  a "column" zig-zags by half a cell. `BoardModel.get_neighbors()` is the
+  single source of truth; power areas use hex discs/rings
+  (`PowerResolver.hex_disc` / `hex_ring`).
+- **Power discovery (persistent tiles).** A power tile is created at the
+  connection's release cell(s) and **stays on the board** (result
+  .powers_formed). The player activates it later by threading it into
+  another connection (power tiles connect to any colour) or tapping it —
+  that is when it detonates and can chain into other powers / expose
+  fresh clusters. This is what makes the documented
+  Match → Power → Explosion → Chain → Combo ladder happen within a single
+  swipe, matching the "CHAIN REACTION" reference panel. "Combo" (the
+  x2/x4/x7 counter) is the resulting chain depth of one move, not a
+  cross-move streak.
+- **Obstacles shipped now: Ice, Lock, Stone.** Ice takes 2 hits to clear
+  fully (each hit still clears the piece underneath immediately — only the
+  ice *layer* persists across hits). Lock has no piece and unlocks when an
+  orthogonally adjacent cell clears. Stone holds no color and can only be
+  removed by a power's area effect, never a plain connect. Portal,
+  Crystal, and Timer are intentionally deferred — the obstacle system
+  (BoardModel + ChainResolver) is built to add them without touching
+  match/chain logic.
+- **Boosters are usable both before and during a level.** The reference
+  mockup's "BOOSTERS (USE BEFORE LEVEL)" section and its always-visible
+  in-gameplay booster bar aren't fully consistent; mid-level use is more
+  standard mobile-puzzle UX and better demonstrates the booster
+  architecture. Bomb/Lightning/Rainbow apply their power at a random
+  eligible cell; Shuffle regenerates the board; Extra Moves adds moves
+  directly. None of this grants premium currency — see docs/SECURITY.md.
+- **Deeper chains are real, not a display trick.** `chain_depth` is 1 for a plain match, 2 for one power created and auto-detonated, and 3+ for a genuine multi-stage cascade, through two deterministic mechanisms (see `chain_resolver.gd`'s docstring):
+  1. **Multiple powers from one big move.** A connection of 9+ (12+) creates 2 (3) power tiles spread across the path, not a single scaled-up power (`data/powers.json`'s `count`). Several powers from the same move share the same color, so the first to detonate — especially "Chain," which clears its whole color board-wide — routinely catches the others: real **power + power interaction**, not simulated.
+  2. **Secondary generation from exposed clusters.** After any clear, the newly-adjacent cells are checked for a same-color connected group big enough to match on its own (`BoardModel.find_connected_group`). If the board state exposed one, it auto-clears as its own wave and, if large enough, spawns its own power(s), which re-enter the cascade. A blast that happens to open up a large same-color pocket can keep going for several waves — entirely from real board state, no randomness deciding whether a "bonus chain" fires.
+  Fever's `max_gain_per_move` (`data/fever.json`) intentionally caps how much any single huge cascade can fill the meter, so Fever stays a built-up progression across several strong moves rather than something one lucky mega-chain instantly maxes out.
+
+## Campaign map & progression
+
+The app now boots into a level-select map (`level_map.gd`), not straight
+into gameplay — a standard mobile-puzzle entry point and the natural home
+for "which level am I on" state. Levels unlock linearly: level 1 is always
+unlocked, and level N unlocks once level N-1 is completed
+(`ProgressService.is_unlocked`). A completed level stays tappable (replay
+is allowed; nothing here forces linear-only play once unlocked).
+
+Star rating (`StarRating.stars_for`) is deliberately objective-agnostic —
+it only looks at how many of the level's move budget were left unused
+(>=50% spare = 3 stars, >=25% = 2, otherwise 1), so it works identically
+whether the level's goal was clear_color/reach_score/create_powers/
+break_obstacles without special-casing. Stars and best score only ever
+improve, never regress, per level.
+
+## Audio & adaptive music
+
+Nothing here is sampled or licensed — the entire soundtrack and every SFX
+are synthesized at runtime from a small set of DSP primitives (`synth.gd`:
+sine/triangle/square/saw tones, pitch sweeps, filtered noise bursts), so
+there is zero risk of reusing another game's audio and it costs nothing to
+extend. Content lives in `data/sfx.json` and `data/music.json`, exactly
+like colors/powers/levels — designers rebalance sound by editing JSON, not
+GDScript. Real recorded assets can replace any id later via
+`Audio.register(id, stream)` with no gameplay-code change.
+
+- **SFX** scale with what's happening: `intensity` (0..1, e.g. connection
+  size) raises pitch/energy within an id, `event_index` (cascade wave,
+  combo tier) shifts it up the pentatonic scale — so "match" pitches up
+  with a bigger connection and "chain_step"/"combo_ding" audibly climb
+  across a cascade, without needing a unique clip per variation.
+- **Music** is five short loops (pad/bass/arpeggio/perc/fever_lead), all
+  the same bar length, started together and crossfaded by `MusicDirector`
+  between named intensity states (idle/base/active/high/fever/tension) —
+  vertical layering, so intensity changes are seamless, never a track
+  restart. "high" triggers on either a real deep cascade (chain_depth >= 4)
+  or a big single-move clear count (>= 10 cells, e.g. a Lightning sweep) —
+  either way, a big real moment, not a fixed script.
+- **Fever** (`fever_activate` sting + the "fever" music state) is earned
+  only through skilled play — repeated power-creating moves build the
+  meter, weak moves decay it. Never purchasable, per this doc's existing
+  Fever section.
+- **Losing stays soft**: `level_failed` is a gentle three-note descent,
+  and the panel copy is "So Close! Try again" rather than a failure
+  message, per this doc's difficulty/accessibility principles.
+- **Settings**: Music/SFX/Haptics on-off plus Master/Music/SFX volume
+  live in `AudioSettings` (persisted locally, applied to real `AudioServer`
+  buses), reachable from the in-HUD gear icon.
 
 ## Adrenaline / satisfaction design
 

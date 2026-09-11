@@ -1,0 +1,19 @@
+{
+  "_comment": "Jamie's combat action table for War of Love (Phase C/D). The only clean-transparency Jamie art shipped is the single heroic portrait (jamie_portrait.png, RGBA cut-out) — cast_atlas_transparent.png is RGB with a baked checkerboard and is NOT used. So JamieRig animates the ONE clean sprite with real multi-phase transforms (windup lean/squash -> lunge/dash toward the enemy -> weapon-hand ignites -> projectile -> impact -> recover) plus the supplied VFX art and an actually-reacting enemy. `hand` = where the attack FX spawns on Jamie: 'sword' (his left, the flaming blade) or 'orb' (his right, the blue magic hand). Timings are seconds and sit inside the brief's ranges. CombatDirector stays authoritative for every number; this file is presentation only. `gesture_shuffle` / `brace` (Phase D) are the instant-booster beats — no lunge, no projectile, `enemy_reaction:none` so they can never deal a hit; JamieRig short-circuits their strike phase to a self-only flourish.",
+  "actions": {
+    "idle":            { "windup": 0.0,  "strike": 0.0,  "recover": 0.0,  "enemy_reaction": "none" },
+    "attack_sword":    { "windup": 0.22, "strike": 0.20, "recover": 0.30, "hand": "sword", "projectile": "vfx_fire_burst",       "impact": "vfx_fire_burst",     "sfx": "sword_attack", "enemy_reaction": "hit",       "lunge": 0.45 },
+    "attack_lightning":{ "windup": 0.28, "strike": 0.22, "recover": 0.30, "hand": "orb",   "projectile": "vfx_lightning_arc",    "impact": "vfx_lightning_arc",  "sfx": "lightning",    "enemy_reaction": "hit",       "lunge": 0.15 },
+    "attack_dash":     { "windup": 0.18, "strike": 0.26, "recover": 0.28, "hand": "sword", "projectile": "vfx_energy_trail_head","impact": "vfx_energy_burst",   "sfx": "lightning",    "enemy_reaction": "knockback", "lunge": 0.92 },
+    "attack_bomb":     { "windup": 0.24, "strike": 0.22, "recover": 0.34, "hand": "sword", "projectile": "vfx_glow_orb",         "impact": "vfx_explosion_core", "sfx": "power_bomb",   "enemy_reaction": "heavy_hit", "lunge": 0.7 },
+    "attack_blast":    { "windup": 0.20, "strike": 0.22, "recover": 0.30, "hand": "orb",   "projectile": "vfx_energy_burst",     "impact": "vfx_shockwave_ring", "sfx": "blast",       "enemy_reaction": "knockback", "lunge": 0.6 },
+    "attack_freeze":   { "windup": 0.22, "strike": 0.24, "recover": 0.32, "hand": "ice",   "projectile": "vfx_ice_burst",        "impact": "vfx_ice_burst",      "sfx": "power_freeze", "enemy_reaction": "stun",      "lunge": 0.35 },
+    "attack_mega_blast":{ "windup": 0.34, "strike": 0.30, "recover": 0.42, "hand": "orb",  "projectile": "vfx_energy_burst",     "impact": "vfx_explosion_core", "sfx": "blast",       "enemy_reaction": "heavy_hit", "lunge": 0.7 },
+    "attack_rainbow":  { "windup": 0.30, "strike": 0.28, "recover": 0.38, "hand": "orb",   "projectile": "vfx_rainbow_burst",    "impact": "vfx_rainbow_burst",  "sfx": "power_rainbow", "enemy_reaction": "heavy_hit", "lunge": 0.55 },
+    "fever_ultimate":  { "windup": 0.45, "strike": 0.90, "recover": 0.55, "sequence": ["attack_sword", "attack_lightning", "attack_dash"], "impact": "vfx_energy_burst", "sfx": "power_up", "enemy_reaction": "heavy_hit", "lunge": 0.55 },
+    "hurt":            { "windup": 0.10, "strike": 0.14, "recover": 0.26, "sfx": "boss_impact", "enemy_reaction": "none",       "lunge": -0.25 },
+    "victory":         { "windup": 0.15, "strike": 0.40, "recover": 0.40, "sfx": "power_up",    "enemy_reaction": "none",       "lunge": 0.0 },
+    "gesture_shuffle": { "windup": 0.16, "strike": 0.16, "recover": 0.24, "sfx": "shuffle",     "enemy_reaction": "none",       "lunge": 0.0 },
+    "brace":           { "windup": 0.12, "strike": 0.10, "recover": 0.26, "sfx": "power_up",    "enemy_reaction": "none",       "lunge": -0.08 }
+  }
+}

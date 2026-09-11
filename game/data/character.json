@@ -1,0 +1,18 @@
+{
+  "_comment": "Color Clash mascot reaction table. Maps a gameplay EngineEvent (plus a few derived triggers like combo tiers and near-fail) to a pose id and an optional short line. Poses are procedural placeholders in character_view.gd until real artwork is supplied — the ids below are the AssetLibrary keys the final art will register under (char_<pose>). `priority` breaks ties when several triggers fire in the same debounce window (higher wins); `cooldown` is a per-pose minimum gap in seconds.",
+  "debounce_seconds": 1.1,
+  "reactions": {
+    "level_started":   { "pose": "wave",     "line": "Let's clash!",     "priority": 20 },
+    "combo_tier_1":    { "pose": "cheer",    "line": "Nice!",            "priority": 30 },
+    "combo_tier_2":    { "pose": "hype",     "line": "Colour storm!",    "priority": 40 },
+    "combo_tier_3":    { "pose": "hype",     "line": "Unreal!",          "priority": 50 },
+    "power_created":   { "pose": "point",    "line": "",                 "priority": 25 },
+    "power_activated": { "pose": "cheer",    "line": "",                 "priority": 22 },
+    "fever_started":   { "pose": "power_up", "line": "FEVER!",           "priority": 80 },
+    "near_fail":       { "pose": "worried",  "line": "Hang on...",       "priority": 60 },
+    "level_completed": { "pose": "victory",  "line": "We did it!",       "priority": 100 },
+    "level_failed":    { "pose": "sad",      "line": "So close!",        "priority": 100 },
+    "booster_used":    { "pose": "point",    "line": "",                 "priority": 15 }
+  },
+  "poses": ["idle", "wave", "cheer", "hype", "point", "power_up", "worried", "victory", "sad"]
+}

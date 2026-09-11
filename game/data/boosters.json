@@ -1,0 +1,11 @@
+{
+  "_comment": "In-level boosters. `power` + `targeted:true` means the player arms it and taps a board cell to detonate that power there; `instant:true` boosters fire immediately. Cost/value are data-driven for live balancing — prices scale with the booster's board impact (bomb < lightning < freeze < rainbow) so the in-level shop rewards strategic use without trivialising the difficulty curve. Client purchases with soft currency only; premium-currency grants must go through a trusted service boundary (see docs/SECURITY.md).",
+  "boosters": [
+    { "id": "bomb", "label": "Bomb", "cost": 90, "currency": "coins", "power": "bomb", "targeted": true, "effect": "clear_random_cluster", "value": 1, "help": "Blasts a 3x3 area." },
+    { "id": "lightning", "label": "Lightning", "cost": 120, "currency": "coins", "power": "lightning", "targeted": true, "effect": "clear_line", "value": 1, "help": "Clears a full row and column." },
+    { "id": "freeze", "label": "Freeze", "cost": 150, "currency": "coins", "power": "freeze", "targeted": true, "effect": "clear_diamond", "value": 1, "help": "Shatters a diamond and frosts the ring." },
+    { "id": "rainbow", "label": "Rainbow", "cost": 200, "currency": "coins", "power": "rainbow", "targeted": true, "effect": "clear_color", "value": 1, "help": "Clears every jewel of one colour." },
+    { "id": "shuffle", "label": "Shuffle", "cost": 60, "currency": "coins", "instant": true, "effect": "shuffle_board", "value": 1, "help": "Reshuffles the whole board." },
+    { "id": "extra_moves", "label": "+5 Moves", "cost": 140, "currency": "coins", "instant": true, "effect": "add_moves", "value": 5, "help": "Adds 5 moves to this level." }
+  ]
+}

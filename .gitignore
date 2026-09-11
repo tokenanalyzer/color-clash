@@ -1,7 +1,9 @@
 # Godot 4
 .godot/
 export.cfg
-export_presets.cfg
+# export_presets.cfg IS tracked — it is the Android/desktop build config and
+# holds no secrets (the debug keystore lives in the user's Godot editor
+# settings, referenced by path, not here).
 
 # OS / editor
 .DS_Store
@@ -11,8 +13,8 @@ Thumbs.db
 !.vscode/settings.json
 
 # Build outputs
-build/
-exports/
+/build/
+/exports/
 *.apk
 *.aab
 *.keystore
@@ -27,3 +29,13 @@ firebase-debug.log
 # Generated Firebase files
 backend/.firebase/
 backend/node_modules/
+
+# Python
+__pycache__/
+*.pyc
+
+# Godot Android custom build template (game/android/) is NOT vendored — it is
+# ~580 MB of regenerable binaries. Recreate it with:
+#   godot4 --headless --path game --install-android-build-template --export-release "Android Release"
+# then re-apply the SDK-35 patch documented in docs/ANDROID_RELEASE.md.
+/game/android/

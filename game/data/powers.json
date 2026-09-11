@@ -1,0 +1,45 @@
+{
+  "_comment": "Match-size -> power tile. A big enough connection LEAVES a power tile on the board (it is not auto-detonated) — the player activates it later by threading it into another connection or catching it in a blast. Evaluated highest min_size down; first threshold whose min_size <= group size wins. `count` (default 1) is how many power tiles a group creates. Ladder: bomb 4 / lightning 5 / freeze 6 / chain 7 / rainbow 8+ (x2 at 10, x3 at 13).",
+  "thresholds": [
+    { "power": "rainbow", "min_size": 13, "count": 3 },
+    { "power": "rainbow", "min_size": 10, "count": 2 },
+    { "power": "rainbow", "min_size": 8, "count": 1 },
+    { "power": "chain", "min_size": 7, "count": 1 },
+    { "power": "freeze", "min_size": 6, "count": 1 },
+    { "power": "lightning", "min_size": 5, "count": 1 },
+    { "power": "bomb", "min_size": 4, "count": 1 },
+    { "power": "none", "min_size": 3, "count": 0 }
+  ],
+  "definitions": {
+    "bomb": {
+      "label": "Bomb",
+      "radius": 1,
+      "base_points_per_cell": 12,
+      "activation_bonus": 150
+    },
+    "lightning": {
+      "label": "Lightning",
+      "base_points_per_cell": 10,
+      "activation_bonus": 250
+    },
+    "freeze": {
+      "label": "Freeze",
+      "radius": 1,
+      "freeze_hp": 2,
+      "base_points_per_cell": 13,
+      "activation_bonus": 300
+    },
+    "chain": {
+      "label": "Chain",
+      "base_points_per_cell": 14,
+      "activation_bonus": 400
+    },
+    "rainbow": {
+      "label": "Rainbow",
+      "base_points_per_cell": 16,
+      "activation_bonus": 500,
+      "refill_spawn_chance": 0.010
+    }
+  },
+  "base_points_per_piece": 10
+}

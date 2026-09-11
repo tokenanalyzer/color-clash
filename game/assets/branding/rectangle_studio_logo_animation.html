@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rectangle Studio — Logo Reveal</title>
+<style>
+  :root { --bg1:#fbfdff; --bg2:#eef5ff; --blue:#075cff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; }
+  body {
+    overflow:hidden;
+    display:grid;
+    place-items:center;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(90,180,255,.13), transparent 38%),
+      linear-gradient(135deg,var(--bg1),var(--bg2));
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+  }
+  .stage { width:min(900px,92vw); text-align:center; }
+  svg { width:min(520px,72vw); height:auto; overflow:visible; }
+  .logo-group { transform-origin:400px 400px; }
+  .top,.left,.right,.bottom,.edge,.shine { 
+    fill:none; stroke-linecap:round; stroke-linejoin:round;
+  }
+  .top { fill:url(#top); stroke:url(#edge); stroke-width:8; }
+  .left { fill:url(#glass); stroke:url(#edge); stroke-width:7; }
+  .right { fill:url(#side); stroke:url(#edge); stroke-width:8; }
+  .bottom { fill:url(#bottom); stroke:url(#edge); stroke-width:7; }
+  .edge { stroke:url(#edge); stroke-width:7; fill:none; }
+  .shine { stroke:#dfffff; stroke-width:4; opacity:.8; }
+  .flat {
+    fill:url(#flat);
+    filter:url(#glow);
+    transform-box:fill-box;
+    transform-origin:center;
+    animation: flatReveal 1.8s cubic-bezier(.22,.8,.2,1) forwards;
+  }
+  .logo-group { opacity:0; animation: logoIn 2.2s cubic-bezier(.18,.82,.22,1) 1.0s forwards; }
+  .wordmark {
+    opacity:0;
+    transform:translateY(10px);
+    animation: textIn 1.0s ease-out 2.2s forwards;
+    letter-spacing:.28em;
+    font-size:34px;
+    font-weight:600;
+    fill:#12316f;
+  }
+  .subtle { fill:#6a7da8; font-size:11px; letter-spacing:.48em; }
+  @keyframes flatReveal {
+    0% { transform:scaleX(.18); opacity:.25; }
+    35% { transform:scaleX(1); opacity:1; }
+    100% { transform:scaleX(1); opacity:0; }
+  }
+  @keyframes logoIn {
+    0% { opacity:0; transform:scale(.84) rotateX(32deg); }
+    45% { opacity:1; }
+    100% { opacity:1; transform:scale(1) rotateX(0); }
+  }
+  @keyframes textIn {
+    to { opacity:1; transform:translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+<svg viewBox="0 0 800 900" aria-label="Rectangle Studio logo reveal">
+<defs>
+  <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#47f4ff"/><stop offset=".22" stop-color="#087bff"/><stop offset=".65" stop-color="#153ddd"/><stop offset="1" stop-color="#031477"/></linearGradient>
+  <linearGradient id="side" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#56efff"/><stop offset=".22" stop-color="#0877ff"/><stop offset=".75" stop-color="#0635c9"/><stop offset="1" stop-color="#00146c"/></linearGradient>
+  <linearGradient id="bottom" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a60ff"/><stop offset=".5" stop-color="#0628ae"/><stop offset="1" stop-color="#00105c"/></linearGradient>
+  <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#fff" stop-opacity=".03"/><stop offset=".5" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#bdefff" stop-opacity=".04"/></linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dfffff"/><stop offset=".25" stop-color="#20eaff"/><stop offset=".7" stop-color="#1574ff"/><stop offset="1" stop-color="#092dbb"/></linearGradient>
+  <linearGradient id="flat" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#cfffff" stop-opacity="0"/><stop offset=".15" stop-color="#20eaff"/><stop offset=".5" stop-color="#fff"/><stop offset=".85" stop-color="#1681ff"/><stop offset="1" stop-color="#cfffff" stop-opacity="0"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="shadow"><feDropShadow dx="8" dy="16" stdDeviation="16" flood-color="#234b9b" flood-opacity=".18"/></filter>
+</defs>
+
+<rect x="100" y="150" width="600" height="8" rx="4" class="flat"/>
+<g class="logo-group" filter="url(#shadow)">
+  <path class="top" d="M155 170 L355 65 L650 210 L450 315 Z"/>
+  <path class="left" d="M155 170 L450 315 L450 735 L155 575 Z"/>
+  <path class="right" d="M450 315 L650 210 L650 635 L450 735 Z"/>
+  <path class="bottom" d="M155 575 L450 735 L650 635 L450 485 Z"/>
+  <path class="edge" d="M155 170 L355 65 L650 210 L650 635 L450 735 L155 575 Z"/>
+  <path class="shine" d="M205 194 L425 315"/>
+  <path class="shine" d="M178 189 L178 552"/>
+</g>
+
+<text class="wordmark" x="400" y="820" text-anchor="middle">RECTANGLE STUDIO</text>
+<text class="subtle" x="400" y="852" text-anchor="middle">GAME • CREATIVE • TECHNOLOGY</text>
+</svg>
+</div>
+<script>
+  // Replay the reveal by clicking/tapping anywhere.
+  document.body.addEventListener('click', () => {
+    const svg = document.querySelector('svg');
+    svg.style.display='none'; void svg.offsetWidth; svg.style.display='';
+  });
+</script>
+</body>
+</html>

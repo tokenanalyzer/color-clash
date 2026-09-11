@@ -1,0 +1,11 @@
+{
+  "_comment": "Playable gem colors. `base` is the mid body tone; `deep` is the shaded lower facet; `accent` is the lit upper facet; `rim` is the crisp edge highlight; `glow` is the bloom/particle color. deep/rim are optional (derived from base when omitted) so older data stays valid.",
+  "colors": [
+    { "id": "red",    "name": "Red",    "base": "#f0324f", "deep": "#a8143a", "accent": "#ff8a9e", "rim": "#ffd0d8", "glow": "#ff4d6d" },
+    { "id": "blue",   "name": "Blue",   "base": "#2f86f0", "deep": "#1451b0", "accent": "#8fcaff", "rim": "#d6ecff", "glow": "#4da3ff" },
+    { "id": "yellow", "name": "Yellow", "base": "#ffc02e", "deep": "#d68a10", "accent": "#ffe6a0", "rim": "#fff4cf", "glow": "#ffcc4d" },
+    { "id": "green",  "name": "Green",  "base": "#28c46e", "deep": "#12894a", "accent": "#8ff0b6", "rim": "#d3ffe6", "glow": "#4ddb8a" },
+    { "id": "purple", "name": "Purple", "base": "#9a54f0", "deep": "#6a26be", "accent": "#cfa6ff", "rim": "#ecdcff", "glow": "#b673ff" },
+    { "id": "orange", "name": "Orange", "base": "#ff7a2e", "deep": "#d24a0f", "accent": "#ffb98a", "rim": "#ffe2cf", "glow": "#ff9448" }
+  ]
+}

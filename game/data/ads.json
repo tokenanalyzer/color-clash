@@ -1,0 +1,27 @@
+{
+  "_comment": "AdMob config for War of Love, loaded by AdsService (autoload 'Ads'). AdsService reads unit_ids.rewarded / unit_ids.interstitial (test|prod, chosen by use_test_ads) and passes them to the native ColorClashAdMob plugin. use_test_ads=false selects the 'prod' ids below, BUT AdsService also forces test ads on any OS.is_debug_build() build regardless of this flag (debug APK exports / running from the editor always stay on Google's OFFICIAL TEST unit ids) — only a non-debug (release/AAB) export ever uses 'prod'. NEVER test with production ids. The AdMob APP ID is NOT read here — it is a build resource (game/android/build/build.gradle resValue 'admob_app_id', referenced from AndroidManifest.xml); Google's TEST App ID by default, override with the ADMOB_APP_ID env var for production (see docs/MONETIZATION.md). Ad unit ids and the app id are not secrets. The game stays fully playable with NO ads — every placement degrades to its normal non-ad behaviour when the plugin is absent / uninitialised / offline / an ad fails.",
+
+  "use_test_ads": false,
+
+  "unit_ids": {
+    "app_id":       { "test": "ca-app-pub-3940256099942544~3347511713", "prod": "ca-app-pub-9900197126922435~4709930379" },
+    "rewarded":     { "test": "ca-app-pub-3940256099942544/5224354917", "prod": "ca-app-pub-9900197126922435/9777941726" },
+    "interstitial": { "test": "ca-app-pub-3940256099942544/1033173712", "prod": "ca-app-pub-9900197126922435/9191618364" },
+    "banner":       { "test": "ca-app-pub-3940256099942544/6300978111", "prod": "" }
+  },
+
+  "interstitial": {
+    "cooldown_seconds": 150,
+    "max_per_session": 4,
+    "min_levels_cleared": 4,
+    "min_session_launches": 2
+  },
+  "back_to_back_guard_seconds": 20,
+
+  "rewards": {
+    "continue_moves": 5,
+    "double_win_coins": true,
+    "free_coins": 120,
+    "free_booster": { "id": "bomb", "amount": 1 }
+  }
+}
