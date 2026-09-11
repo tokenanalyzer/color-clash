@@ -1,6 +1,6 @@
 # Privacy Policy — War of Love
 
-_Last updated: 2026-09-10 · Draft — not yet published. Replace the bracketed
+_Last updated: 2026-09-11 · Draft — not yet published. Replace the bracketed
 fields and host at a public URL before Play Store submission._
 
 **App:** War of Love (`com.colorclash.game`)
@@ -57,6 +57,11 @@ requirements, to personalize ads. You can limit ad personalization and reset
 or delete your Advertising ID from your device settings
 (*Settings → Privacy → Ads* on Android).
 
+**If you're in the EEA, UK, or Switzerland**, the app also uses Google's
+**User Messaging Platform (UMP) SDK** to ask for your consent (or confirm no
+consent choice is required) before requesting any ad — see "Your choices"
+below for how to revisit that choice.
+
 The app does **not** combine this with any data of its own, does not build
 its own advertising profile, and has no other advertising, analytics, or
 tracking SDK.
@@ -97,6 +102,14 @@ match the configuration you ship.
 
 - **Play without ads:** simply don't tap the "watch an ad" buttons; the
   full-screen ads between levels are infrequent and capped.
+- **EEA / UK / Switzerland consent:** on each launch, the app asks Google's
+  User Messaging Platform (UMP) whether your region requires a consent
+  choice. If it does, you're shown Google's consent form before any ad is
+  requested; if it doesn't, this step is invisible and no ad request is
+  made until that's confirmed either way. You can revisit or withdraw your
+  choice at any time from **Settings → Privacy Choices** (only shown when
+  applicable to your region) — withdrawing stops new ad requests
+  immediately.
 - **Limit ad tracking:** reset or delete your Advertising ID and turn on
   "opt out of Ads personalization" in your device settings.
 - **Regional rights:** where applicable (e.g. GDPR/UK GDPR, CCPA/CPRA), you

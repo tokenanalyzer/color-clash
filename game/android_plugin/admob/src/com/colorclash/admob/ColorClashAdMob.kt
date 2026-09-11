@@ -1,5 +1,7 @@
 package com.colorclash.admob
 
+import android.content.Context
+
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin
 import org.godotengine.godot.plugin.SignalInfo
@@ -15,6 +17,9 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.ump.ConsentInformation
+import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.UserMessagingPlatform
 
 /**
  * Minimal native AdMob bridge for War of Love.
@@ -25,10 +30,18 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
  * guarding, interstitial frequency caps, cooldowns, failure-safe fallback —
  * lives in GDScript (`scripts/services/ads_service.gd`), never here.
  *
+ * Also bridges Google's User Messaging Platform (UMP) SDK for EEA/UK/
+ * Switzerland consent (see `initialize()`): `MobileAds.initialize()` is only
+ * ever called after `ConsentInformation.canRequestAds()` allows it, exactly
+ * as Google's own UMP quick-start guide prescribes. No consent POLICY lives
+ * here either — this just drives the UMP SDK and reports outcomes over the
+ * same `ad_event` signal; `AdsService` decides what to do with them.
+ *
  * Registered as the Godot singleton "ColorClashAdMob" via a
  * <meta-data android:name="org.godotengine.plugin.v1.ColorClashAdMob"> entry
  * in AndroidManifest.xml. Compiled straight into the app module (no separate
- * .aar); the only external dependency is play-services-ads.
+ * .aar); the external dependencies are play-services-ads and
+ * user-messaging-platform.
  */
 class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
 
@@ -38,6 +51,8 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
     }
 
     @Volatile private var initialized = false
+    private var mobileAdsInitializeCalled = false
+    private var consentInformation: ConsentInformation? = null
     private var rewardedAd: RewardedAd? = null
     private var interstitialAd: InterstitialAd? = null
     private var lastRewardedUnitId: String = ""
@@ -69,7 +84,8 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
         }
         ui {
             val ctx = activity?.applicationContext
-            if (ctx == null) {
+            val a = activity
+            if (ctx == null || a == null) {
                 send("init_failed", "no_context")
                 return@ui
             }
@@ -84,15 +100,104 @@ class ColorClashAdMob(godot: Godot) : GodotPlugin(godot) {
                         .build()
                 )
             }
-            MobileAds.initialize(ctx) {
-                initialized = true
-                send("initialized", "")
-            }
+            // UMP consent gate — required by Google for EEA/UK/Switzerland
+            // before any ad request. Requested on every launch (this method
+            // runs once per process, from AdsService._ready()). See
+            // https://developers.google.com/admob/ump/android/quick-start.
+            val info = UserMessagingPlatform.getConsentInformation(ctx)
+            consentInformation = info
+            val params = ConsentRequestParameters.Builder().build()
+            info.requestConsentInfoUpdate(
+                a,
+                params,
+                {
+                    send("consent_info_updated", info.consentStatus.toString())
+                    // Shows the consent form ONLY if the SDK determines it is
+                    // required for this user/region; a no-op callback
+                    // otherwise (Google's own "if required" semantics).
+                    UserMessagingPlatform.loadAndShowConsentFormIfRequired(a) { formError ->
+                        if (formError != null) {
+                            send("consent_form_error", formError.message ?: "form_error")
+                        } else {
+                            send("consent_form_dismissed", "")
+                        }
+                        maybeInitializeAds(ctx, announceBlocked = true)
+                    }
+                },
+                { requestConsentError ->
+                    send("consent_info_update_failed", requestConsentError.message ?: "error")
+                    // No form step will run on this path — this is terminal,
+                    // so report a block if consent still doesn't allow ads.
+                    maybeInitializeAds(ctx, announceBlocked = true)
+                },
+            )
+            // A previous session's consent may already permit ad requests —
+            // don't make the player wait on this network round trip if so.
+            // Silent: the definitive outcome is reported by the callbacks
+            // above once the (possibly first-ever) consent flow settles.
+            maybeInitializeAds(ctx, announceBlocked = false)
+        }
+    }
+
+    /**
+     * Calls `MobileAds.initialize()` iff UMP says ad requests are currently
+     * allowed (`ConsentInformation.canRequestAds()`) — the one gate every ad
+     * load in this plugin passes through, since nothing loads before
+     * `initialized` flips true. Safe to call more than once (guarded).
+     */
+    private fun maybeInitializeAds(ctx: Context, announceBlocked: Boolean) {
+        val info = consentInformation ?: return
+        if (!info.canRequestAds()) {
+            if (announceBlocked) send("ads_blocked", "consent_not_obtained")
+            return
+        }
+        if (mobileAdsInitializeCalled) return
+        mobileAdsInitializeCalled = true
+        MobileAds.initialize(ctx) {
+            initialized = true
+            send("initialized", "")
         }
     }
 
     @UsedByGodot
     fun isInitialized(): Boolean = initialized
+
+    /** Mirrors `ConsentInformation.canRequestAds()` for GDScript-side checks. */
+    @UsedByGodot
+    fun canRequestAds(): Boolean = consentInformation?.canRequestAds() ?: false
+
+    /** True when the user must be offered a way to revisit their choice. */
+    @UsedByGodot
+    fun isPrivacyOptionsRequired(): Boolean =
+        consentInformation?.privacyOptionsRequirementStatus ==
+            ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
+
+    /**
+     * Shows Google's privacy-options form so the user can revisit/withdraw
+     * their consent choice (e.g. from a Settings screen). Re-checks
+     * `canRequestAds()` after the user closes it, since a withdrawal here
+     * can turn ad requests back off.
+     */
+    @UsedByGodot
+    fun showPrivacyOptionsForm() {
+        val a = activity
+        if (a == null) {
+            send("privacy_options_error", "no_activity")
+            return
+        }
+        ui {
+            UserMessagingPlatform.showPrivacyOptionsForm(a) { formError ->
+                if (formError != null) {
+                    send("privacy_options_error", formError.message ?: "form_error")
+                } else {
+                    send("privacy_options_dismissed", "")
+                    if (consentInformation?.canRequestAds() != true) {
+                        send("ads_blocked", "consent_withdrawn")
+                    }
+                }
+            }
+        }
+    }
 
     // ------------------------------------------------------------ rewarded --
 

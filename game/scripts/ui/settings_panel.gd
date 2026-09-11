@@ -18,6 +18,7 @@ signal closed()
 
 var _panel: UiKit.AssetFramePanel
 var _scrim: ColorRect
+var _privacy_choices_btn: Control
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -68,6 +69,9 @@ func _ready() -> void:
 	links.add_child(_link_button("Privacy Policy", &"settings_btn_privacy"))
 	links.add_child(_link_button("Terms of Service", &"settings_btn_terms"))
 	links.add_child(_link_button("Restore Purchases", &"settings_btn_restore"))
+	_privacy_choices_btn = _privacy_choices_button()
+	_privacy_choices_btn.visible = Ads.privacy_options_required()
+	links.add_child(_privacy_choices_btn)
 	col.add_child(links)
 
 	var spacer := Control.new()
@@ -103,7 +107,10 @@ func close() -> void:
 	closed.emit()
 
 func _refresh() -> void:
-	pass # rows read AudioSettings live via their own build; nothing cached
+	# UMP consent may have settled (or been withdrawn) since the panel was
+	# built — re-check every time the player opens Settings, not just once.
+	if _privacy_choices_btn != null:
+		_privacy_choices_btn.visible = Ads.privacy_options_required()
 
 ## Gold ornament divider from the supplied sheet, or the old thin gold line.
 func _divider() -> Control:
@@ -212,6 +219,22 @@ func _link_button(text: String, slice_id: StringName) -> Control:
 	pb.pressed.connect(func():
 		Audio.play(&"button_tap")
 		UiKit.show_toast(self, "%s — available at launch" % text)
+	)
+	return pb
+
+## EEA/UK/Switzerland consent revisit entry point (UMP "privacy options").
+## Only shown when `Ads.privacy_options_required()` is true (see `_refresh()`
+## and where this is added in `_ready()`). No supplied art for this yet, so
+## it always uses the procedural secondary-button look — unlike the other
+## link rows, this one is a real, functional action, not a "coming at
+## launch" placeholder.
+func _privacy_choices_button() -> Control:
+	var pb := UiKit.button("Privacy Choices", &"secondary", VisualTheme.FS_BODY, 28)
+	pb.custom_minimum_size = Vector2(0, 56)
+	pb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pb.pressed.connect(func():
+		Audio.play(&"button_tap")
+		Ads.show_privacy_options()
 	)
 	return pb
 

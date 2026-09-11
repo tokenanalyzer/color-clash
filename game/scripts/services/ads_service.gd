@@ -21,6 +21,15 @@ extends Node
 ## (safe to ship in a debug/internal build); production ids are empty
 ## placeholders to be filled from the AdMob console. Ad unit ids are not
 ## secrets. See docs/MONETIZATION.md.
+##
+## UMP consent (EEA/UK/Switzerland): the native plugin runs Google's User
+## Messaging Platform flow on every `initialize()` call (i.e. every launch)
+## BEFORE ever calling MobileAds.initialize — see
+## `game/android_plugin/admob/src/.../ColorClashAdMob.kt`. `_native_initialized`
+## (and therefore every ad request) only ever becomes true once UMP allows it;
+## no separate gating is needed here. `can_request_ads()` / `consent_status()`
+## / `privacy_options_required()` / `show_privacy_options()` expose that state
+## for UI. See docs/MONETIZATION.md's "Consent (UMP)" section.
 
 signal rewarded_completed(placement: String)              ## reward EARNED (fires at the earn moment)
 signal rewarded_closed(placement: String, earned: bool)   ## a shown ad finished (earned or not)
@@ -31,6 +40,10 @@ signal rewarded_failed(placement: String, reason: String) ## ad never showed
 signal rewarded_result(placement: String, earned: bool)
 signal interstitial_shown(placement: String)
 signal interstitial_skipped(placement: String, reason: String)
+## UMP consent (EEA/UK/Switzerland) outcome changed — `can_request_ads()` /
+## `privacy_options_required()` have fresh values. Optional to listen to;
+## nothing currently needs it, ad gating already reads the state directly.
+signal consent_updated()
 
 ## Native plugin singletons we know how to talk to, in priority order.
 const _CANDIDATE_SINGLETONS: Array[String] = [
@@ -42,6 +55,18 @@ var available := false                  ## a usable ad backend is present
 var config: Dictionary = {}
 var _test := true
 var _plugin: Object = null
+
+# --- UMP consent (EEA/UK/Switzerland) ---
+## "unknown" | "not_required" | "required" | "obtained" — the UMP
+## ConsentStatus as of the last `consent_info_updated` event. Informational;
+## `can_request_ads()` is the one value gating actually reads.
+var _consent_status := "unknown"
+## Mirrors native `ConsentInformation.canRequestAds()`. Ad requests
+## (`_preload_rewarded` / `_preload_interstitial`) never happen before this
+## is true — `_native_initialized` itself only ever flips true once the
+## native side has confirmed it, see `_on_native_ad_event("initialized")`.
+var _ads_allowed := false
+var _privacy_options_required := false
 
 # --- session / frequency state (in-memory, per run) ---
 var _session_start_ms := 0
@@ -63,7 +88,12 @@ func _ready() -> void:
 	config = JsonLoader.load_json("res://data/ads.json")
 	if config.is_empty():
 		config = _default_config()
-	_test = bool(config.get("use_test_ads", true))
+	# `use_test_ads=false` (the shipped release config) only ever takes effect
+	# on a non-debug export. Any debug build — including running the editor
+	# and a debug APK export used for on-device testing — forces test ads
+	# regardless of the config value, so production ids can never show up
+	# outside a real release build.
+	_test = bool(config.get("use_test_ads", true)) or OS.is_debug_build()
 	_detect_plugin()
 	if _plugin != null:
 		available = true
@@ -241,6 +271,37 @@ func using_test_ads() -> bool:
 	return _test
 
 # =====================================================================
+#  UMP consent (EEA / UK / Switzerland)
+# =====================================================================
+
+## Whether ad requests are currently allowed by UMP consent state. False
+## until the consent flow (requested fresh on every launch, see `_ready()`)
+## has settled AND allows it. When there's no native backend at all this
+## stays false too — moot, since `available` is already false and every
+## public entry point (`can_show_rewarded()`, `maybe_show_interstitial()`)
+## already gates on that.
+func can_request_ads() -> bool:
+	return _ads_allowed
+
+## "unknown" | "not_required" | "required" | "obtained" (UMP ConsentStatus,
+## lowercased). Informational — nothing gates on this directly.
+func consent_status() -> String:
+	return _consent_status
+
+## True when the player must be given a way to revisit their consent choice
+## (an EEA/UK/CH user who has made one). A Settings-style screen should only
+## show its "Privacy Choices" entry when this is true.
+func privacy_options_required() -> bool:
+	return _privacy_options_required
+
+## Shows Google's privacy-options form so the player can change or withdraw
+## their consent choice. No-ops with no native backend (desktop/headless) —
+## call sites don't need to guard on `available` themselves.
+func show_privacy_options() -> void:
+	if _plugin != null and not _debug_backend:
+		_plugin.call("showPrivacyOptionsForm")
+
+# =====================================================================
 #  native plugin glue  (thin — the plugin API surface lives here only)
 # =====================================================================
 
@@ -281,16 +342,44 @@ func _wire_plugin() -> void:
 	_plugin.call("initialize", OS.is_debug_build() or _test)
 	set_process(true)   # drives the rewarded load-timeout watchdog
 
+func _refresh_privacy_options_required() -> void:
+	var was := _privacy_options_required
+	_privacy_options_required = _plugin != null and not _debug_backend \
+		and bool(_plugin.call("isPrivacyOptionsRequired"))
+	if _privacy_options_required != was:
+		consent_updated.emit()
+
 ## Single dispatcher for every native lifecycle event.
 func _on_native_ad_event(event: String, message: String) -> void:
 	_dbg("native ad_event: %s %s" % [event, message])
 	match event:
+		"consent_info_updated":
+			_consent_status = message.to_lower()
+			_refresh_privacy_options_required()
+		"consent_info_update_failed", "consent_form_error":
+			pass   # non-fatal — the definitive outcome is "initialized" or "ads_blocked"
+		"consent_form_dismissed":
+			_refresh_privacy_options_required()
+		"ads_blocked":
+			# UMP says ad requests are not (or no longer) allowed — matches
+			# "init_failed"'s effect: no preload, every ad request fails safe.
+			_native_initialized = false
+			_ads_allowed = false
+			consent_updated.emit()
+		"privacy_options_dismissed":
+			_refresh_privacy_options_required()
+		"privacy_options_error":
+			pass
 		"initialized":
 			_native_initialized = true
+			_ads_allowed = true
+			_refresh_privacy_options_required()
+			consent_updated.emit()
 			_preload_rewarded()
 			_preload_interstitial()
 		"init_failed":
 			_native_initialized = false
+			_ads_allowed = false
 		"rewarded_loaded":
 			if _rewarded_wants_show and _rewarded_in_flight:
 				_rewarded_wants_show = false
@@ -371,6 +460,7 @@ func debug_enable_fake_backend(now_available: bool = true) -> void:
 	_debug_backend = true
 	available = now_available
 	_native_initialized = now_available
+	_ads_allowed = now_available
 	_plugin = null
 
 ## Restore the real (no-plugin) headless state after a test.
@@ -379,6 +469,9 @@ func debug_disable_fake_backend() -> void:
 	_plugin = null
 	available = false
 	_native_initialized = false
+	_ads_allowed = false
+	_consent_status = "unknown"
+	_privacy_options_required = false
 	_rewarded_wants_show = false
 	_signal_wired = false
 	_clear_rewarded()
@@ -401,6 +494,9 @@ func debug_finish_rewarded(outcome: String, reason: String = "load_failed") -> v
 func debug_install_native_stub(stub: Object) -> void:
 	_debug_backend = false
 	_native_initialized = false
+	_ads_allowed = false
+	_consent_status = "unknown"
+	_privacy_options_required = false
 	_rewarded_wants_show = false
 	_signal_wired = false
 	_clear_rewarded()

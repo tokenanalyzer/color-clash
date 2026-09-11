@@ -116,12 +116,19 @@ class _NativeStub extends RefCounted:
 	var rewarded_ready := false
 	var interstitial_ready := false
 	var auto_init := true
+	var privacy_options_required_value := false
+	var can_request_ads_value := true
 	var calls: Array[String] = []
 	func initialize(_test_devices: bool) -> void:
 		calls.append("initialize")
 		if auto_init:
 			ad_event.emit("initialized", "")
 	func isInitialized() -> bool: return true
+	func canRequestAds() -> bool: return can_request_ads_value
+	func isPrivacyOptionsRequired() -> bool: return privacy_options_required_value
+	func showPrivacyOptionsForm() -> void:
+		calls.append("showPrivacyOptionsForm")
+		ad_event.emit("privacy_options_dismissed", "")
 	func loadRewarded(_id: String) -> void: calls.append("loadRewarded")
 	func isRewardedReady() -> bool: return rewarded_ready
 	func showRewarded() -> bool:
@@ -203,7 +210,145 @@ func test_native_interstitial_uses_preloaded_ad() -> void:
 	check("showInterstitial called on the native stub", stub.calls.has("showInterstitial"))
 	Ads.debug_disable_fake_backend()
 
+# ---- UMP consent (EEA/UK/Switzerland) --------------------------------
+# `initialize()` on the real plugin now runs the UMP flow before ever
+# calling MobileAds.initialize(); here that's simulated entirely by feeding
+# synthetic `ad_event`s (never a live consent UI or network — see
+# `_NativeStub` above), exactly like the native-glue tests above it.
+
+func test_consent_not_required_allows_ads() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false          # full control over the event sequence
+	Ads.debug_install_native_stub(stub)
+	check("ads not allowed before consent settles", not Ads.can_request_ads())
+	Ads.debug_feed_native_event("consent_info_updated", "NOT_REQUIRED")
+	check_eq("consent status reflects NOT_REQUIRED", Ads.consent_status(), "not_required")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	check("no loadRewarded before ads are allowed",
+		not stub.calls.has("loadRewarded") and not stub.calls.has("loadInterstitial"))
+	Ads.debug_feed_native_event("initialized", "")
+	check("ads allowed once initialized fires", Ads.can_request_ads())
+	check("no privacy options entry point needed", not Ads.privacy_options_required())
+	Ads.debug_disable_fake_backend()
+
+func test_consent_required_then_granted_allows_ads() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	stub.privacy_options_required_value = true
+	Ads.debug_install_native_stub(stub)
+	Ads.debug_feed_native_event("consent_info_updated", "REQUIRED")
+	check_eq("consent status reflects REQUIRED", Ads.consent_status(), "required")
+	check("ads not yet allowed while consent is pending", not Ads.can_request_ads())
+	check("nothing preloaded while consent is pending",
+		not stub.calls.has("loadRewarded") and not stub.calls.has("loadInterstitial"))
+	Ads.debug_feed_native_event("consent_form_dismissed", "")   # user completed the form
+	Ads.debug_feed_native_event("initialized", "")              # canRequestAds() was true
+	check("ads allowed once consent is granted", Ads.can_request_ads())
+	check_eq("consent status still queryable", Ads.consent_status(), "required")
+	check("privacy-options entry point available for a REQUIRED-region user",
+		Ads.privacy_options_required())
+	Ads.debug_disable_fake_backend()
+
+func test_consent_required_but_denied_blocks_ads() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	Ads.debug_install_native_stub(stub)
+	Ads.debug_feed_native_event("consent_info_updated", "REQUIRED")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	# consent flow completed but doesn't permit ad requests (denied/restricted)
+	Ads.debug_feed_native_event("ads_blocked", "consent_not_obtained")
+	check("can_request_ads false when consent denies ad requests", not Ads.can_request_ads())
+	check("can_show_rewarded false while blocked", not Ads.can_show_rewarded())
+	check("interstitial also blocked while consent denies ads",
+		not Ads.maybe_show_interstitial("t", {"levels_cleared": 99}))
+	check("no ad was ever loaded while blocked",
+		not stub.calls.has("loadRewarded") and not stub.calls.has("loadInterstitial"))
+	Ads.debug_disable_fake_backend()
+
+func test_can_request_ads_gates_rewarded_show() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	Ads.debug_install_native_stub(stub)
+	check("cannot show rewarded before consent settles", not Ads.can_show_rewarded())
+	var res := {"earned": -1}
+	Ads.rewarded_result.connect(func(_p, e): res["earned"] = 1 if e else 0)
+	Ads.show_rewarded("continue_moves")
+	check_eq("blocked by pending consent -> terminal result earned=false", res["earned"], 0)
+	check("not left in-flight", not Ads.is_rewarded_in_flight())
+	Ads.debug_disable_fake_backend()
+
+func test_privacy_options_availability_and_entry_point() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	Ads.debug_install_native_stub(stub)
+	stub.privacy_options_required_value = false
+	Ads.debug_feed_native_event("consent_info_updated", "NOT_REQUIRED")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	check("privacy options not required for a NOT_REQUIRED consent status",
+		not Ads.privacy_options_required())
+	stub.privacy_options_required_value = true
+	Ads.debug_feed_native_event("consent_info_updated", "OBTAINED")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	check("privacy options required once a REQUIRED-region choice is on record",
+		Ads.privacy_options_required())
+	Ads.show_privacy_options()
+	check("show_privacy_options() reaches the native privacy-options form",
+		stub.calls.has("showPrivacyOptionsForm"))
+	Ads.debug_disable_fake_backend()
+
+func test_show_privacy_options_safe_without_backend() -> void:
+	Ads.debug_disable_fake_backend()
+	Ads.show_privacy_options()   # must not error with no plugin present
+	check("privacy options not required with no backend", not Ads.privacy_options_required())
+	check("can_request_ads false with no backend", not Ads.can_request_ads())
+
+func test_privacy_options_withdrawal_blocks_ads_again() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	Ads.debug_install_native_stub(stub)
+	Ads.debug_feed_native_event("consent_info_updated", "OBTAINED")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	Ads.debug_feed_native_event("initialized", "")
+	check("ads allowed after initial consent", Ads.can_request_ads())
+	# user reopens privacy options (e.g. from Settings) and withdraws consent
+	Ads.debug_feed_native_event("privacy_options_dismissed", "")
+	Ads.debug_feed_native_event("ads_blocked", "consent_withdrawn")
+	check("ads blocked again after withdrawal", not Ads.can_request_ads())
+	check("rewarded now blocked too", not Ads.can_show_rewarded())
+	Ads.debug_disable_fake_backend()
+
+## Existing rewarded/interstitial behaviour must survive unchanged once it
+## runs behind the new consent gate — same reward-once / gating guarantees
+## as the pre-consent tests above, just reached through the consent flow.
+func test_full_consent_then_rewarded_and_interstitial_flow_unchanged() -> void:
+	var stub := _NativeStub.new()
+	stub.auto_init = false
+	stub.rewarded_ready = true
+	Ads.debug_install_native_stub(stub)
+	Ads.debug_feed_native_event("consent_info_updated", "NOT_REQUIRED")
+	Ads.debug_feed_native_event("consent_form_dismissed", "")
+	Ads.debug_feed_native_event("initialized", "")
+	Ads.debug_reset_session()
+
+	var res := {"earned": -1, "cb": 0}
+	Ads.rewarded_result.connect(func(_p, e): res["earned"] = 1 if e else 0)
+	Ads.show_rewarded("continue_moves", func(): res["cb"] += 1)
+	check("showRewarded called through the normal (post-consent) path",
+		stub.calls.has("showRewarded"))
+	Ads.debug_feed_native_event("rewarded_earned", "coins:5")
+	Ads.debug_feed_native_event("rewarded_dismissed")
+	check_eq("reward still granted exactly once", res["cb"], 1)
+	check_eq("terminal result earned=true", res["earned"], 1)
+
+	Ads.debug_reset_session()   # else the back-to-back guard blocks the interstitial below
+	stub.interstitial_ready = true
+	check("interstitial still shows through the normal (post-consent) path",
+		Ads.maybe_show_interstitial("t", {"levels_cleared": 20}))
+	check("showInterstitial called on the native stub", stub.calls.has("showInterstitial"))
+	Ads.debug_disable_fake_backend()
+
 func test_service_left_in_clean_headless_state() -> void:
 	Ads.debug_disable_fake_backend()
 	check("ads unavailable after tests", not Ads.available)
 	check("nothing in flight", not Ads.is_rewarded_in_flight())
+	check("consent state reset", not Ads.can_request_ads() and not Ads.privacy_options_required())

@@ -1,8 +1,155 @@
-# Resume point — 2026-09-06  ·  WAR OF LOVE  ·  UI ASSET INTEGRATION (Home anim + gameplay top bar)
+# Resume point — 2026-09-11  ·  WAR OF LOVE  ·  ADMOB PRODUCTION WIRING + UMP CONSENT
 
-**Latest commit: `c847bc6`**  ·  branch `backup_asset_integration_2026-09-02`
-·  **PUSHED to `origin`** ·  **PR #1 open**: https://github.com/tokenanalyzer/color-clash/pull/1
-(`backup_asset_integration_2026-09-02` → `main`), not yet merged.
+**Latest commit: `5674a73`** (native AdMob backend already committed +
+device-verified with a real rewarded test ad on the previous session) ·
+branch `backup_asset_integration_2026-09-02`, **6 commits ahead of
+`origin`**, not pushed. This file (`docs/RESUME.md`) had gone stale across
+those 6 commits (`8ab2ec4` VRAM/arm64-only preset, `d859c53`/`ea80b30`/
+`0a4e659`/`5674a73` AdMob) — it was last updated at `025dc69`. See
+`docs/MONETIZATION.md` for the authoritative, actively-maintained ads doc
+instead of duplicating it here.
+
+## CHECKPOINT — 2026-09-11 (pass 2) · UMP CONSENT INTEGRATION (UNCOMMITTED)
+
+Built on top of the production-IDs checkpoint below in the same session.
+Google's User Messaging Platform (UMP) SDK is now wired for EEA/UK/
+Switzerland consent, following the official UMP Android quick-start
+(`com.google.android.ump:user-messaging-platform:4.0.0`, verified current
+via live fetches of developers.google.com/admob/ump on 2026-09-11).
+
+**`game/android_plugin/admob/src/.../ColorClashAdMob.kt`:** `initialize()`
+now runs `requestConsentInfoUpdate()` → `loadAndShowConsentFormIfRequired()`
+→ `MobileAds.initialize()` (only once `canRequestAds()` is true) on every
+launch, BEFORE any ad request — matches Google's own sample pattern
+(fast-path check + form-gated check, `mobileAdsInitializeCalled` guard
+against a double `MobileAds.initialize()`). New `@UsedByGodot` methods:
+`canRequestAds()`, `isPrivacyOptionsRequired()`, `showPrivacyOptionsForm()`.
+Still ONE signal (`ad_event`) — new event names only:
+`consent_info_updated`, `consent_info_update_failed`, `consent_form_error`,
+`consent_form_dismissed`, `ads_blocked`, `privacy_options_dismissed`,
+`privacy_options_error`. No consent POLICY in the plugin — same "thin
+bridge" rule as the rest of it.
+
+**Gradle:** new `com.google.android.ump:user-messaging-platform:4.0.0`
+dependency, added via a NEW separate idempotent patch
+(`patches/build_gradle_ump.patch`, applied by `install.sh` step 4) rather
+than editing the already-applied `build.gradle.patch` — keeps the two
+AdMob-core vs. UMP changes independently re-appliable onto a fresh
+template. Verified: reverse-applied both patches from the live
+`android/build/build.gradle` back to a pristine file, then re-applied both
+in sequence and diffed — byte-identical. Applied directly to the current
+(gitignored, regenerable) `game/android/build/build.gradle` +
+`.../ColorClashAdMob.kt` too, so today's exports pick it up without
+regenerating the template.
+
+**`scripts/services/ads_service.gd`:** additive only, nothing existing
+changed — `can_request_ads()`, `consent_status()`,
+`privacy_options_required()`, `show_privacy_options()`, `consent_updated`
+signal. The consent gate needed NO new gating logic anywhere:
+`_native_initialized` (already the one thing every rewarded/interstitial
+call site checks) only ever flips true post-consent now, since the native
+`initialized` event itself only fires post-consent. `_ads_allowed` mirrors
+it 1:1 for the public API's sake.
+
+**`scripts/ui/settings_panel.gd`:** new "Privacy Choices" row in the
+existing links section, visible only when `Ads.privacy_options_required()`
+(re-checked every `open()`, not just at construction — consent can settle
+after the panel is built). No new art asset; procedural secondary-button
+style, real behaviour (calls `Ads.show_privacy_options()`), unlike the
+other 3 link rows which are still "coming at launch" placeholders.
+
+**Tests:** `tests/test_ads_service.gd` — extended `_NativeStub` with
+`canRequestAds`/`isPrivacyOptionsRequired`/`showPrivacyOptionsForm`; 8 new
+test functions (consent not-required / required-then-granted /
+required-but-denied, `can_request_ads()` gating a rewarded show, privacy
+options availability + entry point, safe no-op with no backend, withdrawal
+via privacy options blocks ads again, full consent→rewarded→interstitial
+flow through the new gate). All synthetic `debug_feed_native_event` calls —
+zero live consent UI, zero network, deterministic. `test_runner`
+**3747/3747 pass** (was 3715 before this pass's 32 new checks — 8 functions
+× ~4 checks each). **9/9 smokes pass** (2 of them print a
+`SCRIPT ERROR: Compile Error: Failed to compile depended scripts` /
+`Identifier not found: GameData` warning before their PASSED line — verified
+this reproduces byte-identically with every file this pass touched
+stashed back to the pre-pass state, so it's a pre-existing headless-runner
+flake unrelated to this work, not a regression).
+
+**Verified end-to-end:** ran a real `--export-debug "Android"` (full Gradle
+build); it succeeded, and the resulting APK's `classes3.dex` was confirmed
+(via a byte-search script, since `strings` isn't available in this
+git-bash) to contain `ConsentInformation` / `UserMessagingPlatform` /
+`ConsentRequestParameters` / `colorclash/admob` — the UMP SDK genuinely
+compiled and linked in, not just a source-level change. Also checked the
+Gradle-merged `AndroidManifest.xml` — `INTERNET` + `ACCESS_NETWORK_STATE`
+present (UMP needs network), App ID + plugin meta-data both present, no
+manifest changes needed for UMP itself (it self-merges via its AAR, no
+extra entries this project needs to declare). Deleted the verify APK
+afterward (gitignored `build/` anyway).
+
+**NOT done this pass (by design):**
+- The actual GDPR/UK/US consent **message** is NOT yet configured in the
+  AdMob console (Privacy & messaging) — code is ready but has nothing to
+  show an EEA/UK/CH user until that's published. Needs the AdMob account
+  owner; not something committable to the repo. See
+  `docs/MONETIZATION.md`'s "Consent (UMP)" section, last paragraph.
+- Release keystore — explicitly told not to touch it this pass.
+- Committing/pushing — none of this pass's changes are committed.
+
+**Docs updated:** `docs/MONETIZATION.md` (new "Consent (UMP)" section +
+updated Tests/outstanding-items sections), `docs/PRIVACY_POLICY.md` ("Your
+choices" + advertising section now describe the UMP flow, dated
+2026-09-11), `game/android_plugin/admob/README.md` (dependency list, new
+Plugin API rows, new patch file in the directory tree).
+
+## CHECKPOINT — 2026-09-11 · PRODUCTION ADMOB IDS WIRED (UNCOMMITTED)
+
+Production AdMob app + ad units were created:
+App ID `ca-app-pub-9900197126922435~4709930379`, Rewarded
+`ca-app-pub-9900197126922435/9777941726`, Interstitial
+`ca-app-pub-9900197126922435/9191618364`.
+
+**`game/data/ads.json`:** `prod` fields filled for `app_id` / `rewarded` /
+`interstitial` (banner has no placement, left empty); `use_test_ads` flipped
+`true → false`.
+
+**`game/scripts/services/ads_service.gd` `_ready()`:** `_test` is now
+`bool(config.use_test_ads) or OS.is_debug_build()` — a debug build (editor,
+`--headless` tests, debug APK export) **always** forces test ads regardless
+of the config flag; only a real non-debug release export honours
+`use_test_ads=false` and serves the prod ids. This is the one behavior
+change; everything else (placements, interstitial gating rules, native
+plugin glue, reward-once guarantees) is untouched.
+
+**Verified:** `test_runner` still **3715/3715 pass**, all **9/9 smokes**
+pass. Exported a real debug APK (`--export-debug "Android"`) and inspected
+the packed `assets/data/ads.json` inside it — confirms `use_test_ads:false`
++ correct prod ids reach the build; deleted the verify APK after (gitignored
+`build/` anyway). Did NOT attempt a signed release AAB export — no upload
+keystore exists yet (`docs/ANDROID_RELEASE.md` — unrelated to ads, blocks
+any real release regardless) and creating one is a user decision (permanent
+signing key, needs safe backup).
+
+**docs/MONETIZATION.md updated** with the new test/prod selection rule, the
+real prod ids, and a new "Worldwide release — outstanding" section.
+
+**Outstanding before a worldwide Play Store release** (none of this exists
+in the repo yet — checked, no UMP/consent code/plugin/docs found):
+1. **UMP / consent SDK** for EEA/UK/Switzerland — Google requires this
+   before requesting ads there; not started. Needs: `user-messaging-platform`
+   Play services dep, a native consent-request/show call (in
+   `ColorClashAdMob` or a sibling plugin) gating the first
+   `MobileAds.initialize()`, and headless-testable policy in `AdsService`.
+2. Release upload keystore (`docs/ANDROID_RELEASE.md`) — not created.
+3. Play Console: link the AdMob app, declare `AD_ID`/advertising data in
+   the Data Safety section, before submitting for review.
+4. `docs/ANDROID_RELEASE.md` itself has drifted (still says arm64 +
+   armeabi-v7a / VIBRATE-only permissions; `export_presets.cfg` `preset.1`
+   is actually arm64-only with INTERNET + ACCESS_NETWORK_STATE + VIBRATE
+   now, per `8ab2ec4` and the AdMob commits) — not fixed this session, out
+   of scope for the ads task, flagging for next pass.
+
+**Not done this session (by design — not asked for):** UMP/consent
+implementation itself, keystore creation, committing/pushing.
 
 ## CHECKPOINT — 2026-09-08 (pass 4) · STARTUP-DELAY FIX (no white/logo screen) (UNCOMMITTED)
 

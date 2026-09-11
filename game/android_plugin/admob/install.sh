@@ -37,4 +37,14 @@ else
     echo "  + build.gradle dependency + resValue"
 fi
 
+# 4. build.gradle: user-messaging-platform (UMP consent SDK) dependency —
+#    separate idempotent patch so re-running this script never touches the
+#    already-applied AdMob patch above.
+if grep -q "user-messaging-platform" "$BUILD/build.gradle"; then
+    echo "  = build.gradle already has the UMP dependency"
+else
+    ( cd "$BUILD" && patch -p0 < "$HERE/patches/build_gradle_ump.patch" )
+    echo "  + build.gradle UMP (consent) dependency"
+fi
+
 echo "done. AdMob App ID: \$ADMOB_APP_ID or Google's test id by default."
